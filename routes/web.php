@@ -35,6 +35,8 @@ Route::middleware(['auth:sanctum', 'role:client'])->group(function () {
 Route::middleware(['auth:sanctum', 'role:driver'])->group(function () {
     Route::get('/driver/orders/{id}/location', [OrderController::class, 'getOrderLocation']);
 });
-
+Route::get('/{any}', function () {
+    return view('welcome'); // или app.blade.php, если используешь отдельный layout
+})->where('any', '.*');
 
 
