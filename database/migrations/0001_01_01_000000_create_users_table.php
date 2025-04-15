@@ -22,6 +22,10 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+            $table->boolean('is_available')->nullable()->default(null); // только для водителей
+            $table->decimal('lat', 10, 7)->nullable(); // координаты
+            $table->decimal('lng', 10, 7)->nullable();
+
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
