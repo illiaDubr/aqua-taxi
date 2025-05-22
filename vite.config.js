@@ -9,14 +9,13 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
-    root: 'resources/js', // путь к твоему JS (если у тебя так)
-    publicDir: 'public/vite-public', // если нужен (можно удалить)
     build: {
         manifest: true,
         outDir: path.resolve(__dirname, 'public/build'),
-        rollupOptions: {
-            input: 'resources/js/app.js',
-        },
         emptyOutDir: true,
+        rollupOptions: {
+            input: path.resolve(__dirname, 'resources/js/app.js'),
+        },
     },
+    publicDir: false, // отключаем, чтобы не мешал (vite жаловался)
 });
