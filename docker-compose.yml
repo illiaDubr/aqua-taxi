@@ -1,10 +1,49 @@
 version: '3.8'
 
 services:
-    frontend:
+    app:
         build:
             context: .
             dockerfile: Dockerfile
-        container_name: aqua-frontend
+        container_name: aqua-app
+        volumes:
+            - .:/var/www
+        depends_on:
+            - mysql
+        networks:
+            - aqua
+
+    nginx:
+        image: nginx:alpine
+        container_name: aqua-nginx
         ports:
             - "80:80"
+        volumes:
+            - .:/var/www
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+        depends_on:
+            - app
+        networks:
+            - aqua
+
+    mysql:
+        image: mysql:8.0
+        container_name: aqua-mysql
+        restart: always
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_DATABASE: aqua
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_USER: aqua
+            MYSQL_PASSWORD: aqua
+        volumes:
+            - mysql-data:/var/lib/mysql
+        networks:
+            - aqua
+
+volumes:
+    mysql-data:
+
+networks:
+    aqua:
