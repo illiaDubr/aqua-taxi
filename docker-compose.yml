@@ -28,13 +28,11 @@ services:
 
     mysql:
         image: mysql:8.0
-        container_name: aqua-mysql
-        restart: unless-stopped
         environment:
-            MYSQL_ROOT_PASSWORD=root
-            MYSQL_DATABASE=aqua
-            MYSQL_USER=user
-            MYSQL_PASSWORD=secret
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: aqua
+            MYSQL_USER: aqua_user
+            MYSQL_PASSWORD: secret
         ports:
             - "3306:3306"
         volumes:
