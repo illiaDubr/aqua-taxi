@@ -26,8 +26,7 @@ COPY --from=frontend-builder /app/public/build /var/www/public/build
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader \
-    && php artisan config:clear \
-    && php artisan route:clear \
-    && php artisan view:clear
 
-CMD ["php-fpm"]
+RUN chown -R www-data:www-data /var/www
+
+EXPOSE 9000
