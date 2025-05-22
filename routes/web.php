@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/{any}', function () {
+    return view('app'); // или welcome, если используешь welcome.blade.php
+})->where('any', '.*');
 Route::post('/auth/request-code', [AuthController::class, 'requestCode']);
 Route::post('/auth/verify-code', [AuthController::class, 'verifyCode']);
 Route::middleware(['auth:sanctum', 'role:driver'])->group(function () {

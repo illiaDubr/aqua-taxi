@@ -8,8 +8,8 @@
         </div>
 
         <div class="welcome__buttons">
-            <button class="welcome__btn">Замовити доставку води</button>
-            <button class="welcome__btn outline">Стати водієм Aqua Taxi</button>
+            <button class="welcome__btn" @click="goToAuthUser">Замовити доставку води</button>
+            <button class="welcome__btn" @click="goToAuthDriver">Стати водієм Aqua Taxi</button>
         </div>
     </div>
 </template>
@@ -29,6 +29,14 @@ const selectRole = (role) => {
         router.push('/driver');
     }
 };
+    const goToAuthUser = () => {
+    router.push({ name: 'authUser' });
+};
+    const goToAuthDriver = () => {
+    router.push({ name: 'authdriver' });
+};
+
+
 </script>
 
 <style>
@@ -39,13 +47,15 @@ body {
     font-family: 'Montserrat', sans-serif;
 }
 .welcome {
-
+ height: 100vh;
     display: flex;
+    justify-content: space-around;
+    padding-bottom: 150px;
+    padding-top: 150px;
     flex-direction: column;
     background-color: #ffffff;
     font-family: 'Montserrat', sans-serif;
     box-sizing: border-box;
-    padding: 0;
     overflow: hidden;
 }
 
@@ -83,6 +93,7 @@ body {
 }
 
 .welcome__buttons {
+    margin: 0 auto;
     width: 296px;
     padding: 0 24px 32px;
     display: flex;
@@ -99,16 +110,18 @@ body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    border: none;
-    background-color: #3498db;
-    color: white;
+    background-color: white;
+    color: #3498db;
+    border: 2px solid #3498db;
 }
 
-.welcome__btn.outline {
-    background-color: white;
+.welcome__btn:hover {
+    background-color: #3498db;
+    color: white;
     border: 2px solid #3498db;
-    color: #3498db;
 }
+
+
 
 
 
