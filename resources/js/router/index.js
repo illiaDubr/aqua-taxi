@@ -26,7 +26,7 @@ const routes = [
     },
     {
         path: '/auth-admin',
-        name: 'authUser',
+        name: 'authAdmin',
         component: () => import('../views/AuthAdmin.vue'),
     },
     {

@@ -19,7 +19,7 @@ services:
             - .:/var/www/html
         environment:
             APP_ENV: production
-            APP_KEY: base64:replace_me_with_real_key
+            APP_KEY: base64:REPLACE_ME_WITH_REAL_KEY
         depends_on:
             - mysql
 
