@@ -10,8 +10,13 @@ export default defineConfig({
         }),
         vue(),
     ],
+    build: {
+        outDir: 'public/build',
+        emptyOutDir: true,
+    },
     server: {
         host: true,
         strictPort: true
     }
 });
+
