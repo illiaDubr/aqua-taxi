@@ -1,11 +1,9 @@
-# ===== СТЕЙДЖ 1: frontend =====
+# ===== СТЕЙДЖ 1: FRONTEND =====
 FROM node:18 AS frontend
 
 WORKDIR /app
-
 COPY package*.json vite.config.js ./
 COPY resources ./resources
-
 RUN npm install
 RUN npm run build
 
@@ -19,10 +17,9 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
-
 COPY . .
 
-# ✅ Копируем build и manifest.json из frontend стейджа
+# 👇 копируем сборку фронтенда
 COPY --from=frontend /app/public/build ./public/build
 COPY --from=frontend /app/public/manifest.json ./public/manifest.json
 
