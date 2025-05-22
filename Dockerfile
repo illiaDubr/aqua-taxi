@@ -21,7 +21,6 @@ COPY . .
 
 # 👇 копируем сборку фронтенда
 COPY --from=frontend /app/public/build ./public/build
-COPY --from=frontend /app/public/build/manifest.json ./public/build/manifest.json
 
 
 RUN composer install --no-dev --optimize-autoloader
