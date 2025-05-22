@@ -1,7 +1,7 @@
 <template>
     <div class="order">
         <div class="order__header">
-            <img src="@/assets/city.png" alt="background" class="order__bg" />
+            <img :src="city" alt="background" class="order__bg" />
         </div>
 
         <div class="order__tabs">
@@ -32,6 +32,7 @@
 <script setup>
 import { ref } from 'vue';
 import water1 from '@/assets/1.png';
+import city from '@/assets/city.png';
 import water2 from '@/assets/2.png';
 import { useRouter } from 'vue-router';
 const router = useRouter();

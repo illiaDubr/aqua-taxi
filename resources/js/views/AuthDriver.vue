@@ -2,7 +2,7 @@
     <div class="auth">
         <div class="auth__bg"></div>
         <div class="auth__top">
-            <img src="@/assets/logo2.png" alt="logo" class="auth__logo" />
+            <img :src="logo" alt="logo" class="auth__logo" />
         </div>
 
         <div class="auth__card">
@@ -60,7 +60,7 @@
 
 <script setup>
 import { ref } from 'vue';
-
+import logo from '@/assets/logo2.png'
 const activeTab = ref('register');
 const email = ref('');
 const phone = ref('');

@@ -1,6 +1,6 @@
 <template>
     <div class="welcome">
-        <img src="@/assets/illustration.png" alt="Welcome" class="welcome__img" />
+        <img :src="illustrarion" alt="Welcome" class="welcome__img" />
 
         <div class="welcome__content">
             <h1 class="welcome__title">Вітаю! Радий бачити Вас!</h1>
@@ -17,7 +17,7 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
-
+import illustrarion from '@/assets/illustration.png'
 const router = useRouter();
 const auth = useAuthStore();
 

@@ -2,7 +2,7 @@
     <div class="auth">
         <div class="auth__bg"></div>
         <div class="auth__top">
-            <img src="@/assets/logo2.png" alt="logo" class="auth__logo" />
+            <img :src="logo" alt="logo" class="auth__logo" />
         </div>
 
         <div class="auth__card">
@@ -63,6 +63,7 @@
 
 
 <script setup>
+import logo from '@/assets/logo2.png'
 import { ref } from 'vue';
 
 const activeTab = ref('register');
