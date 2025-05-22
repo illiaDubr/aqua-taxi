@@ -22,7 +22,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-COPY --from=frontend-builder /app/public/dist /var/www/public/build
+COPY --from=frontend-builder /app/public/build /var/www/public/build
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader \
