@@ -26,7 +26,6 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Копируем проект и билд
 COPY . .
 COPY --from=node /app/public/build ./public/build
-COPY --from=node /app/.vite ./public/.vite
 
 # Установка зависимостей Laravel
 RUN composer install --optimize-autoloader --no-dev \
