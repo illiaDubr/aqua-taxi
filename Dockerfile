@@ -25,8 +25,7 @@ WORKDIR /var/www
 COPY --from=frontend-builder /app/public/build /var/www/public/build
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader \
-
-RUN chown -R www-data:www-data /var/www
+RUN composer install --no-dev --optimize-autoloader && \
+    chown -R www-data:www-data /var/www
 
 EXPOSE 9000
