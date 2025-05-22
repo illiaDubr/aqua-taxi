@@ -2,10 +2,9 @@
 FROM node:18 AS frontend
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
+COPY package*.json vite.config.js ./
+COPY resources ./resources
+RUN npm install && npm run build
 
 # ===== СТЕЙДЖ 2: PHP =====
 FROM php:8.2-fpm
@@ -17,9 +16,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
+
 COPY . .
 
-# 👇 Копируем собранный фронт из предыдущего стейджа
+# 👇 Копируем только билд, а не весь проект
 COPY --from=frontend /app/public/build ./public/build
 
 RUN composer install --no-dev --optimize-autoloader
