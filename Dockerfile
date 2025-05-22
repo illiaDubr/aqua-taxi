@@ -1,11 +1,10 @@
-# ===== СТЕЙДЖ 1: FRONTEND =====
-FROM node:18 AS frontend
+# ===== СТЕЙДЖ 1: frontend =====
+FROM node:18 as frontend
 
 WORKDIR /app
 COPY package*.json vite.config.js ./
 COPY resources ./resources
-RUN npm install
-RUN npm run build
+RUN npm install && npm run build
 
 # ===== СТЕЙДЖ 2: PHP =====
 FROM php:8.2-fpm
@@ -19,10 +18,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 
-# 👇 копируем сборку фронтенда
-COPY --from=frontend /app/public/build ./public/build
+# 👇 билд фронта из предыдущего стейджа
+COPY --from=frontend /app/public ./public
 
-
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --optimize-autoloader --no-dev
 
 CMD ["php-fpm"]
