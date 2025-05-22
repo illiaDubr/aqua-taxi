@@ -14,5 +14,6 @@ export default defineConfig({
         outDir: 'public/build',
         emptyOutDir: true,
         manifest: true,
+        manifestDir: '.', // 👈 чтобы manifest.json был в public/build/
     },
 })

@@ -20,7 +20,6 @@ COPY . .
 
 # 👇 билд фронта из предыдущего стейджа
 COPY --from=frontend /app/public/build ./public/build
-COPY --from=frontend /app/public/build/.vite/manifest.json ./public/build/manifest.json
 
 
 RUN composer install --no-dev --optimize-autoloader
