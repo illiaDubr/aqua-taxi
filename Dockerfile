@@ -1,32 +1,30 @@
-# STAGE 1 — Node для сборки фронта
-FROM node:18 as frontend
+# СТЕЙДЖ 1: Сборка фронтенда
+FROM node:18 AS frontend
 
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npm run build
 
-# STAGE 2 — PHP
+# СТЕЙДЖ 2: PHP + Composer + готовый фронт
 FROM php:8.2-fpm
 
-# Установка зависимостей PHP
 RUN apt-get update && apt-get install -y \
     git unzip zip curl libzip-dev libpng-dev libonig-dev libxml2-dev \
     && docker-php-ext-install pdo_mysql mbstring zip bcmath
 
-# Установка Composer
+# Установка composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Копируем проект
 WORKDIR /var/www/html
 COPY . .
 
-# Копируем собранные ассеты из Node stage
+# Копируем собранный фронт
 COPY --from=frontend /app/public/build ./public/build
 
-# Устанавливаем зависимости PHP
+# Установка PHP зависимостей
 RUN composer install --no-dev --optimize-autoloader
 
 CMD ["php-fpm"]
