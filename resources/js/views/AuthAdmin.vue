@@ -50,7 +50,7 @@ body {
     padding: 0;
 }
 .auth {
-    osition: relative;
+    position: relative;
     min-height: 100vh;
     background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%);
     display: flex;
