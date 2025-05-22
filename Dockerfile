@@ -1,19 +1,15 @@
-# Сборка фронтенда (vite build)
-FROM node:18 as node
+# STAGE 1 — Node для сборки фронта
+FROM node:18 as frontend
 
 WORKDIR /app
 
 COPY package*.json ./
 RUN npm install
-
 COPY . .
 RUN npm run build
 
-
-# PHP контейнер с Composer
+# STAGE 2 — PHP
 FROM php:8.2-fpm
-
-WORKDIR /var/www/html
 
 # Установка зависимостей PHP
 RUN apt-get update && apt-get install -y \
@@ -23,14 +19,14 @@ RUN apt-get update && apt-get install -y \
 # Установка Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Копируем проект и билд
+# Копируем проект
+WORKDIR /var/www/html
 COPY . .
-COPY --from=node /app/public/build ./public/build
 
-# Установка зависимостей Laravel
-RUN composer install --optimize-autoloader --no-dev \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+# Копируем собранные ассеты из Node stage
+COPY --from=frontend /app/public/build ./public/build
+
+# Устанавливаем зависимости PHP
+RUN composer install --no-dev --optimize-autoloader
 
 CMD ["php-fpm"]
