@@ -9,6 +9,7 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
+    base: '/build/',
     build: {
         manifest: true,
         outDir: path.resolve(__dirname, 'public/build'),
