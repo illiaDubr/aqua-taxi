@@ -1,17 +1,4 @@
 services:
-    php:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: aqua-php
-        volumes:
-            - .:/var/www/html
-        environment:
-            APP_ENV: production
-            APP_KEY: ${APP_KEY}
-        depends_on:
-            - mysql
-
     nginx:
         image: nginx:stable-alpine
         container_name: aqua-nginx
@@ -23,15 +10,29 @@ services:
         depends_on:
             - php
 
+    php:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: aqua-php
+        volumes:
+            - .:/var/www/html
+        environment:
+            APP_ENV: production
+            APP_KEY: base64:replace_me_with_your_key
+        depends_on:
+            - mysql
+
     mysql:
         image: mysql:8.0
+        container_name: aqua-taxi-mysql-1
+        ports:
+            - "3306:3306"
         environment:
             MYSQL_ROOT_PASSWORD: root
             MYSQL_DATABASE: aqua
             MYSQL_USER: aqua_user
             MYSQL_PASSWORD: secret
-        ports:
-            - "3306:3306"
         volumes:
             - mysql_data:/var/lib/mysql
 
