@@ -1,13 +1,17 @@
-build:
-    context: .
-    dockerfile: Dockerfile
-    container_name: aqua-app
-    volumes:
-        - .:/var/www
-    depends_on:
-        - mysql
-    networks:
-        - aqua
+version: '3.8'
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: aqua-app
+        volumes:
+            - .:/var/www
+        depends_on:
+            - mysql
+        networks:
+            - aqua
 
     nginx:
         image: nginx:alpine
@@ -37,6 +41,18 @@ build:
             MYSQL_PASSWORD: aqua
         volumes:
             - mysql-data:/var/lib/mysql
+
+
+
+
+
+
+
+
+
+
+
+
         networks:
             - aqua
 
