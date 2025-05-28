@@ -9,14 +9,8 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
-    base: '/build/',
-    build: {
-        manifest: true,
-        outDir: path.resolve(__dirname, 'public/build'),
-        emptyOutDir: true,
-        rollupOptions: {
-            input: path.resolve(__dirname, 'resources/js/app.js'),
-        },
-    },
-    publicDir: false, // отключаем, чтобы не мешал (vite жаловался)
+    server: {
+        host: true,
+        port: 5173,
+    }
 });

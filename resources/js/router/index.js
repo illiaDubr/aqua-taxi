@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 import AuthUser from '../views/AuthUser.vue';
 import OrderForm from '../views/OrderForm.vue';
+import OrderTabs from '../views/OrderTabs.vue';
 
 const routes = [
     {
@@ -49,6 +50,17 @@ const routes = [
         name: 'certificateReview',
         component: () => import('../views/CertificateReview.vue')
     },
+    {
+        path: '/ordersDrive',
+        name: 'OrdersDrive',
+        component: OrderTabs,
+    },
+    {
+        path: '/map',
+        name: 'MapView',
+        component: () => import('../views/MapView.vue')
+    }
+
 ];
 
 const router = createRouter({
