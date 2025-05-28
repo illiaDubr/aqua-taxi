@@ -7,44 +7,17 @@
 
         <div class="auth__card">
             <div class="auth__tabs">
-        <span
-            :class="{ active: activeTab === 'register' }"
-            @click="activeTab = 'register'"
-        >Реєстрація</span>
-                <span
-                    :class="{ active: activeTab === 'login' }"
-                    @click="activeTab = 'login'"
-                >Вхід</span>
+                <span :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">Реєстрація</span>
+                <span :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">Вхід</span>
             </div>
 
             <transition name="fade" mode="out-in">
                 <form @submit.prevent="submitForm" class="auth__form" :key="activeTab">
-                    <input
-                        type="email"
-                        placeholder="Ваша пошта*"
-                        v-model="email"
-                        required
-                    />
+                    <input type="email" placeholder="Ваша пошта*" v-model="email" required />
+                    <input v-if="activeTab === 'register'" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
+                    <input type="password" :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'" v-model="password" required />
 
-                    <input
-                        v-if="activeTab === 'register'"
-                        type="tel"
-                        placeholder="Ваш номер телефону*"
-                        v-model="phone"
-                        required
-                    />
-
-                    <input
-                        type="password"
-                        :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
-                        v-model="password"
-                        required
-                    />
-
-                    <label
-                        v-if="activeTab === 'register'"
-                        class="auth__checkbox"
-                    >
+                    <label v-if="activeTab === 'register'" class="auth__checkbox">
                         <input type="checkbox" v-model="agree" />
                         <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
                     </label>
@@ -60,7 +33,11 @@
 
 <script setup>
 import { ref } from 'vue';
-import logo from '@/assets/logo2.png'
+import { useRouter } from 'vue-router';
+import logo from '@/assets/logo2.png';
+
+const router = useRouter();
+
 const activeTab = ref('register');
 const email = ref('');
 const phone = ref('');
@@ -78,6 +55,8 @@ const submitForm = () => {
         password: password.value,
         ...(activeTab.value === 'register' && { phone: phone.value, agree: agree.value }),
     });
+
+    router.push('/ordersDrive');
 };
 </script>
 
@@ -99,7 +78,7 @@ body {
 }
 .auth__bg {
     position: absolute;
-    top: 180px; /* регулируй чтобы опустить фон ниже */
+    top: 180px;
     left: 0;
     width: 100%;
     height: 200px;
@@ -113,19 +92,16 @@ body {
     position: relative;
     z-index: 1;
 }
-
 .auth__top {
     padding-top: 0px;
     margin-bottom: 50px;
 }
-
 .auth__logo {
     width: 96px;
     height: 96px;
     border-radius: 24px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
-
 .auth__card {
     width: 100%;
     max-width: 360px;
@@ -137,14 +113,11 @@ body {
     flex-direction: column;
     gap: 16px;
 }
-
 .auth__tabs {
-
     display: flex;
     justify-content: space-around;
     margin-bottom: 48px;
 }
-
 .auth__tabs span {
     font-size: 18px;
     font-weight: 600;
@@ -153,20 +126,17 @@ body {
     padding-bottom: 4px;
     transition: all 0.2s ease;
 }
-
 .auth__tabs .active {
     font-size: 24px;
     color: #3498db;
     border-bottom: 2px solid #3498db;
 }
-
 .auth__form {
     display: flex;
     flex-direction: column;
     gap: 16px;
     transition: all 0.2s ease;
 }
-
 .auth__form input {
     padding: 14px;
     font-size: 15px;
@@ -174,7 +144,6 @@ body {
     border-radius: 12px;
     outline: none;
 }
-
 .auth__checkbox {
     display: flex;
     align-items: flex-start;
@@ -182,18 +151,15 @@ body {
     color: #7f8c8d;
     gap: 8px;
 }
-
 .auth__checkbox input {
     width: 16px;
     height: 16px;
     margin-top: 2px;
 }
-
 .auth__checkbox a {
     color: #3498db;
     text-decoration: underline;
 }
-
 .auth__submit {
     padding: 14px;
     font-size: 15px;
@@ -204,12 +170,12 @@ body {
     border-radius: 12px;
     cursor: pointer;
 }
-
-/* Анимация */
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
     transition: opacity 0.25s ease;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
     opacity: 0;
 }
 </style>
