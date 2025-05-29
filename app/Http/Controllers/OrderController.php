@@ -1,119 +1,62 @@
 <?php
-use App\Models\Order;
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Order;
+use Illuminate\Support\Facades\Auth;
+use App\Events\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
-    public function create(Request $request)
+    public function store(Request $request)
     {
-        $request->validate([
-            'type' => 'required|in:silver,deep_clean',
-            'bottles_count' => 'required|integer|min:1',
-            'address' => 'nullable|string',
-            'lat' => 'nullable|numeric',
-            'lng' => 'nullable|numeric',
-            'scheduled_at' => 'nullable|date',
+        $validated = $request->validate([
+            'address' => 'required|string',
+            'quantity' => 'required|integer|min:1',
+            'bottle_option' => 'required|in:own,buy',
+            'delivery_time_type' => 'required|in:now,custom',
+            'custom_time' => 'nullable|date',
+            'payment_method' => 'required|in:cash,card',
+            'total_price' => 'required|numeric',
         ]);
 
         $order = Order::create([
-            'user_id' => $request->user()->id,
-            'type' => $request->type,
-            'bottles_count' => $request->bottles_count,
-            'address' => $request->address,
-            'lat' => $request->lat,
-            'lng' => $request->lng,
-            'scheduled_at' => $request->scheduled_at,
+            ...$validated,
+            'user_id' => Auth::id(),
         ]);
 
-        return response()->json(['message' => 'Order created', 'order' => $order]);
+        event(new OrderStatusUpdated($order));
+
+        return response()->json($order, 201);
     }
-
-    public function active(Request $request)
+    public function activeOrders(Request $request)
     {
-        $order = $request->user()->orders()
-            ->whereNotIn('status', ['delivered', 'cancelled'])
-            ->latest()
-            ->first();
+        $user = $request->user();
 
-        return response()->json(['order' => $order]);
-    }
-    public function availableOrders(Request $request)
-    {
-        $orders = Order::where('status', 'pending')
-            ->whereNull('driver_id')
-            ->orderBy('scheduled_at')
-            ->get();
-
-        return response()->json(['orders' => $orders]);
-    }
-
-    public function acceptOrder(Request $request, $id)
-    {
-        $order = Order::where('id', $id)
-            ->where('status', 'pending')
-            ->whereNull('driver_id')
-            ->first();
-
-        if (!$order) {
-            return response()->json(['message' => 'Order not available'], 404);
-        }
-
-        $order->update([
-            'driver_id' => $request->user()->id,
-            'status' => 'accepted',
-        ]);
-
-        return response()->json(['message' => 'Order accepted', 'order' => $order]);
-    }
-
-    public function completeOrder(Request $request, $id)
-    {
-        $order = Order::where('id', $id)
-            ->where('driver_id', $request->user()->id)
-            ->where('status', 'accepted')
-            ->first();
-
-        if (!$order) {
-            return response()->json(['message' => 'Order not found or not active'], 404);
-        }
-
-        $order->update([
-            'status' => 'delivered',
-        ]);
-
-        return response()->json(['message' => 'Order completed']);
-    }
-    public function clientHistory(Request $request)
-    {
-        $orders = $request->user()->orders()
-            ->whereIn('status', ['delivered', 'cancelled'])
+        $orders = Order::where('user_id', $user->id)
+            ->whereIn('status', ['new', 'in_progress'])
             ->orderByDesc('created_at')
             ->get();
 
-        return response()->json(['orders' => $orders]);
+        return response()->json($orders);
     }
-    public function driverHistory(Request $request)
+    public function complete(Request $request, Order $order)
     {
-        $orders = Order::where('driver_id', $request->user()->id)
-            ->whereIn('status', ['delivered', 'cancelled'])
-            ->orderByDesc('created_at')
-            ->get();
-
-        return response()->json(['orders' => $orders]);
-    }
-    public function getDriverLocation(Request $request, $orderId)
-    {
-        $order = Order::where('id', $orderId)
-            ->where('user_id', $request->user()->id)
-            ->whereNotNull('driver_id')
-            ->firstOrFail();
-
-        $driver = $order->driver;
-
-        return response()->json([
-            'lat' => $driver->lat,
-            'lng' => $driver->lng,
+        $request->validate([
+            'rating' => 'required|integer|min:1|max:5'
         ]);
+
+        $order->update([
+            'status' => 'completed',
+            'rating' => $request->rating,
+        ]);
+
+        event(new \App\Events\OrderStatusUpdated($order));
+
+        return response()->json(['message' => 'Order completed'], 200);
     }
+
 
 }

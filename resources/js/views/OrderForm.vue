@@ -1,29 +1,58 @@
 <script setup>
+import { ref, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-import { ref } from 'vue';
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
 const route = useRoute();
+const router = useRouter();
 
-const productName = decodeURIComponent(route.params.productId || ''); // example: 'Срібна вода, 19л'
-
+const productName = decodeURIComponent(route.params.productId || '');
 const pricePerBottle = 120;
+
+const address = ref('');
+const quantity = ref('');
+const bottleOption = ref('own');
+const timeOption = ref('now');
+const customTime = ref('');
+const paymentMethod = ref('cash');
 
 const totalAmount = computed(() => {
     const qty = parseInt(quantity.value, 10);
     return isNaN(qty) ? 0 : qty * pricePerBottle;
 });
-    const address = ref('');
-    const quantity = ref('');
-    const bottlesType = ref('');
-    const buyBottles = ref('');
-    const deliveryTime = ref('');
-    const paymentMethod = ref('cash');        // 'cash' | 'card'
-    const bottleOption = ref('own');          // 'own' | 'buy'
-    const timeOption = ref('now');            // 'now' | 'custom'
-    const customTime = ref('');
 
+const createOrder = async () => {
+    try {
+        const token = localStorage.getItem('user_token');
+        await axios.post('/api/orders', {
+            address: address.value,
+            quantity: Number(quantity.value),
+            bottle_option: bottleOption.value,
+            delivery_time_type: timeOption.value,
+            custom_time: customTime.value || null,
+            payment_method: paymentMethod.value,
+            total_price: totalAmount.value
+        }, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        // Переход с параметрами для всплывашки
+        router.push({
+            name: 'orders',
+            query: {
+                showPopup: true,
+                product: productName,
+                quantity: quantity.value,
+                time: timeOption.value === 'custom' ? customTime.value : 'Найближчий час'
+            }
+        });
+
+    } catch (error) {
+        alert('❌ Помилка створення замовлення');
+        console.error(error);
+    }
+};
 </script>
+
 <template>
     <div class="form">
         <div class="form__bg"></div>
@@ -99,7 +128,7 @@ const totalAmount = computed(() => {
                 <span class="form__amount">{{ totalAmount }} грн</span>
             </div>
 
-            <button class="form__submit">Створити товар</button>
+            <button class="form__submit" @click="createOrder">Створити товар</button>
         </div>
     </div>
 </template>

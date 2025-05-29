@@ -58,4 +58,20 @@ class AuthController extends Controller
             'user' => $user,
         ]);
     }
+    public function topUp(Request $request)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:1',
+        ]);
+
+        $driver = $request->user();
+
+        $driver->balance += $validated['amount'];
+        $driver->save();
+
+        return response()->json([
+            'message' => 'Баланс успішно поповнено',
+            'new_balance' => $driver->balance,
+        ]);
+    }
 }

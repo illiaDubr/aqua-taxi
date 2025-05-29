@@ -15,6 +15,8 @@
                 <form @submit.prevent="submitForm" class="auth__form" :key="activeTab">
                     <input type="email" placeholder="Ваша пошта*" v-model="email" required />
                     <input v-if="activeTab === 'register'" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
+                    <input v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
+                    <input v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
                     <input type="password" :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'" v-model="password" required />
 
                     <label v-if="activeTab === 'register'" class="auth__checkbox">
@@ -34,6 +36,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
 import logo from '@/assets/logo2.png';
 
 const router = useRouter();
@@ -42,25 +45,53 @@ const activeTab = ref('register');
 const email = ref('');
 const phone = ref('');
 const password = ref('');
+const name = ref('');
+const surname = ref('');
 const agree = ref(false);
 
-const submitForm = () => {
-    if (activeTab.value === 'register' && !agree.value) {
-        alert('Потрібно погодитись з договором оферти');
-        return;
+axios.defaults.withCredentials = true;
+
+const submitForm = async () => {
+    try {
+        await axios.get('/sanctum/csrf-cookie');
+
+        if (activeTab.value === 'register') {
+            if (!agree.value) {
+                alert('Потрібно погодитись з договором оферти');
+                return;
+            }
+
+            await axios.post('/api/driver/register', {
+                email: email.value,
+                phone: phone.value,
+                password: password.value,
+                name: name.value,
+                surname: surname.value
+            });
+
+            alert('✅ Реєстрація успішна. Увійдіть');
+            activeTab.value = 'login';
+        } else {
+            const res = await axios.post('/api/driver/login', {
+                email: email.value,
+                password: password.value,
+            });
+
+            if (res.status === 200) {
+                localStorage.setItem('driver_token', res.data.token);
+                localStorage.setItem('driver_balance', res.data.balance);
+                router.push('/ordersDrive');
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        alert('❌ Помилка при відправці даних. Перевірте введене та спробуйте ще раз.');
     }
-
-    console.log('🔐 Данные отправлены:', {
-        email: email.value,
-        password: password.value,
-        ...(activeTab.value === 'register' && { phone: phone.value, agree: agree.value }),
-    });
-
-    router.push('/ordersDrive');
 };
 </script>
 
-<style>
+
+<style scoped>
 body {
     font-family: 'Montserrat', sans-serif;
     margin: 0;

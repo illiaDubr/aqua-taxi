@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Driver extends Authenticatable {
-    use Notifiable;
+class Driver extends Authenticatable
+{
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
         'email',
@@ -19,5 +22,6 @@ class Driver extends Authenticatable {
 
     protected $hidden = [
         'password',
+        'remember_token',
     ];
 }

@@ -33,6 +33,8 @@
                         v-model="phone"
                         required
                     />
+                    <input v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
+                    <input v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
 
                     <input
                         type="password"
@@ -61,30 +63,58 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import logo from '@/assets/logo2.png'
+import axios from 'axios';
+import logo from '@/assets/logo2.png';
+
 const router = useRouter();
 
 const activeTab = ref('register');
 const email = ref('');
 const phone = ref('');
+const name = ref('');
+const surname = ref('');
 const password = ref('');
 const agree = ref(false);
 
-const submitForm = () => {
-    if (activeTab.value === 'register' && !agree.value) {
-        alert('Потрібно погодитись з договором оферти');
-        return;
+const submitForm = async () => {
+    if (activeTab.value === 'register') {
+        if (!agree.value) {
+            alert('Потрібно погодитись з договором оферти');
+            return;
+        }
+
+        try {
+            const res = await axios.post('/api/user/register', {
+                email: email.value,
+                phone: phone.value,
+                password: password.value,
+                name: name.value,
+                surname: surname.value
+            });
+
+            localStorage.setItem('user_token', res.data.token);
+            router.push('/orders');
+        } catch (error) {
+            alert('Помилка реєстрації');
+            console.error(error);
+        }
+    } else {
+        try {
+            const res = await axios.post('/api/user/login', {
+                email: email.value,
+                password: password.value
+            });
+
+            localStorage.setItem('user_token', res.data.token);
+            router.push('/orders');
+        } catch (error) {
+            alert('Невірні дані для входу');
+            console.error(error);
+        }
     }
-
-    console.log('🔐 Данные отправлены:', {
-        email: email.value,
-        password: password.value,
-        ...(activeTab.value === 'register' && { phone: phone.value, agree: agree.value }),
-    });
-
-    router.push('/orders');
 };
 </script>
+
 
 <style>
 body {

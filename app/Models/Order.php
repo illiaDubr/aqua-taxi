@@ -5,20 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
+// app/Models/Order.php
 class Order extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
+        'address',
+        'quantity',
+        'bottle_option',
+        'delivery_time_type',
+        'custom_time',
+        'payment_method',
+        'total_price',
         'user_id',
         'driver_id',
-        'type',
-        'bottles_count',
-        'address',
-        'lat',
-        'lng',
-        'status',
-        'scheduled_at',
+        'status'
     ];
 
     public function user()
@@ -28,7 +28,10 @@ class Order extends Model
 
     public function driver()
     {
-        return $this->belongsTo(User::class, 'driver_id');
+        return $this->belongsTo(Driver::class);
     }
+
+
 }
+
 
