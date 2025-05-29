@@ -41,24 +41,11 @@ services:
             MYSQL_PASSWORD: aqua
         volumes:
             - mysql-data:/var/lib/mysql
+
+
         networks:
             - aqua
-    reverb:
-        image: ghcr.io/laravel/reverb:latest
-        container_name: aqua-reverb
-        restart: unless-stopped
-        environment:
-            REVERB_APP_ID: local
-            REVERB_APP_KEY: local
-            REVERB_APP_SECRET: local
-            REVERB_HOST: 0.0.0.0
-            REVERB_PORT: 6001
-        ports:
-            - "6001:6001"
-        depends_on:
-            - app
-        networks:
-            - aqua
+
 volumes:
     mysql-data:
 
