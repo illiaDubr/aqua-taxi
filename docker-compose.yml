@@ -34,6 +34,9 @@ services:
         restart: always
         ports:
             - "3306:3306"
+        environment:
+            MYSQL_DATABASE: aqua
+            MYSQL_ROOT_PASSWORD: root
         volumes:
             - mysql-data:/var/lib/mysql
 
