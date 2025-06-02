@@ -26,14 +26,27 @@
                     <div class="order__info">
                         <h3 class="order__title">Адреса: {{ order.address }}</h3>
                         <p>Кількість: {{ order.quantity }}</p>
-                        <p>Час: {{ order.custom_time || 'Найближчий час' }}</p>
-                        <p>Статус: {{ order.status }}</p>
-                        <button v-if="order.status !== 'completed'" class="order__btn" @click="confirmOrder(order)">Підтвердити отримання</button>
+                        <p>Час: {{ order.delivery_time_type === 'custom' ? formatDate(order.custom_time) : 'Найближчий час' }}</p>
+                        <p>Статус: {{ statusText(order.status) }}</p>
+
+                        <div v-if="order.status === 'in_progress' && order.driver" class="order__driver">
+                            <p>🚚 <strong>Ваш водій:</strong></p>
+                            <p>{{ order.driver.name }} {{ order.driver.surname }}</p>
+                            <p>📞 {{ order.driver.phone }}</p>
+                        </div>
+
+
+                        <button
+                            v-if="order.status !== 'completed'"
+                            class="order__btn"
+                            @click="confirmOrder(order)"
+                        >Підтвердити отримання</button>
                     </div>
                 </div>
             </div>
             <p v-else class="order__placeholder">Немає активних замовлень</p>
         </div>
+
 
         <!-- 🌟 Модалка подтверждения -->
         <div v-if="showModal" class="modal">
@@ -130,6 +143,27 @@ const submitConfirmation = async () => {
     }
 };
 
+const formatDate = (str) => {
+    if (!str) return '';
+    const d = new Date(str);
+    return d.toLocaleString('uk-UA', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+const statusText = (status) => {
+    switch (status) {
+        case 'new': return 'Очікує підтвердження';
+        case 'in_progress': return 'В дорозі';
+        case 'completed': return 'Виконано';
+        default: return status;
+    }
+};
+
+
 onMounted(() => {
     Echo.private(`orders`)
         .listen('OrderStatusUpdated', (e) => {
@@ -139,6 +173,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
+
+.order__driver {
+    background: #f0f8ff;
+    border: 1px solid #3498db;
+    padding: 12px;
+    border-radius: 10px;
+    color: #333;
+    font-size: 14px;
+    text-align: center;
+}
+.order__driver p {
+    margin: 4px 0;
+}
+
 .modal {
     position: fixed;
     top: 0; left: 0;
@@ -274,6 +322,7 @@ onMounted(() => {
     display: flex;
     gap: 12px;
     padding: 12px;
+    margin: 16px;
     align-items: center;
 }
 .order__image {
@@ -286,7 +335,6 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
 }
 .order__btn {
     font-size: 16px;

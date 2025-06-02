@@ -17,12 +17,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot()
+    public function boot(): void
     {
         parent::boot();
 
-        Route::middleware('api')
-            ->prefix('api')
-            ->group(base_path('routes/api.php'));
+        // Обязательно для Reverb
+        Broadcast::routes();
+        require base_path('routes/channels.php');
     }
 }

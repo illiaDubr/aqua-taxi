@@ -78,6 +78,37 @@ const waterTypes = ref('');
 const agree = ref(false);
 const file = ref(null);
 
+import axios from 'axios';
+
+const handleRegister = async () => {
+    if (step.value === 1) {
+        goToStep2();
+        return;
+    }
+
+    if (!warehouse.value || !file.value || !agree.value) {
+        alert('Будь ласка, заповніть усі поля та погодьтесь з умовами.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('email', email.value);
+    formData.append('phone', phone.value);
+    formData.append('password', password.value);
+    formData.append('website', website.value);
+    formData.append('warehouse_address', warehouse.value);
+    formData.append('water_types', waterTypes.value);
+    formData.append('certificate', file.value);
+
+    try {
+        const res = await axios.post('/api/factory/register', formData);
+        alert('Реєстрація успішна!');
+        activeTab.value = 'login';
+    } catch (err) {
+        console.error(err);
+        alert('Помилка при реєстрації');
+    }
+};
 const goToStep2 = () => {
     if (!email.value || !phone.value || !password.value || !website.value || !agree.value) {
         alert('Будь ласка, заповніть усі поля та підтвердіть згоду.');
@@ -90,36 +121,32 @@ const handleFile = (e) => {
     file.value = e.target.files[0];
 };
 
-const handleRegister = () => {
-    if (step.value === 1) {
-        goToStep2();
-        return;
-    }
 
-    if (!warehouse.value || !file.value) {
-        alert('Будь ласка, заповніть адресу складу та прикріпіть сертифікат.');
-        return;
-    }
-
-    console.log('✅ Зареєстровано:', {
-        email: email.value,
-        phone: phone.value,
-        password: password.value,
-        website: website.value,
-        warehouse: warehouse.value,
-        waterTypes: waterTypes.value,
-        file: file.value,
-    });
-};
-
-const handleLogin = () => {
+const handleLogin = async () => {
     if (!email.value || !password.value) {
         alert('Введіть пошту та пароль');
         return;
     }
 
-    console.log('🔐 Вхід:', { email: email.value, password: password.value });
+    try {
+        const res = await axios.post('/api/factory/login', {
+            email: email.value,
+            password: password.value
+        });
+
+        const token = res.data.token;
+        localStorage.setItem('token', token);
+
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+        alert('Успішний вхід!');
+        // router.push('/factory/dashboard') или другая страница
+    } catch (err) {
+        console.error(err);
+        alert('Невірна пошта або пароль');
+    }
 };
+
 </script>
 
 

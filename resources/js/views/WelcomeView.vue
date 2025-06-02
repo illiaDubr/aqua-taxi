@@ -10,6 +10,8 @@
         <div class="welcome__buttons">
             <button class="welcome__btn" @click="goToAuthUser">Замовити доставку води</button>
             <button class="welcome__btn" @click="goToAuthDriver">Стати водієм Aqua Taxi</button>
+            <button class="welcome__btn" @click="goToAuthFactory">Стати виробником</button>
+
         </div>
     </div>
 </template>
@@ -35,7 +37,9 @@ const selectRole = (role) => {
     const goToAuthDriver = () => {
     router.push({ name: 'authdriver' });
 };
-
+const goToAuthFactory = () => {
+    router.push({ name: 'authFactory' });
+};
 
 </script>
 

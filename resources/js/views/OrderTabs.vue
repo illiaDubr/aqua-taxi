@@ -5,9 +5,9 @@
             <div class="orders__top-bar">
                 <div class="orders__burger">☰</div>
                 <div class="orders__balance">
-                    <span>{{ balance.toFixed(2) }} грн</span>
-                    <button @click="showTopUpModal = true">＋</button>
+                    <span>{{ balance && typeof balance.value === 'number' ? balance.value.toFixed(2) : '0.00' }} грн</span>
 
+                    <button @click="showTopUpModal = true">＋</button>
                 </div>
             </div>
         </div>
@@ -17,61 +17,154 @@
             <span :class="{ active: activeTab === 'new' }" @click="activeTab = 'new'">Нові замовлення</span>
         </div>
 
+        <!-- Вкладка: Активні -->
         <div class="orders__content" v-if="activeTab === 'active'">
-            <div class="orders__wrap">
-            <div class="orders__alert">
-                <p>❗ Для прийняття замовлень потрібно ввімкнути повідомлення від Aqua Taxi</p>
+            <div v-if="activeOrders.length">
+                <div v-for="order in activeOrders" :key="order.id" class="orders__card">
+                    <h3>🚰 {{ order.quantity }} × Срібна вода</h3>
+                    <p>
+                        📍
+                        <a
+                            :href="getMapLink(order.address)"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style="text-decoration: underline; color: #007bff;"
+                        >
+                            {{ order.address }}
+                        </a>
+                    </p>
+                    <p>💳 {{ order.payment_method === 'cash' ? 'Готівка' : 'Картка' }} | {{ order.total_price }} грн</p>
+                    <p>⏱ {{ order.delivery_time_type === 'custom' ? formatDate(order.custom_time) : 'Найближчий час' }}</p>
+                    <p v-if="order.user">👤 Клієнт: {{ order.user.name }} {{ order.user.surname }}</p>
+                    <p v-if="order.user">📞 {{ order.user.phone }}</p>
+                </div>
             </div>
-
-            <h1 class="orders__title" v-if="balance <= 20">
-                Щоб розмістити послугу,<br />
-                поповніть баланс на 100грн
-            </h1>
-
-            <a href="#" class="orders__notify">Ввімкнути повідомлення</a>
-
-            <button class="orders__pay" v-if="balance <= 20">Поповнити баланс</button>
-
-            <!-- 🔵 Новая кнопка -->
-            <button class="orders__map" @click="goToMap">Набрати воду</button>
+            <div v-else>
+                <p>У вас поки немає активних замовлень</p>
+                <div class="orders__wrap">
+                    <h1 class="orders__title">
+                        Щоб розмістити послугу,<br />
+                        поповніть баланс на 100грн
+                    </h1>
+                    <a href="#" class="orders__notify">Ввімкнути повідомлення</a>
+                    <button class="orders__pay" v-if="balance <= 20">Поповнити баланс</button>
+                    <button class="orders__map" @click="goToMap">Набрати воду</button>
+                </div>
+            </div>
         </div>
-        </div>
+
+
+        <!-- Вкладка: Нові -->
         <div class="orders__content" v-else>
-            <p>Тут будуть нові замовлення</p>
+            <div v-if="newOrders.length">
+                <div v-for="order in newOrders" :key="order.id" class="orders__card">
+                    <h3>🚰 {{ order.quantity }} × Срібна вода</h3>
+                    <p>
+                        📍
+                        <a
+                            :href="getMapLink(order.address)"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style="text-decoration: underline; color: #007bff;"
+                        >
+                            {{ order.address }}
+                        </a>
+                    </p>
+                    <p>💳 {{ order.payment_method === 'cash' ? 'Готівка' : 'Картка' }} | {{ order.total_price }} грн</p>
+                    <p>⏱ {{ order.delivery_time_type === 'custom' ? formatDate(order.custom_time) : 'Найближчий час' }}</p>
+                    <button class="orders__map" @click="acceptOrder(order.id)">Прийняти замовлення</button>
+                </div>
+            </div>
+            <p v-else>Немає нових замовлень</p>
+        </div>
+
+        <!-- Модалка -->
+        <div v-if="showTopUpModal" class="modal">
+            <div class="modal__overlay" @click="showTopUpModal = false"></div>
+            <div class="modal__content">
+                <h3>Поповнення балансу</h3>
+                <input type="number" v-model="topUpAmount" placeholder="Сума в грн" />
+                <button @click="payWithFondy">Поповнити</button>
+            </div>
         </div>
     </div>
-
-    <div v-if="showTopUpModal" class="modal">
-        <div class="modal__overlay" @click="showTopUpModal = false"></div>
-        <div class="modal__content">
-            <h3>Поповнення балансу</h3>
-            <input type="number" v-model="topUpAmount" placeholder="Сума в грн" />
-            <button @click="payWithFondy">Поповнити</button>
-        </div>
-
-    </div>
-
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import city from '@/assets/city.png';
 
-const activeTab = ref('active');
 const router = useRouter();
+const activeTab = ref('active');
 const showTopUpModal = ref(false);
 const topUpAmount = ref('');
-const balance = ref(Number(localStorage.getItem('driver_balance') || 0));
+const balance = ref(null);
+
+const newOrders = ref([]);
+
+const driverToken = localStorage.getItem('driver_token');
+
 const goToMap = () => router.push('/map');
+
+const getMapLink = (address) => {
+    const query = encodeURIComponent(address);
+    return `https://www.google.com/maps/search/?api=1&query=${query}`;
+};
+
+const fetchBalance = async () => {
+    try {
+        const res = await axios.get('/api/driver/balance', {
+            headers: { Authorization: `Bearer ${driverToken}` }
+        });
+        balance.value = res.data.balance ?? 0;
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+const fetchNewOrders = async () => {
+    if (!driverToken) return; // 🛑 нет токена — не шлем запрос
+    try {
+        const res = await axios.get('/api/driver/orders/new', {
+            headers: { Authorization: `Bearer ${driverToken}` }
+        });
+        newOrders.value = res.data;
+    } catch (e) {
+        console.error('❌ Не вдалося завантажити нові замовлення', e);
+    }
+};
+const activeOrders = ref([]);
+
+const fetchActiveOrders = async () => {
+    try {
+        const res = await axios.get('/api/driver/orders/active', {
+            headers: { Authorization: `Bearer ${driverToken}` }
+        });
+        activeOrders.value = res.data;
+    } catch (e) {
+        console.error('❌ Не вдалося отримати активні замовлення', e);
+    }
+};
+const acceptOrder = async (orderId) => {
+    try {
+        await axios.post(`/api/driver/orders/${orderId}/accept`, {}, {
+            headers: { Authorization: `Bearer ${driverToken}` }
+        });
+        await fetchNewOrders();
+    } catch (e) {
+        alert('❌ Помилка при прийнятті замовлення');
+        console.error(e);
+    }
+};
+
 const payWithFondy = async () => {
     try {
-        const token = localStorage.getItem('driver_token');
-
         const res = await axios.post('/api/driver/pay', {
             amount: parseFloat(topUpAmount.value)
         }, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${driverToken}` }
         });
 
         const { url, params } = res.data;
@@ -95,47 +188,55 @@ const payWithFondy = async () => {
         console.error(error);
     }
 };
-const fetchBalance = async () => {
-    try {
-        const token = localStorage.getItem('driver_token');
-        const res = await axios.get('/api/driver/balance', {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        balance.value = res.data.balance;
-    } catch (e) {
-        console.error(e);
-    }
+
+const formatDate = (str) => {
+    if (!str) return '';
+    const d = new Date(str);
+    return d.toLocaleString('uk-UA', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 };
 
-const topUpBalance = async () => {
-    try {
-        const token = localStorage.getItem('driver_token');
-        await axios.post('/api/driver/top-up', {
-            amount: parseFloat(topUpAmount.value),
-        }, {
-            headers: { Authorization: `Bearer ${token}` }
+watch(activeTab, (tab) => {
+    if (tab === 'new') fetchNewOrders();
+    if (tab === 'active') fetchActiveOrders(); // 👈
+});
+
+onMounted(() => {
+    fetchBalance();
+    if (activeTab.value === 'new') fetchNewOrders();
+
+    window.Echo.channel('orders')
+        .listen('.NewOrderCreated', (e) => {
+            console.log('🆕 Новый заказ через сокет:', e.order);
+            newOrders.value.unshift(e.order); // или fetchNewOrders()
+        })
+        .listen('.OrderStatusUpdated', (e) => {
+            console.log('📦 Обновление заказа:', e.order);
+            if (activeTab.value === 'new') fetchNewOrders();
         });
-
-        showTopUpModal.value = false;
-        topUpAmount.value = '';
-        fetchBalance(); // Обновляем баланс
-    } catch (e) {
-        alert('Помилка поповнення');
-        console.error(e);
-    }
-};
-
-onMounted(fetchBalance);
-
+});
 </script>
 
-
 <style scoped>
-.orders__wrap{
+.orders__wrap {
     display: flex;
     flex-direction: column;
     margin-top: 300px;
 }
+
+.orders__card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-bottom: 16px;
+    text-align: left;
+}
+
 .modal {
     position: fixed;
     top: 0; left: 0;
@@ -184,6 +285,7 @@ onMounted(fetchBalance);
     min-height: 100vh;
     overflow-x: hidden;
 }
+
 .orders__map {
     background: #00aaff;
     color: white;
@@ -277,13 +379,9 @@ onMounted(fetchBalance);
 
 .orders__content {
     padding: 24px;
-    height: 70vh;
+    min-height: 60vh;
     text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
 }
-
 .orders__alert {
     border: 1px solid #e74c3c;
     background: #fff0f0;
@@ -293,22 +391,18 @@ onMounted(fetchBalance);
     margin-bottom: 24px;
     font-size: 14px;
 }
-
 .orders__title {
     font-size: 28px;
     font-weight: 700;
     margin-bottom: 16px;
 }
-
 .orders__notify {
     text-decoration: none;
     color: #0095FF;
     display: inline-block;
-    margin-bottom:-30px;
+    margin-bottom: -30px;
     font-size: 14px;
-
 }
-
 .orders__pay {
     background: #3498db;
     color: white;

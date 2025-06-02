@@ -1,11 +1,12 @@
-import './bootstrap';
+import './reverb';
+import './bootstrap.js';
 import { createApp } from 'vue';
 import App from './components/App.vue';
 import router from './router';
 import { createPinia } from 'pinia';
 import axios from 'axios';
 
-// Импортируем компоненты только ради того, чтобы Vite включил их стили в app.css
+// Стили для включения в финальный бандл
 import './views/AuthUser.vue';
 import './views/AuthDriver.vue';
 import './views/WelcomeView.vue';
@@ -14,16 +15,22 @@ import './views/OrderView.vue';
 import './views/CertificatesPage.vue';
 import './views/CertificateReview.vue';
 
-// Инициализация Vue-приложения
+// Создание и регистрация Pinia
+const pinia = createPinia();
 const app = createApp(App);
 
+app.use(pinia);
 app.use(router);
-app.use(createPinia());
 
-// Настройка axios
-const token = localStorage.getItem('token');
-if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+// 🛡️ Инициализация токена администратора и пользователя
+const adminToken = localStorage.getItem('admin_token');
+const userToken = localStorage.getItem('token');
+
+// Устанавливаем приоритет токена администратора
+if (adminToken) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${adminToken}`;
+} else if (userToken) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${userToken}`;
 }
 
 app.mount('#app');

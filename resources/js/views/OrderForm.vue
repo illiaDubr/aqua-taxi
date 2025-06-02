@@ -20,9 +20,32 @@ const totalAmount = computed(() => {
     return isNaN(qty) ? 0 : qty * pricePerBottle;
 });
 
+const validateAddress = async (address) => {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+
+    const response = await fetch(url, {
+        headers: {
+            'User-Agent': 'AquaTaxi (nivedy14@gmail.com)' // укажи свой email или домен
+        }
+    });
+
+    const data = await response.json();
+
+    return data.length ? data[0] : null;
+};
+
+
 const createOrder = async () => {
     try {
+        const result = await validateAddress(address.value);
+
+        if (!result) {
+            alert('❌ Адрес не знайдено. Введіть точнішу адресу.');
+            return;
+        }
+
         const token = localStorage.getItem('user_token');
+
         await axios.post('/api/orders', {
             address: address.value,
             quantity: Number(quantity.value),
@@ -35,7 +58,6 @@ const createOrder = async () => {
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        // Переход с параметрами для всплывашки
         router.push({
             name: 'orders',
             query: {
@@ -51,6 +73,7 @@ const createOrder = async () => {
         console.error(error);
     }
 };
+
 </script>
 
 <template>

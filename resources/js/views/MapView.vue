@@ -5,32 +5,39 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { onMounted, ref } from 'vue';
+import axios from 'axios';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-// Пример мок-данных, позже заменить на реальные данные из API
-const points = [
-    { id: 1, lat: 50.4501, lng: 30.5234, price: '32.50₴', distance: '2.5км' },
-    { id: 2, lat: 50.4551, lng: 30.5300, price: '32.50₴', distance: '3.2км' },
-    { id: 3, lat: 50.4480, lng: 30.5200, price: '32.50₴', distance: '1.8км' }
-]
+const mapContainer = ref();
+const factories = ref([]);
 
-const mapContainer = ref()
+const fetchFactories = async () => {
+    try {
+        const res = await axios.get('/api/factories/coordinates');
+        factories.value = res.data;
+    } catch (e) {
+        console.error('Не вдалося завантажити координати виробників', e);
+    }
+};
 
-onMounted(() => {
-    const map = L.map(mapContainer.value).setView([50.4501, 30.5234], 14)
+onMounted(async () => {
+    await fetchFactories();
+
+    const map = L.map(mapContainer.value).setView([50.4501, 30.5234], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map)
+    }).addTo(map);
 
-    points.forEach(point => {
-        const marker = L.marker([point.lat, point.lng]).addTo(map)
-        marker.bindPopup(`<strong>${point.price}</strong><br>${point.distance}`).openPopup()
-    })
-})
+    factories.value.forEach(factory => {
+        const marker = L.marker([factory.lat, factory.lng]).addTo(map);
+        marker.bindPopup(`<strong>Склад</strong><br>${factory.warehouse_address}`);
+    });
+});
 </script>
+
 
 <style scoped>
 .map-page {

@@ -32,16 +32,21 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import logo from '@/assets/logo2.png'
+import logo from '@/assets/logo2.png';
+import { useAdminStore } from '@/store/admin';
 
 const email = ref('');
 const password = ref('');
 const router = useRouter();
+const admin = useAdminStore();
 
-const submitForm = () => {
-    console.log('🛡️ Адмін логін:', { email: email.value, password: password.value });
-
-    router.push('/admin'); // переход после логина
+const submitForm = async () => {
+    try {
+        await admin.login(email.value, password.value);
+        router.push('/admin'); // переход в панель
+    } catch (e) {
+        alert('Невірна пошта або пароль');
+    }
 };
 </script>
 <style>

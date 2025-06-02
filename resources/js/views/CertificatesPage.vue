@@ -8,49 +8,111 @@
 
         <div class="cert__card">
             <div class="cert__tabs">
-        <span
-            :class="{ active: activeTab === 'certificates' }"
-            @click="activeTab = 'certificates'"
-        >
-          Прийняття сертифікатів
-        </span>
+                <span
+                    :class="{ active: activeTab === 'certificates' }"
+                    @click="activeTab = 'certificates'"
+                >
+                    Прийняття сертифікатів
+                </span>
                 <span
                     :class="{ active: activeTab === 'prices' }"
                     @click="activeTab = 'prices'"
                 >
-          Ціни + база сертифікатів
-        </span>
+                    Ціни + база сертифікатів
+                </span>
             </div>
 
-            <div v-if="activeTab === 'certificates'" class="cert__list">
-                <div class="cert__item" v-for="(cert, index) in certificates" :key="index">
-                    <h3>Новий сертифікат</h3>
-                    <button class="cert__btn" @click="goToReview(index)">
-                        Переглянути сертифікат
-                    </button>
+            <!-- НЕверифіковані -->
+            <div v-if="activeTab === 'certificates'">
+                <div v-if="unverifiedCertificates.length" class="cert__list">
+                    <div
+                        class="cert__item"
+                        v-for="cert in unverifiedCertificates"
+                        :key="cert.id"
+                    >
+                        <h3>Новий сертифікат</h3>
+                        <p>{{ cert.email }}</p>
+                        <button class="cert__btn" @click="goToReview(cert.id)">
+                            Переглянути сертифікат
+                        </button>
+                    </div>
+                </div>
+                <div v-else class="cert__placeholder">
+                    <p>Сертифікатів на перевірку немає</p>
                 </div>
             </div>
 
-            <div v-else class="cert__placeholder">
-                <p>База сертифікатів незабаром…</p>
+            <!-- Верифіковані -->
+            <div v-else>
+                <div v-if="verifiedCertificates.length" class="cert__list">
+                    <div
+                        class="cert__item"
+                        v-for="cert in verifiedCertificates"
+                        :key="cert.id"
+                    >
+                        <h3>Верифікований виробник</h3>
+                        <p>{{ cert.email }}</p>
+                        <p>До: {{ cert.verified_until }}</p>
+                        <p>Адреса складу: {{ cert.warehouse_address }}</p>
+                    </div>
+                </div>
+                <div v-else class="cert__placeholder">
+                    <p>Ще немає верифікованих виробників</p>
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
+
 const router = useRouter();
+const activeTab = ref('certificates');
+
+const unverifiedCertificates = ref([]);
+const verifiedCertificates = ref([]);
 
 const goToReview = (id) => {
     router.push({ name: 'certificateReview', params: { id } });
 };
-const activeTab = ref('certificates');
 
-const certificates = ref([
-    {}, {}, {}, // ← количество карточек
-]);
+const loadUnverified = async () => {
+    try {
+        const res = await axios.get('/api/factories?is_verified=0');
+        unverifiedCertificates.value = Array.isArray(res.data.data)
+            ? res.data.data
+            : Array.isArray(res.data)
+                ? res.data
+                : [];
+    } catch (err) {
+        console.error('❌ Помилка завантаження неварифікованих', err);
+    }
+};
+
+const loadVerified = async () => {
+    try {
+        const res = await axios.get('/api/factories?is_verified=1');
+        verifiedCertificates.value = Array.isArray(res.data.data)
+            ? res.data.data
+            : Array.isArray(res.data)
+                ? res.data
+                : [];
+    } catch (err) {
+        console.error('❌ Помилка завантаження верифікованих', err);
+    }
+};
+
+watch(activeTab, (tab) => {
+    if (tab === 'certificates') loadUnverified();
+    else loadVerified();
+});
+
+onMounted(() => {
+    loadUnverified();
+});
 </script>
 
 <style scoped>
@@ -69,7 +131,7 @@ const certificates = ref([
     top: 10px;
     width: 100%;
     height: 140px;
-    background: url('@/assets/city.png') no-repeat center;
+
     background-size: cover;
     z-index: 0;
 }
@@ -89,7 +151,7 @@ const certificates = ref([
     font-weight: 500;
     font-size: 13px;
     color: #333;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     cursor: pointer;
 }
 
@@ -98,7 +160,7 @@ const certificates = ref([
     max-width: 400px;
     background: #fff;
     border-radius: 20px 20px 0 0;
-    box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
     z-index: 1;
     padding: 24px 16px;
 }
@@ -146,7 +208,7 @@ const certificates = ref([
     border-radius: 16px;
     border: 1px solid #eee;
     padding: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     text-align: center;
 }
 
