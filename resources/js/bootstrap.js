@@ -1,17 +1,15 @@
 import Echo from 'laravel-echo';
-import ReverbConnector from './reverb-connector';
-import axios from 'axios';
+import Pusher from 'pusher-js';
 
-window.axios = axios;
-window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+window.Pusher = Pusher;
 
 window.Echo = new Echo({
-    broadcaster: ReverbConnector,
-    key: 'aqua_key', // 👈 обязательно!
+    broadcaster: 'reverb', // это важно
+    key: '123456789abcdef',
     wsHost: window.location.hostname,
     wsPort: 6001,
     wssPort: 6001,
     forceTLS: false,
-    disableStats: true,
-    enabledTransports: ['ws'],
+    enabledTransports: ['ws', 'wss'],
+    withCredentials: true, // ← критично для private channel
 });

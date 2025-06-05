@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\FactoryAuthController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\Admin\FactoryController;
-use App\Http\Controllers\Admin\FactoryModerationController;
+use App\Http\Controllers\FactoryModerationController;
 
 Route::prefix('driver')->group(function () {
     Route::post('register', [DriverAuthController::class, 'register']);

@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->string('name');
             $table->string('surname');
             $table->decimal('balance', 10, 2)->default(0.00);
+            $table->string('bottles')->default(0.00);
             $table->timestamps();
         });
     }

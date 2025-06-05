@@ -51,7 +51,7 @@ body {
     font-family: 'Montserrat', sans-serif;
 }
 .welcome {
- height: 100vh;
+ height: 100%;
     display: flex;
     justify-content: space-around;
     padding-bottom: 150px;

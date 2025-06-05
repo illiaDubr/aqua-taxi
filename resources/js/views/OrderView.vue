@@ -342,7 +342,7 @@ onMounted(() => {
     color: white;
     border-radius: 10px;
     border: none;
-    padding: 16px 60px;
+    padding: 16px 20px;
 }
 .order__placeholder {
     text-align: center;

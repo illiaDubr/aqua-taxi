@@ -32,5 +32,18 @@ class BalanceController extends Controller
             'balance' => $driver->balance
         ]);
     }
+    public function profile(Request $request)
+    {
+        /** @var Driver $driver */
+        $driver = $request->user(); // Только если драйвер аутентифицирован через sanctum
+
+        return response()->json([
+            'id' => $driver->id,
+            'name' => $driver->name,
+            'surname' => $driver->surname,
+            'bottles' => $driver->bottles,
+            'balance' => $driver->balance,
+        ]);
+    }
 }
 

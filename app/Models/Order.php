@@ -18,7 +18,9 @@ class Order extends Model
         'total_price',
         'user_id',
         'driver_id',
-        'status'
+        'status',
+        'latitude',
+        'longitude',
     ];
 
     public function user()

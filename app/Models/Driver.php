@@ -18,6 +18,7 @@ class Driver extends Authenticatable
         'name',
         'surname',
         'balance',
+        'bottles'
     ];
 
     protected $hidden = [

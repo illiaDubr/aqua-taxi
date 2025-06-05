@@ -8,8 +8,11 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use App\Events\OrderStatusUpdated;
 use App\Events\NewOrderCreated;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 class OrderController extends Controller
 {
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -22,16 +25,44 @@ class OrderController extends Controller
             'total_price' => 'required|numeric',
         ]);
 
+        // 🛰 Получаем координаты через Nominatim
+        $lat = null;
+        $lon = null;
+
+        try {
+            $geo = Http::withHeaders([
+                'User-Agent' => 'AquaTaxi/1.0 (admin@aqua-taxi.com)'
+            ])->get('https://nominatim.openstreetmap.org/search', [
+                'format' => 'json',
+                'q' => $validated['address'],
+                'limit' => 1,
+            ]);
+
+            $response = $geo->json();
+            Log::info('GEO API response', ['response' => $response]);
+
+            if ($geo->ok() && !empty($response)) {
+                $lat = $response[0]['lat'] ?? null;
+                $lon = $response[0]['lon'] ?? null;
+            } else {
+                Log::warning('GEO API returned empty or invalid response', ['address' => $validated['address']]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('GEO API error', ['exception' => $e]);
+        }
+
+        // 📝 Создаем заказ
         $order = Order::create([
             ...$validated,
             'user_id' => Auth::id(),
+            'latitude' => $lat,
+            'longitude' => $lon,
         ]);
 
-        event(new OrderStatusUpdated($order));
-        event(new NewOrderCreated($order));
 
         return response()->json($order, 201);
     }
+
     public function activeOrders(Request $request)
     {
         $user = $request->user();
