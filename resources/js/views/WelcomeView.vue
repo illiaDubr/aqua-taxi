@@ -55,7 +55,7 @@ body {
     display: flex;
     justify-content: space-around;
     padding-bottom: 150px;
-    padding-top: 150px;
+    padding-top: 50px;
     flex-direction: column;
     background-color: #ffffff;
     font-family: 'Montserrat', sans-serif;

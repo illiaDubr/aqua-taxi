@@ -1,9 +1,15 @@
 <template>
     <div class="driver-map">
+        <!-- Свитчер -->
+        <div class="order-switcher">
+            <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
+            <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
+        </div>
+
         <!-- Верхняя панель -->
         <div class="driver-map__top-panel">
             <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
-                <span>{{ bottles }} бут.</span>
+                <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
                 <button>＋</button>
             </div>
             <div class="driver-map__block">
@@ -19,7 +25,6 @@
 
         <!-- Карта -->
         <div ref="mapContainer" class="driver-map__container"></div>
-
 
         <!-- Модалка пополнения -->
         <div v-if="showTopUpModal" class="modal">
@@ -49,22 +54,21 @@ const newOrderAlert = ref(false);
 const showTopUpModal = ref(false);
 const topUpAmount = ref('');
 const router = useRouter();
-const renderedOrderIds = ref([]); // 🆕 список уже отрисованных заказов
+const renderedOrderIds = ref([]);
+const orderMarkers = ref({});
+const currentTab = ref('new');
 
 const goToMap = () => router.push('/map');
-
-const showOrderAlert = () => {
-    newOrderAlert.value = true;
-    setTimeout(() => (newOrderAlert.value = false), 3000);
+const switchTab = (tab) => {
+    currentTab.value = tab;
+    fetchOrders();
 };
 
 const fetchDriverData = async () => {
     try {
         const token = localStorage.getItem('driver_token');
         const res = await axios.get('/api/driver/profile', {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
+            headers: { Authorization: `Bearer ${token}` }
         });
         bottles.value = res.data.bottles;
         balance.value = res.data.balance;
@@ -76,12 +80,8 @@ const fetchDriverData = async () => {
 const payWithFondy = async () => {
     try {
         const token = localStorage.getItem('driver_token');
-        const res = await axios.post('/api/driver/pay', {
-            amount: parseFloat(topUpAmount.value)
-        }, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
+        const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, {
+            headers: { Authorization: `Bearer ${token}` }
         });
 
         const { url, params } = res.data;
@@ -105,48 +105,67 @@ const payWithFondy = async () => {
     }
 };
 
-const fetchNewOrders = async () => {
+const fetchOrders = async () => {
     try {
+        Object.values(orderMarkers.value).forEach(marker => {
+            map.value?.removeLayer(marker);
+        });
+        orderMarkers.value = {};
+        renderedOrderIds.value = [];
+        newOrders.value = [];
+
         const token = localStorage.getItem('driver_token');
-        const res = await axios.get('/api/driver/orders/new', {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
+        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new';
+        const res = await axios.get(endpoint, {
+            headers: { Authorization: `Bearer ${token}` }
         });
 
         const orders = res.data;
 
         orders.forEach(order => {
-            if (renderedOrderIds.value.includes(order.id)) return; // 🛑 уже на карте
-            renderedOrderIds.value.push(order.id);
-
-            const exists = newOrders.value.some(o => o.id === order.id);
-            if (!exists) newOrders.value.unshift(order);
-
-            showOrderAlert();
-
             if (!order.latitude || !order.longitude) return;
-
             const lat = parseFloat(order.latitude);
             const lng = parseFloat(order.longitude);
             if (isNaN(lat) || isNaN(lng)) return;
 
+            renderedOrderIds.value.push(order.id);
+            newOrders.value.push(order);
+
             const icon = L.icon({
-                iconUrl: '/assets/loc.png',
-                iconSize: [35, 45],
-                iconAnchor: [17, 45],
-                popupAnchor: [0, -35]
+                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowUrl: null
             });
 
-            L.marker([lat, lng], { icon })
+            const marker = L.marker([lat, lng], { icon })
                 .addTo(map.value)
                 .bindPopup(`
-                    <b>🚰 Нове замовлення</b><br>
-                    <b>Адреса:</b> ${order.address}<br>
-                    <b>Кількість:</b> ${order.quantity} бут.<br>
-                    <b>Оплата:</b> ${order.payment_method === 'cash' ? 'Готівка' : 'Картка'}
-                `)
-                .openPopup();
+          <div class="order-popup">
+            <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
+<b>Адреса:</b> ${
+                    currentTab.value === 'active'
+                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}" target="_blank">${order.address}</a>`
+                        : order.address
+                }<br>
+<b>Кількість:</b> ${order.quantity} бут.<br>
+<b>Оплата:</b> ${order.payment_method === 'cash' ? 'Готівка' : 'Картка'}<br>
+<b>Сума:</b> ${order.total_price}<br>
+${
+                    currentTab.value === 'active' && order.user
+                        ? `<b>Замовник:</b> ${order.user.name} ${order.user.surname}<br><b>Телефон:</b> ${order.user.phone}<br>`
+                        : ''
+                }<br>${
+                    currentTab.value === 'new'
+                        ? `<button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>`
+                        : ''
+                }
+
+          </div>
+        `);
+
+            orderMarkers.value[order.id] = marker;
 
             const pulse = L.circle([lat, lng], {
                 radius: 60,
@@ -155,34 +174,95 @@ const fetchNewOrders = async () => {
                 fillOpacity: 0.3
             }).addTo(map.value);
 
-            setTimeout(() => map.value.removeLayer(pulse), 3000);
-            map.value.setView([lat, lng], 14);
+            setTimeout(() => map.value?.removeLayer(pulse), 3000);
+            map.value?.setView([lat, lng], 14);
         });
     } catch (error) {
-        console.error('❌ Помилка завантаження нових замовлень', error);
+        console.error('❌ Помилка завантаження замовлень', error);
     }
 };
 
 onMounted(async () => {
-    console.log('🟦 Ініціалізація карти...');
     await fetchDriverData();
     await nextTick();
-
-    map.value = L.map(mapContainer.value, {
-        zoomControl: false
-    }).setView([50.4501, 30.5234], 13);
-
+    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map.value);
-
-    await fetchNewOrders();
-    setInterval(fetchNewOrders, 60000); // 🔁 каждый 60 сек
+    await fetchOrders();
 });
+
+window.acceptOrder = async function(orderId) {
+    const confirmAccept = confirm('Підтвердити прийняття замовлення?');
+    if (!confirmAccept) return;
+
+    try {
+        const token = localStorage.getItem('driver_token');
+        await axios.post(`/api/driver/orders/${orderId}/accept`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        alert('✅ Замовлення прийнято');
+        map.value?.closePopup();
+
+        const marker = orderMarkers.value[orderId];
+        if (marker) {
+            map.value?.removeLayer(marker);
+            delete orderMarkers.value[orderId];
+        }
+
+        newOrders.value = newOrders.value.filter(o => o.id !== orderId);
+        renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId);
+    } catch (error) {
+        if (error.response?.status === 409) {
+            alert('❌ Це замовлення вже прийнято іншим водієм');
+        } else {
+            alert('❌ Помилка при прийнятті замовлення');
+            console.error(error);
+        }
+    }
+};
 </script>
 
+<style>
+.order-switcher {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 12px;
+    background: #e9f1fc;
+    border-radius: 0 0 12px 12px;
+    font-weight: 600;
+}
+.order-switcher button {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #888;
+    border-bottom: 3px solid transparent;
+    font-size: 15px;
+}
+.order-switcher button.active {
+    color: #000;
+    border-color: #0095FF;
+}
 
-<style scoped>
+.accept-button {
+    background-color: #0095FF;
+    color: white;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.accept-button:hover {
+    background-color: #43a047;
+}
+
+
 .driver-map {
     position: relative;
     width: 100%;
