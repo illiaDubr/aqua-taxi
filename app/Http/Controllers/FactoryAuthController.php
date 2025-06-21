@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 
 class FactoryAuthController extends Controller
 {
@@ -19,10 +20,10 @@ class FactoryAuthController extends Controller
             'website' => 'required|string',
             'warehouse_address' => 'required|string',
             'water_types' => 'nullable|string',
-            'certificate' => 'required|file|mimes:pdf',
+            'certificate' => 'required|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        // 🧾 Сохраняем PDF сертификат
+
         $certificatePath = $request->file('certificate')->store('certificates', 'public');
 
         // 🌍 Геокодируем адрес через Nominatim

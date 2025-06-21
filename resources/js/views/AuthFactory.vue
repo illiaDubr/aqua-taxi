@@ -30,13 +30,15 @@
                         <!-- STEP 2 -->
                         <div v-else class="auth__form">
                             <div class="upload-wrapper">
-                                <label class="upload-label">
-                                    <span class="attacher">
-                                    <i class="icon attach"></i>
-                                    Прикріпіть сертифікат якості*</span>
-                                    <input type="file" @change="handleFile" hidden required />
-                                </label>
-                                <p class="upload-desc">Додайте PDF файл, в якому дійсна інформація стосовно якості води</p>
+<!--                                <label class="upload-label">-->
+<!--                                    <span class="attacher">-->
+<!--                                    <i class="icon attach"></i>-->
+<!--                                    Прикріпіть сертифікат якості*</span>-->
+<!--                                </label>-->
+                                <input type="file" name="certificate" accept="image/png, image/jpeg" @change="handleFile"/>
+                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG або PNG</p>
+
+
                             </div>
 
                             <input type="text" placeholder="Ваша адреса складу" v-model="warehouse" required />
@@ -65,7 +67,9 @@
 <script setup>
 import logo from '@/assets/logo2.png'
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const activeTab = ref('register');
 const step = ref(1);
 
@@ -88,6 +92,10 @@ const handleRegister = async () => {
 
     if (!warehouse.value || !file.value || !agree.value) {
         alert('Будь ласка, заповніть усі поля та погодьтесь з умовами.');
+        return;
+    }
+    if (!file.value) {
+        alert("Будь ласка, додайте фото сертифіката.");
         return;
     }
 
@@ -135,12 +143,14 @@ const handleLogin = async () => {
         });
 
         const token = res.data.token;
-        localStorage.setItem('token', token);
+        const factory = res.data.user; // предполагаем, что возвращается объект пользователя
 
+        localStorage.setItem('token', token);
+        localStorage.setItem('factory', JSON.stringify(factory)); // сохраняем данные производителя
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
         alert('Успішний вхід!');
-        // router.push('/factory/dashboard') или другая страница
+        router.push('/factory-page');
     } catch (err) {
         console.error(err);
         alert('Невірна пошта або пароль');

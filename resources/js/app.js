@@ -13,6 +13,7 @@ import './views/AuthAdmin.vue';
 import './views/OrderView.vue';
 import './views/CertificatesPage.vue';
 import './views/CertificateReview.vue';
+import './views/FactoryView.vue';
 
 // Создание и регистрация Pinia
 const pinia = createPinia();

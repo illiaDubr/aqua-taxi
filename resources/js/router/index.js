@@ -51,6 +51,11 @@ const routes = [
         component: () => import('../views/CertificateReview.vue')
     },
     {
+        path: '/factory-page',
+        name: 'factoryPage',
+        component: () => import('../views/FactoryView.vue')
+    },
+    {
         path: '/ordersDrive',
         name: 'OrdersDrive',
         component: OrderTabs,
