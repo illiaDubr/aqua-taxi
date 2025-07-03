@@ -78,3 +78,13 @@ Route::prefix('factories')->group(function () {
     Route::put('{id}/approve', [FactoryModerationController::class, 'approve']);
     Route::post('{id}/reject', [FactoryModerationController::class, 'reject']);
 });
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/factory/upload-certificate', [FactoryAuthController::class, 'uploadCertificate']);
+});
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/admin/factories/{id}/moderate-certificate', [FactoryModerationController::class, 'moderateCertificate']);
+});
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/admin/factories-with-certificates', [FactoryModerationController::class, 'factoriesWithCertificates']);
+});

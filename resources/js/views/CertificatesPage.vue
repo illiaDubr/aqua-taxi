@@ -31,10 +31,47 @@
                         :key="cert.id"
                     >
                         <h3>Новий сертифікат</h3>
-                        <p>{{ cert.email }}</p>
-                        <button class="cert__btn" @click="goToReview(cert.id)">
-                            Переглянути сертифікат
-                        </button>
+
+                        <p><strong>Email:</strong> {{ cert.email }}</p>
+                        <p v-if="cert.phone"><strong>Телефон:</strong> {{ cert.phone }}</p>
+                        <p v-if="cert.website">
+                            <strong>Сайт:</strong>
+                            <a :href="cert.website" target="_blank">{{ cert.website }}</a>
+                        </p>
+                        <p v-if="cert.warehouse_address"><strong>Адреса складу:</strong> {{ cert.warehouse_address }}</p>
+                        <p v-if="cert.lat && cert.lng">
+                            <strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}
+                        </p>
+
+                        <div v-if="cert.certificate_path">
+                            <img
+                                v-if="isImage(cert.certificate_path)"
+                                :src="fullUrl(cert.certificate_path)"
+                                alt="Certificate"
+                                style="max-width: 100%; margin: 10px 0;"
+                            />
+                            <a
+                                v-else
+                                :href="fullUrl(cert.certificate_path)"
+                                target="_blank"
+                                style="display: block; margin: 10px 0;"
+                            >Скачати сертифікат (PDF)</a>
+                        </div>
+
+                        <div class="moderation-controls">
+                            <label>Дата закінчення дії сертифіката:</label>
+                            <input type="date" v-model="cert.certificate_expiration" />
+
+                            <label>Статус сертифіката:</label>
+                            <select v-model="cert.certificate_status">
+                                <option value="valid">Валідний</option>
+                                <option value="invalid">Невалідний</option>
+                            </select>
+
+                            <button class="cert__btn" @click="moderate(cert)">
+                                Зберегти
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div v-else class="cert__placeholder">
@@ -52,7 +89,7 @@
                     >
                         <h3>Верифікований виробник</h3>
                         <p>{{ cert.email }}</p>
-                        <p>До: {{ cert.verified_until }}</p>
+                        <p>До: {{ formatDate(cert.certificate_expiration) }}</p>
                         <p>Адреса складу: {{ cert.warehouse_address }}</p>
                     </div>
                 </div>
@@ -66,27 +103,36 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import axios from 'axios';
 
-const router = useRouter();
 const activeTab = ref('certificates');
-
 const unverifiedCertificates = ref([]);
 const verifiedCertificates = ref([]);
 
-const goToReview = (id) => {
-    router.push({ name: 'certificateReview', params: { id } });
+const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path);
+const fullUrl = (path) => window.location.origin + '/storage/' + path.replace(/^storage\//, '');
+
+const formatDate = (date) => new Date(date).toLocaleDateString('uk-UA');
+
+const moderate = async (cert) => {
+    try {
+        await axios.post(`/api/admin/factories/${cert.id}/moderate-certificate`, {
+            status: cert.certificate_status,
+            expiration_date: cert.certificate_expiration,
+        });
+        alert('Сертифікат успішно оновлено.');
+        loadUnverified();
+    } catch (err) {
+        console.error('❌ Помилка оновлення сертифіката', err);
+        alert('Не вдалося оновити сертифікат.');
+    }
 };
 
 const loadUnverified = async () => {
     try {
-        const res = await axios.get('/api/factories?is_verified=0');
-        unverifiedCertificates.value = Array.isArray(res.data.data)
-            ? res.data.data
-            : Array.isArray(res.data)
-                ? res.data
-                : [];
+        const res = await axios.get('/api/admin/factories-with-certificates');
+        // фильтруем только с сертификатами в статусе pending
+        unverifiedCertificates.value = res.data.filter(cert => cert.certificate_status === 'pending');
     } catch (err) {
         console.error('❌ Помилка завантаження неварифікованих', err);
     }
@@ -94,12 +140,8 @@ const loadUnverified = async () => {
 
 const loadVerified = async () => {
     try {
-        const res = await axios.get('/api/factories?is_verified=1');
-        verifiedCertificates.value = Array.isArray(res.data.data)
-            ? res.data.data
-            : Array.isArray(res.data)
-                ? res.data
-                : [];
+        const res = await axios.get('/api/admin/factories-with-certificates');
+        verifiedCertificates.value = res.data.filter(cert => cert.certificate_status === 'valid');
     } catch (err) {
         console.error('❌ Помилка завантаження верифікованих', err);
     }
@@ -131,7 +173,6 @@ onMounted(() => {
     top: 10px;
     width: 100%;
     height: 140px;
-
     background-size: cover;
     z-index: 0;
 }
@@ -227,6 +268,7 @@ onMounted(() => {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    margin-top: 10px;
 }
 
 .cert__placeholder {

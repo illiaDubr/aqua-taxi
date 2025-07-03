@@ -35,4 +35,25 @@ class FactoryModerationController extends Controller
 
         return response()->json(['message' => 'Factory rejected and deleted']);
     }
+    public function moderateCertificate(Request $request, $factoryId)
+    {
+        $request->validate([
+            'status' => 'required|in:valid,invalid',
+            'expiration_date' => 'nullable|date',
+        ]);
+
+        $factory = Factory::findOrFail($factoryId);
+
+        $factory->certificate_status = $request->status;
+        $factory->certificate_expiration = $request->expiration_date;
+        $factory->save();
+
+        return response()->json(['message' => 'Сертификат обновлен администратором.'], 200);
+    }
+    public function factoriesWithCertificates()
+    {
+        $factories = Factory::whereNotNull('certificate_path')->get();
+
+        return response()->json($factories, 200);
+    }
 }

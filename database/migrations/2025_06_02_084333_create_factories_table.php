@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->string('phone');
             $table->string('password');
             $table->string('website');
+            $table->string('address')->nullable();
             $table->string('warehouse_address');
             $table->text('water_types')->nullable();
             $table->string('certificate_path'); // путь к PDF

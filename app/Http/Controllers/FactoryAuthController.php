@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class FactoryAuthController extends Controller
 {
@@ -20,10 +21,10 @@ class FactoryAuthController extends Controller
             'website' => 'required|string',
             'warehouse_address' => 'required|string',
             'water_types' => 'nullable|string',
-            'certificate' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'certificate' => 'required|file|mimes:jpeg,png,jpg,pdf|max:10240', // добавил pdf + увеличил лимит
         ]);
 
-
+        // 📥 Сохраняем сертификат
         $certificatePath = $request->file('certificate')->store('certificates', 'public');
 
         // 🌍 Геокодируем адрес через Nominatim
@@ -49,15 +50,18 @@ class FactoryAuthController extends Controller
             'website' => $request->website,
             'warehouse_address' => $request->warehouse_address,
             'water_types' => $request->water_types,
-            'certificate_path' => $certificatePath,
+            'certificate_path' => str_replace('public/', 'storage/', $certificatePath), // сохраняем в поле certificate_file
+            'certificate_status' => 'pending', // выставляем статус сертификата
+            'certificate_expiration' => null,
             'is_verified' => false,
             'verified_until' => null,
             'lat' => $lat,
             'lng' => $lng,
         ]);
 
-        return response()->json(['message' => 'Реєстрація успішна', 'factory' => $factory], 201);
+        return response()->json(['message' => 'Реєстрація успішна. Сертифікат відправлений на модерацію.', 'factory' => $factory], 201);
     }
+
 
     public function login(Request $request)
     {
@@ -75,5 +79,25 @@ class FactoryAuthController extends Controller
             'token' => $token,
             'factory' => $factory
         ]);
+    }
+    public function uploadCertificate(Request $request)
+    {
+        $factory = auth()->user(); // получаем текущего производителя
+
+        $request->validate([
+            'certificate' => 'required|file|mimes:jpeg,png,pdf|max:10240', // 10 MB
+        ]);
+
+        // сохраняем файл
+        $path = $request->file('certificate')->store('public/certificates');
+
+        // обновляем фабрику
+        $factory->update([
+            'certificate_file' => str_replace('public/', 'storage/', $path),
+            'certificate_status' => 'pending',
+            'certificate_expiration' => null,
+        ]);
+
+        return response()->json(['message' => 'Сертификат успешно загружен и отправлен на проверку.'], 200);
     }
 }

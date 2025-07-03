@@ -18,7 +18,18 @@
                         <div v-if="step === 1" class="auth__form">
                             <input type="email" placeholder="Ваша пошта*" v-model="email" required />
                             <input type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
-                            <input type="password" placeholder="Ваш пароль*" v-model="password" required />
+                            <div class="auth__password-wrapper">
+                                <input
+                                    :type="showPassword ? 'text' : 'password'"
+                                    :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
+                                    v-model="password"
+                                    required
+                                />
+                                <span class="auth__eye-icon" @click="showPassword = !showPassword">
+    <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M12 5c-7.633 0-12 6.5-12 6.5s4.367 6.5 12 6.5 12-6.5 12-6.5-4.367-6.5-12-6.5zm0 11c-2.485 0-4.5-2.239-4.5-5s2.015-5 4.5-5 4.5 2.239 4.5 5-2.015 5-4.5 5zm0-8c-1.657 0-3 1.567-3 3s1.343 3 3 3 3-1.567 3-3-1.343-3-3-3z"/></svg>
+    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M2.293 2.293l19.414 19.414-1.414 1.414-2.387-2.387c-1.841.773-3.875 1.266-5.906 1.266-7.633 0-12-6.5-12-6.5 1.337-1.989 3.267-4.129 5.837-5.58l-2.544-2.544 1.414-1.414zm5.163 5.163l1.729 1.729c-.118.282-.185.594-.185.915 0 1.657 1.343 3 3 3 .321 0 .633-.067.915-.185l1.729 1.729c-.81.303-1.676.456-2.644.456-2.485 0-4.5-2.239-4.5-5 0-.968.153-1.834.456-2.644zm6.462-1.066c.795.229 1.553.539 2.271.924l-1.511 1.511c-.226-.063-.462-.098-.707-.098-1.657 0-3 1.343-3 3 0 .245.035.481.098.707l-1.511 1.511c-.385-.718-.695-1.476-.924-2.271.81-1.307 1.964-2.461 3.384-3.384z"/></svg>
+  </span>
+                            </div>
                             <input type="text" placeholder="Ваш вебсайт*" v-model="website" required />
                             <label class="auth__checkbox">
                                 <input type="checkbox" v-model="agree" />
@@ -54,7 +65,18 @@
                     <!-- ВХІД -->
                     <template v-else>
                         <input type="email" placeholder="Ваша пошта*" v-model="email" required />
-                        <input type="password" placeholder="Пароль*" v-model="password" required />
+                        <div class="auth__password-wrapper">
+                            <input
+                                :type="showPassword ? 'text' : 'password'"
+                                :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
+                                v-model="password"
+                                required
+                            />
+                            <span class="auth__eye-icon" @click="showPassword = !showPassword">
+    <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M12 5c-7.633 0-12 6.5-12 6.5s4.367 6.5 12 6.5 12-6.5 12-6.5-4.367-6.5-12-6.5zm0 11c-2.485 0-4.5-2.239-4.5-5s2.015-5 4.5-5 4.5 2.239 4.5 5-2.015 5-4.5 5zm0-8c-1.657 0-3 1.567-3 3s1.343 3 3 3 3-1.567 3-3-1.343-3-3-3z"/></svg>
+    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M2.293 2.293l19.414 19.414-1.414 1.414-2.387-2.387c-1.841.773-3.875 1.266-5.906 1.266-7.633 0-12-6.5-12-6.5 1.337-1.989 3.267-4.129 5.837-5.58l-2.544-2.544 1.414-1.414zm5.163 5.163l1.729 1.729c-.118.282-.185.594-.185.915 0 1.657 1.343 3 3 3 .321 0 .633-.067.915-.185l1.729 1.729c-.81.303-1.676.456-2.644.456-2.485 0-4.5-2.239-4.5-5 0-.968.153-1.834.456-2.644zm6.462-1.066c.795.229 1.553.539 2.271.924l-1.511 1.511c-.226-.063-.462-.098-.707-.098-1.657 0-3 1.343-3 3 0 .245.035.481.098.707l-1.511 1.511c-.385-.718-.695-1.476-.924-2.271.81-1.307 1.964-2.461 3.384-3.384z"/></svg>
+  </span>
+                        </div>
                         <button type="submit" class="auth__submit">Увійти</button>
                     </template>
                 </form>
@@ -81,6 +103,7 @@ const warehouse = ref('');
 const waterTypes = ref('');
 const agree = ref(false);
 const file = ref(null);
+const showPassword = ref(false);
 
 import axios from 'axios';
 
@@ -161,6 +184,24 @@ const handleLogin = async () => {
 
 
 <style>
+.auth__password-wrapper {
+    position: relative;
+}
+
+.auth__password-wrapper input {
+    width: 100%;
+    padding-left: 5px !important;
+    padding-right: 0px !important;
+    /* место для глазика */
+}
+
+.auth__eye-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+}
 body {
     font-family: 'Montserrat', sans-serif;
     margin: 0;
