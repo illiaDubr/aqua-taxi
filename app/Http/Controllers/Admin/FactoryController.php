@@ -41,10 +41,17 @@ class FactoryController extends Controller
 
     public function coordinates()
     {
-        // Только подтвержденные и ещё действующие производители
-        $factories = Factory::where('is_verified', true)
-            ->where('verified_until', '>', Carbon::now())
-            ->get(['id', 'warehouse_address', 'lat', 'lng']);
+        $factories = Factory::where('certificate_status', 'valid')
+            ->whereNotNull('lat')
+            ->whereNotNull('lng')
+            ->get([
+                'id',
+                'email',
+                'website',
+                'warehouse_address',
+                'lat',
+                'lng'
+            ]);
 
         return response()->json($factories);
     }

@@ -25,10 +25,7 @@
                                     v-model="password"
                                     required
                                 />
-                                <span class="auth__eye-icon" @click="showPassword = !showPassword">
-    <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M12 5c-7.633 0-12 6.5-12 6.5s4.367 6.5 12 6.5 12-6.5 12-6.5-4.367-6.5-12-6.5zm0 11c-2.485 0-4.5-2.239-4.5-5s2.015-5 4.5-5 4.5 2.239 4.5 5-2.015 5-4.5 5zm0-8c-1.657 0-3 1.567-3 3s1.343 3 3 3 3-1.567 3-3-1.343-3-3-3z"/></svg>
-    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M2.293 2.293l19.414 19.414-1.414 1.414-2.387-2.387c-1.841.773-3.875 1.266-5.906 1.266-7.633 0-12-6.5-12-6.5 1.337-1.989 3.267-4.129 5.837-5.58l-2.544-2.544 1.414-1.414zm5.163 5.163l1.729 1.729c-.118.282-.185.594-.185.915 0 1.657 1.343 3 3 3 .321 0 .633-.067.915-.185l1.729 1.729c-.81.303-1.676.456-2.644.456-2.485 0-4.5-2.239-4.5-5 0-.968.153-1.834.456-2.644zm6.462-1.066c.795.229 1.553.539 2.271.924l-1.511 1.511c-.226-.063-.462-.098-.707-.098-1.657 0-3 1.343-3 3 0 .245.035.481.098.707l-1.511 1.511c-.385-.718-.695-1.476-.924-2.271.81-1.307 1.964-2.461 3.384-3.384z"/></svg>
-  </span>
+                                <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
                             </div>
                             <input type="text" placeholder="Ваш вебсайт*" v-model="website" required />
                             <label class="auth__checkbox">
@@ -41,18 +38,17 @@
                         <!-- STEP 2 -->
                         <div v-else class="auth__form">
                             <div class="upload-wrapper">
-<!--                                <label class="upload-label">-->
-<!--                                    <span class="attacher">-->
-<!--                                    <i class="icon attach"></i>-->
-<!--                                    Прикріпіть сертифікат якості*</span>-->
-<!--                                </label>-->
-                                <input type="file" name="certificate" accept="image/png, image/jpeg" @change="handleFile"/>
-                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG або PNG</p>
-
-
+                                <input type="file" name="certificate" accept="image/png, image/jpeg, application/pdf" @change="handleFile" />
+                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG, PNG або PDF</p>
                             </div>
 
                             <input type="text" placeholder="Ваша адреса складу" v-model="warehouse" required />
+                            <div v-if="geoError" class="geo-warning">
+                                <p>⚠️ Не вдалося визначити координати. Вкажіть місцезнаходження вручну, клікнувши по карті:</p>
+                                <div ref="mapRef" class="map-container"></div>
+                                <p v-if="lat && lng">📍 Обрані координати: {{ lat.toFixed(5) }}, {{ lng.toFixed(5) }}</p>
+                            </div>
+
                             <input type="text" placeholder="Додайте види води" v-model="waterTypes" />
                             <label class="auth__checkbox">
                                 <input type="checkbox" v-model="agree" />
@@ -72,10 +68,7 @@
                                 v-model="password"
                                 required
                             />
-                            <span class="auth__eye-icon" @click="showPassword = !showPassword">
-    <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M12 5c-7.633 0-12 6.5-12 6.5s4.367 6.5 12 6.5 12-6.5 12-6.5-4.367-6.5-12-6.5zm0 11c-2.485 0-4.5-2.239-4.5-5s2.015-5 4.5-5 4.5 2.239 4.5 5-2.015 5-4.5 5zm0-8c-1.657 0-3 1.567-3 3s1.343 3 3 3 3-1.567 3-3-1.343-3-3-3z"/></svg>
-    <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M2.293 2.293l19.414 19.414-1.414 1.414-2.387-2.387c-1.841.773-3.875 1.266-5.906 1.266-7.633 0-12-6.5-12-6.5 1.337-1.989 3.267-4.129 5.837-5.58l-2.544-2.544 1.414-1.414zm5.163 5.163l1.729 1.729c-.118.282-.185.594-.185.915 0 1.657 1.343 3 3 3 .321 0 .633-.067.915-.185l1.729 1.729c-.81.303-1.676.456-2.644.456-2.485 0-4.5-2.239-4.5-5 0-.968.153-1.834.456-2.644zm6.462-1.066c.795.229 1.553.539 2.271.924l-1.511 1.511c-.226-.063-.462-.098-.707-.098-1.657 0-3 1.343-3 3 0 .245.035.481.098.707l-1.511 1.511c-.385-.718-.695-1.476-.924-2.271.81-1.307 1.964-2.461 3.384-3.384z"/></svg>
-  </span>
+                            <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
                         </div>
                         <button type="submit" class="auth__submit">Увійти</button>
                     </template>
@@ -85,11 +78,13 @@
     </div>
 </template>
 
-
 <script setup>
 import logo from '@/assets/logo2.png'
-import { ref } from 'vue';
+import { ref, watchEffect, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import axios from 'axios';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const router = useRouter();
 const activeTab = ref('register');
@@ -104,8 +99,35 @@ const waterTypes = ref('');
 const agree = ref(false);
 const file = ref(null);
 const showPassword = ref(false);
+const manualMode = ref(false);
+const geoError = ref(false);
+const lat = ref(null);
+const lng = ref(null);
+const map = ref(null);
+const marker = ref(null);
+const mapRef = ref(null);
 
-import axios from 'axios';
+watchEffect(async () => {
+    if (manualMode.value && geoError.value && mapRef.value && !map.value) {
+        await nextTick();
+        map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data © OpenStreetMap contributors'
+        }).addTo(map.value);
+
+        map.value.on('click', function (e) {
+            lat.value = e.latlng.lat;
+            lng.value = e.latlng.lng;
+
+            if (marker.value) {
+                marker.value.setLatLng(e.latlng);
+            } else {
+                marker.value = L.marker(e.latlng).addTo(map.value);
+            }
+        });
+    }
+});
 
 const handleRegister = async () => {
     if (step.value === 1) {
@@ -115,10 +137,6 @@ const handleRegister = async () => {
 
     if (!warehouse.value || !file.value || !agree.value) {
         alert('Будь ласка, заповніть усі поля та погодьтесь з умовами.');
-        return;
-    }
-    if (!file.value) {
-        alert("Будь ласка, додайте фото сертифіката.");
         return;
     }
 
@@ -132,26 +150,37 @@ const handleRegister = async () => {
     formData.append('certificate', file.value);
 
     try {
+        if (manualMode.value && (lat.value === null || lng.value === null)) {
+            alert('Введіть координати вручну.');
+            return;
+        }
+
+        if (manualMode.value) {
+            formData.append('lat', lat.value);
+            formData.append('lng', lng.value);
+        }
+
         const res = await axios.post('/api/factory/register', formData);
         alert('Реєстрація успішна!');
         activeTab.value = 'login';
+
+        map.value?.remove();
+        map.value = null;
+        marker.value = null;
+        lat.value = null;
+        lng.value = null;
+        geoError.value = false;
+        manualMode.value = false;
+
     } catch (err) {
+        if (err.response?.data?.error === 'geocoding_failed') {
+            geoError.value = true;
+            manualMode.value = true;
+        }
         console.error(err);
         alert('Помилка при реєстрації');
     }
 };
-const goToStep2 = () => {
-    if (!email.value || !phone.value || !password.value || !website.value || !agree.value) {
-        alert('Будь ласка, заповніть усі поля та підтвердіть згоду.');
-        return;
-    }
-    step.value = 2;
-};
-
-const handleFile = (e) => {
-    file.value = e.target.files[0];
-};
-
 
 const handleLogin = async () => {
     if (!email.value || !password.value) {
@@ -166,10 +195,9 @@ const handleLogin = async () => {
         });
 
         const token = res.data.token;
-        const factory = res.data.user; // предполагаем, что возвращается объект пользователя
-
+        const factory = res.data.user;
         localStorage.setItem('token', token);
-        localStorage.setItem('factory', JSON.stringify(factory)); // сохраняем данные производителя
+        localStorage.setItem('factory', JSON.stringify(factory));
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
         alert('Успішний вхід!');
@@ -180,10 +208,39 @@ const handleLogin = async () => {
     }
 };
 
+const goToStep2 = () => {
+    if (!email.value || !phone.value || !password.value || !website.value || !agree.value) {
+        alert('Будь ласка, заповніть усі поля та підтвердіть згоду.');
+        return;
+    }
+    step.value = 2;
+};
+
+const handleFile = (e) => {
+    file.value = e.target.files[0];
+};
 </script>
 
 
 <style>
+.geo-warning {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #92400e;
+    margin-top: 20px;
+}
+.map-container {
+    height: 250px;
+    margin-top: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.manual-coords input {
+    margin-top: 8px;
+}
 .auth__password-wrapper {
     position: relative;
 }

@@ -17,7 +17,20 @@
                 <button @click="showTopUpModal = true">＋</button>
             </div>
         </div>
-
+        <div class="driver-map__filter-panel">
+            <button
+                :class="{ active: selectedWaterType === 'silver' }"
+                @click="setWaterFilter('silver')"
+            >
+                Показати срібну воду
+            </button>
+            <button
+                :class="{ active: selectedWaterType === 'deep' }"
+                @click="setWaterFilter('deep')"
+            >
+                Показати глибоке очищення
+            </button>
+        </div>
         <!-- Алерт -->
         <div v-if="newOrderAlert" class="order-alert">
             🚚 Нове замовлення додано на карту
@@ -57,7 +70,12 @@ const router = useRouter();
 const renderedOrderIds = ref([]);
 const orderMarkers = ref({});
 const currentTab = ref('new');
+const selectedWaterType = ref(null); // 'silver' | 'deep' | null
 
+const setWaterFilter = (type) => {
+    selectedWaterType.value = type;
+    fetchOrders(); // повторно подгружаем заказы с фильтром
+};
 const goToMap = () => router.push('/map');
 const switchTab = (tab) => {
     currentTab.value = tab;
@@ -107,6 +125,7 @@ const payWithFondy = async () => {
 
 const fetchOrders = async () => {
     try {
+        // Очистка старых маркеров
         Object.values(orderMarkers.value).forEach(marker => {
             map.value?.removeLayer(marker);
         });
@@ -120,7 +139,14 @@ const fetchOrders = async () => {
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        const orders = res.data;
+        let orders = res.data;
+
+        // 🔵 ФИЛЬТРАЦИЯ ПО ТИПУ ВОДЫ
+        if (selectedWaterType.value === 'silver') {
+            orders = orders.filter(order => order.water_type === 'Срібна');
+        } else if (selectedWaterType.value === 'deep') {
+            orders = orders.filter(order => order.water_type === 'Глибокого очищення');
+        }
 
         orders.forEach(order => {
             if (!order.latitude || !order.longitude) return;
@@ -150,6 +176,7 @@ const fetchOrders = async () => {
                         : order.address
                 }<br>
 <b>Кількість:</b> ${order.quantity} бут.<br>
+<b>Тип:</b> ${order.water_type}<br>
 <b>Оплата:</b> ${order.payment_method === 'cash' ? 'Готівка' : 'Картка'}<br>
 <b>Сума:</b> ${order.total_price}<br>
 ${
@@ -225,6 +252,31 @@ window.acceptOrder = async function(orderId) {
 </script>
 
 <style>
+.driver-map__filter-panel {
+    position: absolute;
+    bottom: 5px;
+    left: 10px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.driver-map__filter-panel button {
+    background-color: white;
+    color: #0095FF;
+    font-weight: 600;
+    padding: 8px 12px;
+    border: 2px solid #0095FF;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.driver-map__filter-panel button.active {
+    background-color: #0095FF;
+    color: white;
+}
 .order-switcher {
     display: flex;
     justify-content: center;

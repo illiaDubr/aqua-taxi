@@ -12,6 +12,7 @@ use App\Http\Controllers\FactoryAuthController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\Admin\FactoryController;
 use App\Http\Controllers\FactoryModerationController;
+use App\Http\Controllers\FactoryOrderController;
 
 Route::prefix('driver')->group(function () {
     Route::post('register', [DriverAuthController::class, 'register']);
@@ -87,4 +88,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/factories-with-certificates', [FactoryModerationController::class, 'factoriesWithCertificates']);
+});
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/factory-orders', [FactoryOrderController::class, 'store']);
+    Route::get('/factory-orders', [FactoryOrderController::class, 'forFactory']); // для производителя
 });

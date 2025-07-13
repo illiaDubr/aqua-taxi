@@ -10,11 +10,19 @@ class Factory extends Authenticatable
     use HasApiTokens;
 
     protected $fillable = [
-        'email', 'phone', 'password', 'website',
-        'warehouse_address', 'water_types',
-        'certificate_path', 'certificate_status', 'certificate_expiration',
-        'is_verified', 'verified_until',
-        'lat', 'lng',
+        'email',
+        'phone',
+        'password',
+        'website',
+        'warehouse_address',
+        'water_types',
+        'certificate_path',
+        'certificate_status',
+        'certificate_expiration',
+        'is_verified',
+        'verified_until',
+        'lat',
+        'lng', // ← ОБЯЗАТЕЛЬНО должно быть!
     ];
 
     protected $casts = [

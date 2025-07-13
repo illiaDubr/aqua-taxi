@@ -14,7 +14,7 @@ import './views/OrderView.vue';
 import './views/CertificatesPage.vue';
 import './views/CertificateReview.vue';
 import './views/FactoryView.vue';
-
+import './views/FactoryOrderModal.vue';
 // Создание и регистрация Pinia
 const pinia = createPinia();
 const app = createApp(App);

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\Log;
 class FactoryAuthController extends Controller
 {
     public function register(Request $request)
@@ -21,28 +21,47 @@ class FactoryAuthController extends Controller
             'website' => 'required|string',
             'warehouse_address' => 'required|string',
             'water_types' => 'nullable|string',
-            'certificate' => 'required|file|mimes:jpeg,png,jpg,pdf|max:10240', // добавил pdf + увеличил лимит
+            'certificate' => 'required|file|mimes:jpeg,png,jpg,pdf|max:10240',
+            'lat' => 'nullable|numeric',
+            'lng' => 'nullable|numeric',
         ]);
 
-        // 📥 Сохраняем сертификат
+        // Загрузка сертификата
         $certificatePath = $request->file('certificate')->store('certificates', 'public');
 
-        // 🌍 Геокодируем адрес через Nominatim
-        $geoResponse = Http::get('https://nominatim.openstreetmap.org/search', [
-            'q' => $request->warehouse_address,
-            'format' => 'json',
-            'limit' => 1
-        ]);
-
+        // Координаты по умолчанию — null
         $lat = null;
         $lng = null;
 
-        if ($geoResponse->ok() && count($geoResponse->json()) > 0) {
-            $lat = $geoResponse->json()[0]['lat'];
-            $lng = $geoResponse->json()[0]['lon'];
+        // Приоритет ручных координат, если заданы
+        if ($request->filled('lat') && $request->filled('lng')) {
+            $lat = $request->lat;
+            $lng = $request->lng;
+        } else {
+            // Пробуем геокодировать через Nominatim
+            $geoResponse = Http::timeout(5)->get('https://nominatim.openstreetmap.org/search', [
+                'q' => $request->warehouse_address,
+                'format' => 'json',
+                'limit' => 1,
+            ]);
+
+            if ($geoResponse->ok() && count($geoResponse->json()) > 0) {
+                $lat = $geoResponse->json()[0]['lat'];
+                $lng = $geoResponse->json()[0]['lon'];
+            } else {
+                Log::warning('Nominatim не знайшов координати', [
+                    'address' => $request->warehouse_address,
+                    'response' => $geoResponse->json()
+                ]);
+
+                return response()->json([
+                    'error' => 'geocoding_failed',
+                    'message' => 'Не вдалося визначити координати. Встановіть точку вручну.',
+                ], 422);
+            }
         }
 
-        // 🏭 Создаём запись производителя
+        // Создание записи
         $factory = Factory::create([
             'email' => $request->email,
             'phone' => $request->phone,
@@ -50,8 +69,8 @@ class FactoryAuthController extends Controller
             'website' => $request->website,
             'warehouse_address' => $request->warehouse_address,
             'water_types' => $request->water_types,
-            'certificate_path' => str_replace('public/', 'storage/', $certificatePath), // сохраняем в поле certificate_file
-            'certificate_status' => 'pending', // выставляем статус сертификата
+            'certificate_path' => str_replace('public/', 'storage/', $certificatePath),
+            'certificate_status' => 'pending',
             'certificate_expiration' => null,
             'is_verified' => false,
             'verified_until' => null,
@@ -59,7 +78,10 @@ class FactoryAuthController extends Controller
             'lng' => $lng,
         ]);
 
-        return response()->json(['message' => 'Реєстрація успішна. Сертифікат відправлений на модерацію.', 'factory' => $factory], 201);
+        return response()->json([
+            'message' => 'Реєстрація успішна. Сертифікат відправлений на модерацію.',
+            'factory' => $factory,
+        ], 201);
     }
 
 

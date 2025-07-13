@@ -1,6 +1,14 @@
 <template>
     <div class="map-page">
         <div ref="mapContainer" class="map-container"></div>
+
+        <FactoryOrderModal
+            v-if="showModal"
+            :factory-id="selectedFactory.id"
+            :water-type="selectedFactory.water_types"
+            :price-per-bottle="33.5"
+            :on-close="() => showModal = false"
+        />
     </div>
 </template>
 
@@ -9,9 +17,14 @@ import { onMounted, ref } from 'vue';
 import axios from 'axios';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import FactoryOrderModal from '@/views/FactoryOrderModal.vue';
+
 
 const mapContainer = ref();
 const factories = ref([]);
+
+const selectedFactory = ref(null);
+const showModal = ref(false);
 
 const fetchFactories = async () => {
     try {
@@ -33,11 +46,20 @@ onMounted(async () => {
 
     factories.value.forEach(factory => {
         const marker = L.marker([factory.lat, factory.lng]).addTo(map);
-        marker.bindPopup(`<strong>Склад</strong><br>${factory.warehouse_address}`);
+        marker.bindPopup(`
+      <strong>Склад:</strong> ${factory.warehouse_address}<br>
+      <strong>Email:</strong> ${factory.email}<br>
+      ${factory.website ? `<strong>Сайт:</strong> <a href="${factory.website}" target="_blank">${factory.website}</a><br>` : ''}
+    `);
+
+        // 💡 Обработка клика по маркеру
+        marker.on('click', () => {
+            selectedFactory.value = factory;
+            showModal.value = true;
+        });
     });
 });
 </script>
-
 
 <style scoped>
 .map-page {
