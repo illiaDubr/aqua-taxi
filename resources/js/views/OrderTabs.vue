@@ -17,10 +17,11 @@
                 <button @click="showTopUpModal = true">＋</button>
             </div>
         </div>
+
         <div class="driver-map__filter-panel">
             <button
-                :class="{ active: selectedWaterType === 'silver' }"
-                @click="setWaterFilter('silver')"
+                :class="{ active: selectedWaterType === 'срібна' }"
+                @click="setWaterFilter('срібна')"
             >
                 Показати срібну воду
             </button>
@@ -31,6 +32,7 @@
                 Показати глибоке очищення
             </button>
         </div>
+
         <!-- Алерт -->
         <div v-if="newOrderAlert" class="order-alert">
             🚚 Нове замовлення додано на карту
@@ -52,110 +54,110 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
-import axios from 'axios';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { ref, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
-const mapContainer = ref();
-const map = ref(null);
-const bottles = ref(0);
-const balance = ref(0);
-const newOrders = ref([]);
-const newOrderAlert = ref(false);
-const showTopUpModal = ref(false);
-const topUpAmount = ref('');
-const router = useRouter();
-const renderedOrderIds = ref([]);
-const orderMarkers = ref({});
-const currentTab = ref('new');
-const selectedWaterType = ref(null); // 'silver' | 'deep' | null
+const mapContainer = ref()
+const map = ref(null)
+const bottles = ref(0)
+const balance = ref(0)
+const newOrders = ref([])
+const newOrderAlert = ref(false)
+const showTopUpModal = ref(false)
+const topUpAmount = ref('')
+const router = useRouter()
+const renderedOrderIds = ref([])
+const orderMarkers = ref({})
+const currentTab = ref('new')
+const selectedWaterType = ref(null) // 'silver' | 'deep' | null
 
 const setWaterFilter = (type) => {
-    selectedWaterType.value = type;
-    fetchOrders(); // повторно подгружаем заказы с фильтром
-};
-const goToMap = () => router.push('/map');
+    selectedWaterType.value = type
+    fetchOrders()
+}
+const goToMap = () => router.push('/map')
 const switchTab = (tab) => {
-    currentTab.value = tab;
-    fetchOrders();
-};
+    currentTab.value = tab
+    fetchOrders()
+}
 
 const fetchDriverData = async () => {
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         const res = await axios.get('/api/driver/profile', {
             headers: { Authorization: `Bearer ${token}` }
-        });
-        bottles.value = res.data.bottles;
-        balance.value = res.data.balance;
+        })
+        bottles.value = res.data.bottles
+        balance.value = res.data.balance
     } catch (e) {
-        console.error('❌ Помилка отримання даних водія', e);
+        console.error('❌ Помилка отримання даних водія', e)
     }
-};
+}
 
 const payWithFondy = async () => {
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        const { url, params } = res.data;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
+        const { url, params } = res.data
+        const form = document.createElement('form')
+        form.method = 'POST'
+        form.action = url
 
         Object.entries(params).forEach(([key, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-        });
+            const input = document.createElement('input')
+            input.type = 'hidden'
+            input.name = key
+            input.value = value
+            form.appendChild(input)
+        })
 
-        document.body.appendChild(form);
-        form.submit();
+        document.body.appendChild(form)
+        form.submit()
     } catch (error) {
-        alert('❌ Помилка при генерації платежу');
-        console.error(error);
+        alert('❌ Помилка при генерації платежу')
+        console.error(error)
     }
-};
+}
 
 const fetchOrders = async () => {
     try {
         // Очистка старых маркеров
         Object.values(orderMarkers.value).forEach(marker => {
-            map.value?.removeLayer(marker);
-        });
-        orderMarkers.value = {};
-        renderedOrderIds.value = [];
-        newOrders.value = [];
+            map.value?.removeLayer(marker)
+        })
+        orderMarkers.value = {}
+        renderedOrderIds.value = []
+        newOrders.value = []
 
-        const token = localStorage.getItem('driver_token');
-        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new';
+        const token = localStorage.getItem('driver_token')
+        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
         const res = await axios.get(endpoint, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        let orders = res.data;
+        let orders = res.data
 
         // 🔵 ФИЛЬТРАЦИЯ ПО ТИПУ ВОДЫ
         if (selectedWaterType.value === 'silver') {
-            orders = orders.filter(order => order.water_type === 'Срібна');
+            orders = orders.filter(order => order.water_type === 'Срібна')
         } else if (selectedWaterType.value === 'deep') {
-            orders = orders.filter(order => order.water_type === 'Глибокого очищення');
+            orders = orders.filter(order => order.water_type === 'Глибокого очищення')
         }
 
         orders.forEach(order => {
-            if (!order.latitude || !order.longitude) return;
-            const lat = parseFloat(order.latitude);
-            const lng = parseFloat(order.longitude);
-            if (isNaN(lat) || isNaN(lng)) return;
+            if (!order.latitude || !order.longitude) return
+            const lat = parseFloat(order.latitude)
+            const lng = parseFloat(order.longitude)
+            if (isNaN(lat) || isNaN(lng)) return
 
-            renderedOrderIds.value.push(order.id);
-            newOrders.value.push(order);
+            renderedOrderIds.value.push(order.id)
+            newOrders.value.push(order)
 
             const icon = L.icon({
                 iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -163,92 +165,101 @@ const fetchOrders = async () => {
                 iconAnchor: [12, 41],
                 popupAnchor: [1, -34],
                 shadowUrl: null
-            });
+            })
+
+            // Ссылка на карты + явный бейдж
+            const hasAddress = order.address && String(order.address).trim().length > 0
+            const googleLink = hasAddress
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`
+                : `https://www.google.com/maps?q=${lat},${lng}`
+            const addressText = hasAddress ? order.address : `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+            const addressHtml = `
+        <a class="map-link" href="${googleLink}" target="_blank" rel="noopener">
+          ${addressText}
+          <span class="ext-hint">↗ Перейти</span>
+        </a>
+      `
 
             const marker = L.marker([lat, lng], { icon })
                 .addTo(map.value)
                 .bindPopup(`
           <div class="order-popup">
             <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
-<b>Адреса:</b> ${
-                    currentTab.value === 'active'
-                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}" target="_blank">${order.address}</a>`
-                        : order.address
-                }<br>
-<b>Кількість:</b> ${order.quantity} бут.<br>
-<b>Тип:</b> ${order.water_type}<br>
-<b>Оплата:</b> ${order.payment_method === 'cash' ? 'Готівка' : 'Картка'}<br>
-<b>Сума:</b> ${order.total_price}<br>
-${
+            <b>Адреса:</b> ${addressHtml}<br>
+            <b>Кількість:</b> ${order.quantity} бут.<br>
+            <b>Тип:</b> ${order.water_type}<br>
+            <b>Оплата:</b> ${order.payment_method === 'cash' ? 'Готівка' : 'Картка'}<br>
+            <b>Сума:</b> ${order.total_price}<br>
+            ${
                     currentTab.value === 'active' && order.user
                         ? `<b>Замовник:</b> ${order.user.name} ${order.user.surname}<br><b>Телефон:</b> ${order.user.phone}<br>`
                         : ''
-                }<br>${
+                }
+            <br>${
                     currentTab.value === 'new'
                         ? `<button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>`
                         : ''
                 }
-
           </div>
-        `);
+        `)
 
-            orderMarkers.value[order.id] = marker;
+            orderMarkers.value[order.id] = marker
 
             const pulse = L.circle([lat, lng], {
                 radius: 60,
                 color: '#3498db',
                 fillColor: '#3498db',
                 fillOpacity: 0.3
-            }).addTo(map.value);
+            }).addTo(map.value)
 
-            setTimeout(() => map.value?.removeLayer(pulse), 3000);
-            map.value?.setView([lat, lng], 14);
-        });
+            setTimeout(() => map.value?.removeLayer(pulse), 3000)
+            map.value?.setView([lat, lng], 14)
+        })
     } catch (error) {
-        console.error('❌ Помилка завантаження замовлень', error);
+        console.error('❌ Помилка завантаження замовлень', error)
     }
-};
+}
 
 onMounted(async () => {
-    await fetchDriverData();
-    await nextTick();
-    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13);
+    await fetchDriverData()
+    await nextTick()
+    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map.value);
-    await fetchOrders();
-});
+    }).addTo(map.value)
+    await fetchOrders()
+})
 
 window.acceptOrder = async function(orderId) {
-    const confirmAccept = confirm('Підтвердити прийняття замовлення?');
-    if (!confirmAccept) return;
+    const confirmAccept = confirm('Підтвердити прийняття замовлення?')
+    if (!confirmAccept) return
 
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         await axios.post(`/api/driver/orders/${orderId}/accept`, {}, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        alert('✅ Замовлення прийнято');
-        map.value?.closePopup();
+        alert('✅ Замовлення прийнято')
+        map.value?.closePopup()
 
-        const marker = orderMarkers.value[orderId];
+        const marker = orderMarkers.value[orderId]
         if (marker) {
-            map.value?.removeLayer(marker);
-            delete orderMarkers.value[orderId];
+            map.value?.removeLayer(marker)
+            delete orderMarkers.value[orderId]
         }
 
-        newOrders.value = newOrders.value.filter(o => o.id !== orderId);
-        renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId);
+        newOrders.value = newOrders.value.filter(o => o.id !== orderId)
+        renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId)
     } catch (error) {
         if (error.response?.status === 409) {
-            alert('❌ Це замовлення вже прийнято іншим водієм');
+            alert('❌ Це замовлення вже прийнято іншим водієм')
         } else {
-            alert('❌ Помилка при прийнятті замовлення');
-            console.error(error);
+            alert('❌ Помилка при прийнятті замовлення')
+            console.error(error)
         }
     }
-};
+}
 </script>
 
 <style>
@@ -277,6 +288,7 @@ window.acceptOrder = async function(orderId) {
     background-color: #0095FF;
     color: white;
 }
+
 .order-switcher {
     display: flex;
     justify-content: center;
@@ -309,11 +321,9 @@ window.acceptOrder = async function(orderId) {
     cursor: pointer;
     font-weight: 600;
 }
-
 .accept-button:hover {
     background-color: #43a047;
 }
-
 
 .driver-map {
     position: relative;
@@ -410,5 +420,29 @@ window.acceptOrder = async function(orderId) {
     border-radius: 8px;
     padding: 12px;
     cursor: pointer;
+}
+
+/* ссылка в попапе адреса */
+.order-popup a.map-link {
+    color: #1a73e8;
+    text-decoration: underline;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.order-popup .ext-hint {
+    font-size: 12px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid #1a73e8;
+    background: #e8f1ff;
+    color: #1a73e8;
+    font-weight: 700;
+}
+.order-popup a.map-link:hover .ext-hint {
+    background: #1a73e8;
+    color: #fff;
 }
 </style>
