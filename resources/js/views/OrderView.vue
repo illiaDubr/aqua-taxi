@@ -90,8 +90,8 @@ const confirmed = ref(false);
 const rating = ref(0);
 
 const products = ref([
-    { title: 'Глибокого\nочищення, 19л', price: 120, image: water1 },
-    { title: 'Срібна вода, 19л', price: 130, image: water2 }
+    { title: 'Срібна вода, 19л', price: 120, image: water1 },
+    { title: 'Глибокого\nочищення, 19л', price: 130, image: water2 }
 ]);
 
 const goToOrderForm = (product) => {

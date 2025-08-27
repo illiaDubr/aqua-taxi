@@ -24,13 +24,14 @@ class OrderController extends Controller
             'custom_time'        => 'nullable|date',
             'payment_method'     => 'required|in:cash,card',
 
-            // координаты с фронта (любой вариант имён)
+            // новая опция
+            'delivery_option'    => 'required|in:home,entrance,coffee',
+
+            // координаты
             'lat'        => 'nullable|numeric|between:-90,90',
             'lng'        => 'nullable|numeric|between:-180,180',
             'latitude'   => 'nullable|numeric|between:-90,90',
             'longitude'  => 'nullable|numeric|between:-180,180',
-
-            'total_price'        => 'nullable|numeric|min:0',
         ]);
 
         if ($validated['delivery_time_type'] === 'custom' && empty($validated['custom_time'])) {
@@ -40,11 +41,11 @@ class OrderController extends Controller
             ], 422);
         }
 
-        // Нормализуем координаты
+        // Нормализация координат
         $latitude  = $request->input('lat', $request->input('latitude'));
         $longitude = $request->input('lng', $request->input('longitude'));
 
-        // Если координат нет — попробуем геокодить адрес (как раньше)
+        // Геокодинг при отсутствии координат
         if (($latitude === null || $longitude === null) && !empty($validated['address'])) {
             try {
                 $geo = \Illuminate\Support\Facades\Http::withHeaders([
@@ -56,12 +57,12 @@ class OrderController extends Controller
                     $latitude  = $j[0]['lat'] ?? null;
                     $longitude = $j[0]['lon'] ?? null;
                 }
-            } catch (\Throwable $e) { \Log::error('GEO search error', ['e'=>$e->getMessage()]); }
+            } catch (\Throwable $e) {
+                \Log::error('GEO search error', ['e'=>$e->getMessage()]);
+            }
         }
 
-        // === КЛЮЧЕВАЯ ЧАСТЬ ===
-        // Если адрес пустой, но есть координаты — реверс-геокодим,
-        // а при неудаче — подставляем "Manual point: {lat}, {lng}".
+        // Реверс-геокодинг
         $addressToSave = $validated['address'] ?? null;
         if ((empty($addressToSave) || trim((string)$addressToSave) === '')
             && $latitude !== null && $longitude !== null) {
@@ -77,20 +78,41 @@ class OrderController extends Controller
                 if ($rev->ok() && ($r = $rev->json()) && !empty($r['display_name'])) {
                     $addressToSave = mb_substr($r['display_name'], 0, 255);
                 }
-            } catch (\Throwable $e) { \Log::error('GEO reverse error', ['e'=>$e->getMessage()]); }
+            } catch (\Throwable $e) {
+                \Log::error('GEO reverse error', ['e'=>$e->getMessage()]);
+            }
 
             if (empty($addressToSave)) {
                 $addressToSave = sprintf('Manual point: %.5f, %.5f', (float)$latitude, (float)$longitude);
             }
         }
-        // === /КЛЮЧЕВАЯ ЧАСТЬ ===
 
-        // Пересчёт цены на бэке
+        // === Расчёт цены ===
         $PRICE_PER_BOTTLE = 120;
-        $total = (int)$validated['quantity'] * $PRICE_PER_BOTTLE;
+        $total = 0;
 
+        switch ($validated['delivery_option']) {
+            case 'home':
+                $total = $validated['quantity'] * $PRICE_PER_BOTTLE;
+                break;
+
+            case 'entrance':
+                $total = $validated['quantity'] * $PRICE_PER_BOTTLE * 0.8;
+                break;
+
+            case 'coffee':
+                if ($validated['quantity'] < 5) {
+                    return response()->json([
+                        'message' => 'Для доставки в кав’ярню мінімальне замовлення — 5 бутлів'
+                    ], 422);
+                }
+                $total = $validated['quantity'] * 70;
+                break;
+        }
+
+        // Сохранение заказа
         $order = \App\Models\Order::create([
-            'address'            => $addressToSave, // всегда НЕ пустая строка к моменту сохранения
+            'address'            => $addressToSave,
             'quantity'           => (int)$validated['quantity'],
             'bottle_option'      => $validated['bottle_option'],
             'delivery_time_type' => $validated['delivery_time_type'],
@@ -100,10 +122,12 @@ class OrderController extends Controller
             'user_id'            => \Illuminate\Support\Facades\Auth::id(),
             'latitude'           => $latitude !== null ? (float)$latitude : null,
             'longitude'          => $longitude !== null ? (float)$longitude : null,
+            'delivery_option'    => $validated['delivery_option'],
         ]);
 
         return response()->json($order, 201);
     }
+
 
 
 
@@ -143,7 +167,19 @@ class OrderController extends Controller
             'order' => $order,
         ]);
     }
+    public function activeOrders(Request $request)
+    {
+        $userId = $request->user()->id;
 
+        $orders = Order::query()
+            ->with(['driver:id,name,surname,phone']) // подгружаем данные водителя
+            ->where('user_id', $userId)              // фильтр по клиенту
+            ->whereIn('status', ['new', 'in_progress'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json($orders);
+    }
 
 
 

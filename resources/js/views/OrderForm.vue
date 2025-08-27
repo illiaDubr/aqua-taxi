@@ -8,15 +8,19 @@ import 'leaflet/dist/leaflet.css'
 const route = useRoute()
 const router = useRouter()
 
+// название товара
 const productName = decodeURIComponent(route.params.productId || '')
-const pricePerBottle = 120
 
+// form state
 const address = ref('')
 const quantity = ref('')
 const bottleOption = ref('own')
 const timeOption = ref('now')
 const customTime = ref('')
 const paymentMethod = ref('cash')
+
+// новая опция
+const deliveryOption = ref('home') // home | entrance | coffee
 
 // ручной выбор локации
 const manualMode = ref(false)
@@ -26,21 +30,34 @@ const marker = ref(null)
 const lat = ref(null)
 const lng = ref(null)
 
+// расчет цены
 const totalAmount = computed(() => {
     const qty = parseInt(quantity.value, 10)
-    return isNaN(qty) ? 0 : qty * pricePerBottle
+    if (isNaN(qty)) return 0
+
+    switch (deliveryOption.value) {
+        case 'home':
+            return qty * 120
+        case 'entrance':
+            return qty * 120 * 0.8
+        case 'coffee':
+            return qty >= 5 ? qty * 70 : 0
+        default:
+            return 0
+    }
 })
 
+// validate address
 const validateAddress = async (addr) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`
     const response = await fetch(url, {
-        headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' } // укажи свой email/домен
+        headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' }
     })
     const data = await response.json()
     return data.length ? data[0] : null
 }
 
-// инициализация/разрушение карты при показе/скрытии блока
+// destroy map
 const destroyMap = () => {
     if (map.value) {
         map.value.off()
@@ -69,7 +86,6 @@ watchEffect(async () => {
     }
 
     if (!manualMode.value) {
-        // при скрытии режима — очищаем карту и координаты
         destroyMap()
         lat.value = null
         lng.value = null
@@ -93,16 +109,22 @@ const createOrder = async () => {
             }
         }
 
+        // coffee check
+        if (deliveryOption.value === 'coffee' && quantity.value < 5) {
+            alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів')
+            return
+        }
+
         const token = localStorage.getItem('user_token')
 
-        // СБОРКА payload: адрес отправляем ТОЛЬКО если не manualMode и поле не пустое
         const payload = {
             quantity: Number(quantity.value),
             bottle_option: bottleOption.value,
             delivery_time_type: timeOption.value,
             custom_time: customTime.value || null,
             payment_method: paymentMethod.value,
-            total_price: totalAmount.value, // бэк всё равно пересчитает
+            total_price: totalAmount.value,
+            delivery_option: deliveryOption.value,
             lat: manualMode.value ? lat.value : Number(result?.lat),
             lng: manualMode.value ? lng.value : Number(result?.lon)
         }
@@ -131,7 +153,6 @@ const createOrder = async () => {
                 error.response.data?.message ||
                 'Validation error'
             alert('❌ ' + msg)
-            console.error('422 errors:', errs)
             return
         }
         alert('❌ Помилка створення замовлення')
@@ -148,17 +169,15 @@ const createOrder = async () => {
             <h2 class="form__title">Оформлення<br />замовлення</h2>
             <p class="form__subtitle">Срібна вода, 19л</p>
 
+            <!-- адрес -->
             <div class="form__group">
                 <label>Введіть ваші дані</label>
-
                 <input type="text" placeholder="Ваша адреса" v-model="address" />
 
-                <!-- кнопка включения ручного выбора -->
                 <button type="button" class="manual-btn" @click="manualMode = !manualMode">
                     {{ manualMode ? 'Сховати карту' : 'Вибрати на карті' }}
                 </button>
 
-                <!-- карта для ручного выбора -->
                 <div v-if="manualMode" class="geo-warning">
                     <p>📍 Клікніть по карті, щоб обрати місцезнаходження:</p>
                     <div ref="mapRef" class="map-container"></div>
@@ -171,6 +190,23 @@ const createOrder = async () => {
                 </select>
             </div>
 
+            <!-- опция доставки -->
+            <div class="form__group">
+                <label>Варіант доставки</label>
+                <div class="form__switch">
+                    <button :class="{ active: deliveryOption === 'home' }" @click="deliveryOption = 'home'">
+                        В квартиру
+                    </button>
+                    <button :class="{ active: deliveryOption === 'entrance' }" @click="deliveryOption = 'entrance'">
+                        Під під’їзд (-20%)
+                    </button>
+                    <button :class="{ active: deliveryOption === 'coffee' }" @click="deliveryOption = 'coffee'">
+                        Кав’ярня (від 5 бутлів)
+                    </button>
+                </div>
+            </div>
+
+            <!-- бутли -->
             <div class="form__group">
                 <label>Бутелі</label>
                 <div class="form__switch">
@@ -179,24 +215,26 @@ const createOrder = async () => {
                 </div>
             </div>
 
+            <!-- время -->
             <div class="form__group">
                 <label>Час</label>
                 <div class="form__switch">
-                    <button :class="{ active: timeOption === 'now' }" @click="timeOption = 'now'">Привезти в найближчий час</button>
-                    <button :class="{ active: timeOption === 'custom' }" @click="timeOption = 'custom'">Привезти на обраний час</button>
+                    <button :class="{ active: timeOption === 'now' }" @click="timeOption = 'now'">Найближчий час</button>
+                    <button :class="{ active: timeOption === 'custom' }" @click="timeOption = 'custom'">На обраний час</button>
                 </div>
-
                 <input v-if="timeOption === 'custom'" type="datetime-local" v-model="customTime" />
             </div>
 
+            <!-- оплата -->
             <div class="form__group">
                 <label>Спосіб оплати</label>
                 <div class="form__switch">
                     <button :class="{ active: paymentMethod === 'cash' }" @click="paymentMethod = 'cash'">Готівка</button>
-                    <button :class="{ active: paymentMethod === 'card' }" @click="paymentMethod = 'card'">Оплата карткою</button>
+                    <button :class="{ active: paymentMethod === 'card' }" @click="paymentMethod = 'card'">Картка</button>
                 </div>
             </div>
 
+            <!-- итог -->
             <div class="form__footer">
                 <span class="form__total">До сплати:</span>
                 <span class="form__amount">{{ totalAmount }} грн</span>
@@ -206,6 +244,57 @@ const createOrder = async () => {
         </div>
     </div>
 </template>
+
+<style scoped>
+.form__switch {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.form__switch button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    background: #f1f1f1;
+    border: none;
+    font-size: 15px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.form__switch button.active {
+    background: #007bff;
+    color: white;
+}
+/* остальной стиль такой же как у тебя */
+.manual-btn {
+    margin-top: -8px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #007bff;
+    background: #fff;
+    color: #007bff;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.geo-warning {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #92400e;
+    margin-bottom: 10px;
+}
+.map-container {
+    height: 250px;
+    margin-top: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+</style>
 
 <style scoped>
 .form__switch {

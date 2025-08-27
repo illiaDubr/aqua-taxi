@@ -14,18 +14,9 @@ class Order extends Model
     // protected $table = 'orders';
 
     protected $fillable = [
-        'address',
-        'quantity',
-        'bottle_option',          // own | buy
-        'delivery_time_type',     // now | custom
-        'custom_time',
-        'payment_method',         // cash | card
-        'total_price',
-        'user_id',
-        'driver_id',
-        'status',                 // new | in_progress | completed | cancelled
-        'latitude',
-        'longitude',
+        'user_id','driver_id','address','quantity','bottle_option',
+        'delivery_time_type','custom_time','payment_method','total_price',
+        'latitude','longitude','delivery_option','water_type','status','rating'
     ];
 
     protected $casts = [
