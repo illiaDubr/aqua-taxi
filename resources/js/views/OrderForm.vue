@@ -8,10 +8,31 @@ import 'leaflet/dist/leaflet.css'
 const route = useRoute()
 const router = useRouter()
 
-// название товара
-const productName = decodeURIComponent(route.params.productId || '')
+// === Имя товара реактивно из параметра маршрута ===
+const productName = computed(() => {
+    return decodeURIComponent(route.params.productId || 'Срібна вода, 19л')
+})
 
-// form state
+// === Тип воды из имени товара (устойчиво к ", 19л", падежам и т.п.)
+const waterType = computed(() => {
+    const n = (productName.value || '')
+        .toLowerCase()
+        .replace(/19\s*л/g, '')
+        .replace(/[(),]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    if (n.includes('срібн')) return 'Срібна'
+    if (n.includes('глибок')) return 'Глибокого очищення'
+    return null
+})
+
+// === Базовые цены по типам воды ===
+const PRODUCT_PRICES = {
+    'Срібна вода, 19л': 120,
+    'Глибокого очищення, 19л': 130,
+}
+
+// --- form state
 const address = ref('')
 const quantity = ref('')
 const bottleOption = ref('own')
@@ -22,7 +43,7 @@ const paymentMethod = ref('cash')
 // новая опция
 const deliveryOption = ref('home') // home | entrance | coffee
 
-// ручной выбор локации
+// --- карта / ручной выбор локации
 const manualMode = ref(false)
 const mapRef = ref(null)
 const map = ref(null)
@@ -30,34 +51,35 @@ const marker = ref(null)
 const lat = ref(null)
 const lng = ref(null)
 
-// расчет цены
+// --- базовая цена зависит от выбранного типа воды
+const basePrice = computed(() => PRODUCT_PRICES[productName.value] ?? 120)
+
+// --- расчёт суммы
 const totalAmount = computed(() => {
     const qty = parseInt(quantity.value, 10)
     if (isNaN(qty)) return 0
 
-    switch (deliveryOption.value) {
-        case 'home':
-            return qty * 120
-        case 'entrance':
-            return qty * 120 * 0.8
-        case 'coffee':
-            return qty >= 5 ? qty * 70 : 0
-        default:
-            return 0
+    // спец-тариф для кав'ярні
+    if (deliveryOption.value === 'coffee') {
+        return qty >= 5 ? qty * 70 : 0
     }
+
+    const price = basePrice.value
+    if (deliveryOption.value === 'entrance') return Math.round(qty * price * 0.8)
+    return qty * price
 })
 
-// validate address
+// --- валидация адреса через Nominatim
 const validateAddress = async (addr) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`
     const response = await fetch(url, {
-        headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' }
+        headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' },
     })
     const data = await response.json()
     return data.length ? data[0] : null
 }
 
-// destroy map
+// --- уничтожение карты
 const destroyMap = () => {
     if (map.value) {
         map.value.off()
@@ -67,13 +89,14 @@ const destroyMap = () => {
     marker.value = null
 }
 
+// --- инициализация/сброс карты по manualMode
 watchEffect(async () => {
     if (manualMode.value && mapRef.value && !map.value) {
         await nextTick()
         map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data © OpenStreetMap contributors'
+            attribution: 'Map data © OpenStreetMap contributors',
         }).addTo(map.value)
 
         map.value.on('click', (e) => {
@@ -92,6 +115,7 @@ watchEffect(async () => {
     }
 })
 
+// --- отправка заказа
 const createOrder = async () => {
     try {
         let result = null
@@ -109,15 +133,23 @@ const createOrder = async () => {
             }
         }
 
-        // coffee check
+        // проверка для кав'ярні
         if (deliveryOption.value === 'coffee' && quantity.value < 5) {
             alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів')
+            return
+        }
+
+        // подстраховка: не отправляем заказ с неизвестным типом воды
+        if (!waterType.value) {
+            alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.')
             return
         }
 
         const token = localStorage.getItem('user_token')
 
         const payload = {
+            product_name: productName.value,   // полное название (например, "Срібна вода, 19л")
+            water_type: waterType.value,       // нормализованный тип ("Срібна" | "Глибокого очищення")
             quantity: Number(quantity.value),
             bottle_option: bottleOption.value,
             delivery_time_type: timeOption.value,
@@ -126,24 +158,24 @@ const createOrder = async () => {
             total_price: totalAmount.value,
             delivery_option: deliveryOption.value,
             lat: manualMode.value ? lat.value : Number(result?.lat),
-            lng: manualMode.value ? lng.value : Number(result?.lon)
+            lng: manualMode.value ? lng.value : Number(result?.lon),
         }
         if (!manualMode.value && address.value.trim()) {
             payload.address = address.value.trim()
         }
 
         await axios.post('/api/orders', payload, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
         })
 
         router.push({
             name: 'orders',
             query: {
                 showPopup: true,
-                product: productName,
+                product: productName.value,
                 quantity: quantity.value,
-                time: timeOption.value === 'custom' ? customTime.value : 'Найближчий час'
-            }
+                time: timeOption.value === 'custom' ? customTime.value : 'Найближчий час',
+            },
         })
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 422) {
@@ -167,7 +199,7 @@ const createOrder = async () => {
 
         <div class="form__card">
             <h2 class="form__title">Оформлення<br />замовлення</h2>
-            <p class="form__subtitle">Срібна вода, 19л</p>
+            <p class="form__subtitle">{{ productName }}</p>
 
             <!-- адрес -->
             <div class="form__group">
@@ -263,59 +295,6 @@ const createOrder = async () => {
     cursor: pointer;
     transition: all 0.2s ease;
 }
-.form__switch button.active {
-    background: #007bff;
-    color: white;
-}
-/* остальной стиль такой же как у тебя */
-.manual-btn {
-    margin-top: -8px;
-    margin-bottom: 8px;
-    padding: 8px 12px;
-    font-size: 14px;
-    border: 1px solid #007bff;
-    background: #fff;
-    color: #007bff;
-    border-radius: 8px;
-    cursor: pointer;
-}
-.geo-warning {
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #92400e;
-    margin-bottom: 10px;
-}
-.map-container {
-    height: 250px;
-    margin-top: 10px;
-    border-radius: 8px;
-    overflow: hidden;
-}
-</style>
-
-<style scoped>
-.form__switch {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.form__switch button {
-    flex: 1;
-    padding: 12px;
-    border-radius: 10px;
-    background: #f1f1f1;
-    border: none;
-    font-size: 15px;
-    font-weight: 500;
-    color: #555;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
 .form__switch button.active {
     background: #007bff;
     color: white;
