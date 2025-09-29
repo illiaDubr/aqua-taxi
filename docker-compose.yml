@@ -12,13 +12,14 @@ services:
         depends_on:
             - mysql
         networks: [aqua]
+        # ВАЖНО: без volumes у app — образ содержит собранный Vite (public/build)
 
     nginx:
         image: nginx:alpine
         container_name: aqua-nginx
         ports:
             - "80:80"
-            # - "443:443"   # если добавишь SSL
+            # - "443:443"   # включишь при добавлении SSL
         volumes:
             - .:/var/www:ro
             - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
