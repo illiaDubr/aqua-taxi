@@ -13,12 +13,13 @@
 
             <transition name="fade" mode="out-in">
                 <form @submit.prevent="submitForm" class="auth__form" :key="activeTab">
-                    <input type="email" placeholder="Ваша пошта*" v-model="email" required />
-                    <input v-if="activeTab === 'register'" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
-                    <input v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
-                    <input v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
+                    <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model="email" required />
+                    <input class="auth__input" v-if="activeTab === 'register'" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
+                    <input class="auth__input" v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
+                    <input class="auth__input" v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
                     <div class="auth__password-wrapper">
                         <input
+                            class="auth__input"
                             :type="showPassword ? 'text' : 'password'"
                             :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
                             v-model="password"
@@ -130,12 +131,11 @@ body {
 .auth {
     position: relative;
     min-height: 100vh;
+    padding: 60px 0px 0px 0px;
     background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%);
     display: flex;
-    justify-content: center;
     flex-direction: column;
     align-items: center;
-    overflow: hidden;
 }
 .auth__bg {
     position: absolute;
@@ -198,7 +198,9 @@ body {
     gap: 16px;
     transition: all 0.2s ease;
 }
-.auth__form input {
+
+.auth__input {
+    width: 100%;
     padding: 14px;
     font-size: 15px;
     border: 1px solid #ccc;

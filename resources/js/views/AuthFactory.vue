@@ -16,10 +16,11 @@
                     <template v-if="activeTab === 'register'">
                         <!-- STEP 1 -->
                         <div v-if="step === 1" class="auth__form">
-                            <input type="email" placeholder="Ваша пошта*" v-model="email" required />
-                            <input type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
+                            <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model="email" required />
+                            <input class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
                             <div class="auth__password-wrapper">
                                 <input
+                                    class="auth__input"
                                     :type="showPassword ? 'text' : 'password'"
                                     :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
                                     v-model="password"
@@ -274,12 +275,11 @@ body {
 .auth {
     position: relative;
     min-height: 100vh;
+    padding: 60px 0px 0px 0px;
     background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%);
     display: flex;
-    justify-content: center;
     flex-direction: column;
     align-items: center;
-    overflow: hidden;
 }
 .auth__bg {
     position: absolute;
@@ -351,7 +351,8 @@ body {
     transition: all 0.2s ease;
 }
 
-.auth__form input {
+.auth__input {
+    width: 100%;
     padding: 14px;
     font-size: 15px;
     border: 1px solid #ccc;
