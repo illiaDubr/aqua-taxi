@@ -44,14 +44,18 @@ const goToAuthFactory = () => {
 </script>
 
 <style>
-body {
 
+*, *:before, *:after {
+    box-sizing: border-box;
+}
+
+body {
     margin: 0;
     padding: 0;
     font-family: 'Montserrat', sans-serif;
 }
 .welcome {
- height: 100%;
+    height: 100%;
     display: flex;
     justify-content: space-around;
     padding-bottom: 150px;
@@ -124,9 +128,4 @@ body {
     color: white;
     border: 2px solid #3498db;
 }
-
-
-
-
-
 </style>
