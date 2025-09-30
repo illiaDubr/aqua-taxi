@@ -35,7 +35,6 @@
                             <p>📞 {{ order.driver.phone }}</p>
                         </div>
 
-
                         <button
                             v-if="order.status !== 'completed'"
                             class="order__btn"
@@ -46,134 +45,91 @@
             </div>
             <p v-else class="order__placeholder">Немає активних замовлень</p>
         </div>
-
-
-        <!-- 🌟 Модалка подтверждения -->
-        <div v-if="showModal" class="modal">
-            <div class="modal__content">
-                <h3>Підтвердіть, що Ви отримали замовлення</h3>
-                <label class="modal__check">
-                    <input type="checkbox" v-model="confirmed" />
-                    <span>Я підтверджую, що отримав замовлення</span>
-                </label>
-
-                <p>Оцініть якість добавки води</p>
-                <div class="modal__stars">
-                    <span v-for="n in 5" :key="n" @click="rating = n">
-                        {{ rating >= n ? '★' : '☆' }}
-                    </span>
-                </div>
-
-                <button class="modal__btn" @click="submitConfirmation">Відправити форму</button>
-            </div>
-        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import axios from 'axios';
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 
+import city from '@/assets/city.png'
+import water1 from '@/assets/1.png'
+import water2 from '@/assets/2.png'
 
-import city from '@/assets/city.png';
-import water1 from '@/assets/1.png';
-import water2 from '@/assets/2.png';
-
-const Echo = window.Echo;
-const router = useRouter();
-const activeTab = ref('order');
-const activeOrders = ref([]);
-const showModal = ref(false);
-const selectedOrder = ref(null);
-const confirmed = ref(false);
-const rating = ref(0);
+const Echo = window.Echo
+const router = useRouter()
+const activeTab = ref('order')
+const activeOrders = ref([])
 
 const products = ref([
     { title: 'Срібна вода, 19л', price: 120, image: water1 },
     { title: 'Глибокого\nочищення, 19л', price: 130, image: water2 }
-]);
+])
 
 const goToOrderForm = (product) => {
-    router.push({ name: 'orderForm', params: { productId: encodeURIComponent(product.title) } });
-};
+    router.push({ name: 'orderForm', params: { productId: encodeURIComponent(product.title) } })
+}
 
 const switchToActiveOrders = async () => {
-    activeTab.value = 'active';
-    await fetchActiveOrders();
-};
+    activeTab.value = 'active'
+    await fetchActiveOrders()
+}
 
 const fetchActiveOrders = async () => {
     try {
-        const token = localStorage.getItem('user_token');
+        const token = localStorage.getItem('user_token')
         const { data } = await axios.get('/api/orders/active', {
             headers: { Authorization: `Bearer ${token}` }
-        });
-        activeOrders.value = data;
+        })
+        activeOrders.value = data
     } catch (error) {
-        console.error('❌ Не вдалося отримати активні замовлення', error);
+        console.error('❌ Не вдалося отримати активні замовлення', error)
     }
-};
+}
 
-const confirmOrder = (order) => {
-    selectedOrder.value = order;
-    confirmed.value = false;
-    rating.value = 0;
-    showModal.value = true;
-};
-
-const submitConfirmation = async () => {
-    if (!confirmed.value || !rating.value) {
-        alert('Підтвердіть замовлення і поставте оцінку');
-        return;
-    }
-
+// 👉 без попапа: сразу завершаем заказ с дефолтным рейтингом 5
+const confirmOrder = async (order) => {
     try {
-        const token = localStorage.getItem('user_token');
-        await axios.post(`/api/orders/${selectedOrder.value.id}/complete`, {
-            rating: rating.value
-        }, {
+        const token = localStorage.getItem('user_token')
+        await axios.post(`/api/orders/${order.id}/complete`, { rating: 5 }, {
             headers: { Authorization: `Bearer ${token}` }
-        });
-
-        showModal.value = false;
-        await fetchActiveOrders();
+        })
+        await fetchActiveOrders()
     } catch (error) {
-        console.error('❌ Помилка при завершенні замовлення', error);
+        console.error('❌ Помилка при завершенні замовлення', error)
     }
-};
+}
 
 const formatDate = (str) => {
-    if (!str) return '';
-    const d = new Date(str);
+    if (!str) return ''
+    const d = new Date(str)
     return d.toLocaleString('uk-UA', {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-    });
-};
+    })
+}
 
 const statusText = (status) => {
     switch (status) {
-        case 'new': return 'Очікує підтвердження';
-        case 'in_progress': return 'В дорозі';
-        case 'completed': return 'Виконано';
-        default: return status;
+        case 'new': return 'Очікує підтвердження'
+        case 'in_progress': return 'В дорозі'
+        case 'completed': return 'Виконано'
+        default: return status
     }
-};
-
+}
 
 onMounted(() => {
     Echo.private(`orders`)
-        .listen('OrderStatusUpdated', (e) => {
-            fetchActiveOrders();
-        });
-});
+        .listen('OrderStatusUpdated', () => {
+            fetchActiveOrders()
+        })
+})
 </script>
 
 <style scoped>
-
 .order__driver {
     background: #f0f8ff;
     border: 1px solid #3498db;
@@ -187,75 +143,8 @@ onMounted(() => {
     margin: 4px 0;
 }
 
-.modal {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-.modal__content {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    width: 90%;
-    max-width: 360px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-}
-.modal__check {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    justify-content: center;
-}
-.modal__stars span {
-    font-size: 28px;
-    cursor: pointer;
-    user-select: none;
-}
-.modal__btn {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.popup {
-    position: fixed;
-    bottom: 20px;
-    left: 10px;
-    right: 10px;
-    background: white;
-    padding: 20px;
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    z-index: 9999;
-    text-align: center;
-}
-.popup__title {
-    font-weight: 700;
-    font-size: 16px;
-    margin-bottom: 6px;
-}
-.popup__btn {
-    background: #007bff;
-    color: white;
-    font-weight: 600;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 12px;
-    margin-top: 12px;
-    cursor: pointer;
-}
+/* удалены стили модалки и попапа подтверждения */
+
 .order__title {
     font-size: 15px;
     font-weight: 600;

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watchEffect, nextTick } from 'vue'
+import { ref, computed, watchEffect, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
@@ -44,7 +44,7 @@ const paymentMethod = ref('cash')
 const deliveryOption = ref('home') // home | entrance | coffee
 
 // --- карта / ручной выбор локации
-const manualMode = ref(false)
+const manualMode = ref(false)           // как только включим — назад нельзя
 const mapRef = ref(null)
 const map = ref(null)
 const marker = ref(null)
@@ -89,29 +89,52 @@ const destroyMap = () => {
     marker.value = null
 }
 
-// --- инициализация/сброс карты по manualMode
+// Чистим карту при размонтировании компонента
+onBeforeUnmount(() => {
+    destroyMap()
+})
+
+// --- включение ручного режима (только один раз, без обратного выключения)
+const activateManual = async () => {
+    if (manualMode.value) return
+    manualMode.value = true
+    await nextTick()
+    if (!mapRef.value || map.value) return
+
+    map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Map data © OpenStreetMap contributors',
+    }).addTo(map.value)
+
+    map.value.on('click', (e) => {
+        lat.value = e.latlng.lat
+        lng.value = e.latlng.lng
+
+        if (marker.value) marker.value.setLatLng(e.latlng)
+        else marker.value = L.marker(e.latlng).addTo(map.value)
+    })
+}
+
+// Если по какой-то причине рендер задержится — подстрахуемся
 watchEffect(async () => {
     if (manualMode.value && mapRef.value && !map.value) {
         await nextTick()
-        map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
+        if (!map.value) {
+            map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data © OpenStreetMap contributors',
-        }).addTo(map.value)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: 'Map data © OpenStreetMap contributors',
+            }).addTo(map.value)
 
-        map.value.on('click', (e) => {
-            lat.value = e.latlng.lat
-            lng.value = e.latlng.lng
+            map.value.on('click', (e) => {
+                lat.value = e.latlng.lat
+                lng.value = e.latlng.lng
 
-            if (marker.value) marker.value.setLatLng(e.latlng)
-            else marker.value = L.marker(e.latlng).addTo(map.value)
-        })
-    }
-
-    if (!manualMode.value) {
-        destroyMap()
-        lat.value = null
-        lng.value = null
+                if (marker.value) marker.value.setLatLng(e.latlng)
+                else marker.value = L.marker(e.latlng).addTo(map.value)
+            })
+        }
     }
 })
 
@@ -206,9 +229,18 @@ const createOrder = async () => {
                 <label>Введіть ваші дані</label>
                 <input type="text" placeholder="Ваша адреса" v-model="address" />
 
-                <button type="button" class="manual-btn" @click="manualMode = !manualMode">
-                    {{ manualMode ? 'Сховати карту' : 'Вибрати на карті' }}
+                <!-- КНОПКА ТОЛЬКО ДЛЯ ВКЛЮЧЕНИЯ. НАЗАД НЕЛЬЗЯ -->
+                <button
+                    v-if="!manualMode"
+                    type="button"
+                    class="manual-btn"
+                    @click="activateManual"
+                >
+                    Вибрати на карті
                 </button>
+                <div v-else class="manual-badge" aria-disabled="true">
+                    🗺️ Карта активна — виберіть точку
+                </div>
 
                 <div v-if="manualMode" class="geo-warning">
                     <p>📍 Клікніть по карті, щоб обрати місцезнаходження:</p>
@@ -408,6 +440,19 @@ const createOrder = async () => {
     color: #007bff;
     border-radius: 8px;
     cursor: pointer;
+}
+
+.manual-badge {
+    margin-top: -6px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 8px;
+    user-select: none;
+    pointer-events: none; /* специально — чтобы не кликалось */
 }
 
 .geo-warning {
