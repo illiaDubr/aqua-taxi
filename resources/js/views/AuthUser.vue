@@ -20,6 +20,7 @@
             <transition name="fade" mode="out-in">
                 <form @submit.prevent="submitForm" class="auth__form" :key="activeTab">
                     <input
+                        class="auth__input"
                         type="email"
                         placeholder="Ваша пошта*"
                         v-model="email"
@@ -27,17 +28,19 @@
                     />
 
                     <input
+                        class="auth__input"
                         v-if="activeTab === 'register'"
                         type="tel"
                         placeholder="Ваш номер телефону*"
                         v-model="phone"
                         required
                     />
-                    <input v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
-                    <input v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
+                    <input class="auth__input" v-if="activeTab === 'register'" type="text" placeholder="Ім’я" v-model="name" required />
+                    <input class="auth__input" v-if="activeTab === 'register'" type="text" placeholder="Прізвище" v-model="surname" required />
 
                     <div class="auth__password-wrapper">
                         <input
+                            class="auth__input"
                             :type="showPassword ? 'text' : 'password'"
                             :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
                             v-model="password"
@@ -129,12 +132,6 @@ const submitForm = async () => {
     position: relative;
 }
 
-.auth__password-wrapper input {
-    width: 100%;
-    padding-left: 5px !important;
-    padding-right: 0px !important; /* место для глазика */
-}
-
 .auth__eye-icon {
     position: absolute;
     right: 12px;
@@ -150,12 +147,11 @@ body {
 .auth {
     position: relative;
     min-height: 100vh;
+    padding: 60px 0px 0px 0px;
     background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%);
     display: flex;
-    justify-content: center;
     flex-direction: column;
     align-items: center;
-    overflow: hidden;
 }
 .auth__bg {
     position: absolute;
@@ -195,14 +191,13 @@ body {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 55px;
 }
 
 .auth__tabs {
-
     display: flex;
     justify-content: space-around;
-    margin-bottom: 48px;
+    align-content: center;
 }
 
 .auth__tabs span {
@@ -227,7 +222,8 @@ body {
     transition: all 0.2s ease;
 }
 
-.auth__form input {
+.auth__input {
+    width: 100%;
     padding: 14px;
     font-size: 15px;
     border: 1px solid #ccc;
@@ -237,7 +233,7 @@ body {
 
 .auth__checkbox {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     font-size: 13px;
     color: #7f8c8d;
     gap: 8px;

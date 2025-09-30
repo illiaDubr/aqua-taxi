@@ -54,17 +54,10 @@ body {
     padding: 0;
     font-family: 'Montserrat', sans-serif;
 }
+
 .welcome {
-    height: 100%;
-    display: flex;
-    justify-content: space-around;
-    padding-bottom: 150px;
-    padding-top: 50px;
-    flex-direction: column;
     background-color: #ffffff;
     font-family: 'Montserrat', sans-serif;
-    box-sizing: border-box;
-    overflow: hidden;
 }
 
 .welcome__img {
@@ -91,13 +84,6 @@ body {
     text-align: center;
     margin: 0 0 40px 0;
     padding: 0 24px;
-}
-
-.welcome__content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
 }
 
 .welcome__buttons {
