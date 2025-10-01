@@ -14,7 +14,7 @@ FROM php:8.2-fpm
 RUN apt-get update && apt-get install -y \
     zip unzip curl git nano vim bash \
     libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev \
-    && docker-php-ext-install pdo_mysql zip
+    && docker-php-ext-install pdo_mysql zip \
     libpng-dev libonig-dev libxml2-dev \
     libzip-dev zip unzip curl git \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
