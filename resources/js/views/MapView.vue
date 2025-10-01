@@ -6,7 +6,6 @@
             v-if="showModal"
             :factory-id="selectedFactory.id"
             :water-type="selectedFactory.water_types"
-            :price-per-bottle="33.5"
             :on-close="() => showModal = false"
         />
     </div>

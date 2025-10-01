@@ -19,4 +19,7 @@ class FactoryOrder extends Model
         'total_price',
         'status',
     ];
+    protected $casts = [
+        'water_types' => 'array',
+    ];
 }

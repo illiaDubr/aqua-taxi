@@ -8,28 +8,18 @@
 
         <div class="cert__card">
             <div class="cert__tabs">
-                <span
-                    :class="{ active: activeTab === 'certificates' }"
-                    @click="activeTab = 'certificates'"
-                >
-                    Прийняття сертифікатів
-                </span>
-                <span
-                    :class="{ active: activeTab === 'prices' }"
-                    @click="activeTab = 'prices'"
-                >
-                    Ціни + база сертифікатів
-                </span>
+        <span :class="{ active: activeTab === 'certificates' }" @click="activeTab = 'certificates'">
+          Прийняття сертифікатів
+        </span>
+                <span :class="{ active: activeTab === 'prices' }" @click="activeTab = 'prices'">
+          Верифіковані виробники
+        </span>
             </div>
 
-            <!-- НЕверифіковані -->
+            <!-- Pending/Invalid -->
             <div v-if="activeTab === 'certificates'">
                 <div v-if="unverifiedCertificates.length" class="cert__list">
-                    <div
-                        class="cert__item"
-                        v-for="cert in unverifiedCertificates"
-                        :key="cert.id"
-                    >
+                    <div class="cert__item" v-for="cert in unverifiedCertificates" :key="cert.id">
                         <h3>Новий сертифікат</h3>
 
                         <p><strong>Email:</strong> {{ cert.email }}</p>
@@ -39,9 +29,7 @@
                             <a :href="cert.website" target="_blank">{{ cert.website }}</a>
                         </p>
                         <p v-if="cert.warehouse_address"><strong>Адреса складу:</strong> {{ cert.warehouse_address }}</p>
-                        <p v-if="cert.lat && cert.lng">
-                            <strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}
-                        </p>
+                        <p v-if="cert.lat && cert.lng"><strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}</p>
 
                         <div v-if="cert.certificate_path">
                             <img
@@ -68,9 +56,12 @@
                                 <option value="invalid">Невалідний</option>
                             </select>
 
-                            <button class="cert__btn" @click="moderate(cert)">
-                                Зберегти
-                            </button>
+                            <div class="actions">
+                                <button class="cert__btn" @click="moderate(cert)">Зберегти</button>
+                                <button class="cert__btn cert__btn--danger" @click="deleteCert(cert)">
+                                    Видалити сертифікат
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -79,18 +70,27 @@
                 </div>
             </div>
 
-            <!-- Верифіковані -->
+            <!-- Verified (по is_verified) -->
             <div v-else>
                 <div v-if="verifiedCertificates.length" class="cert__list">
-                    <div
-                        class="cert__item"
-                        v-for="cert in verifiedCertificates"
-                        :key="cert.id"
-                    >
+                    <div class="cert__item" v-for="cert in verifiedCertificates" :key="cert.id">
                         <h3>Верифікований виробник</h3>
                         <p>{{ cert.email }}</p>
-                        <p>До: {{ formatDate(cert.certificate_expiration) }}</p>
+                        <p>До: {{ formatDate(cert.verified_until) }}</p>
                         <p>Адреса складу: {{ cert.warehouse_address }}</p>
+
+                        <div class="actions" style="margin-top:10px;">
+                            <button class="cert__btn cert__btn--warning" @click="revokeVerify(cert)">
+                                Скасувати верифікацію
+                            </button>
+                            <button
+                                v-if="cert.certificate_path"
+                                class="cert__btn cert__btn--danger"
+                                @click="deleteCert(cert)"
+                            >
+                                Видалити сертифікат
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div v-else class="cert__placeholder">
@@ -102,59 +102,92 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import axios from 'axios';
+import { ref, onMounted, watch } from 'vue'
+import axios from 'axios'
 
-const activeTab = ref('certificates');
-const unverifiedCertificates = ref([]);
-const verifiedCertificates = ref([]);
+const activeTab = ref('certificates')
+const unverifiedCertificates = ref([])
+const verifiedCertificates = ref([])
 
-const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path);
-const fullUrl = (path) => window.location.origin + '/storage/' + path.replace(/^storage\//, '');
+const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path)
+const fullUrl = (p) => {
+    // приводим к виду /storage/...
+    const clean = String(p || '').replace(/^\/+/, '')
+    return `${window.location.origin}/${clean.startsWith('storage/') ? clean : 'storage/' + clean}`
+}
+const formatDate = (date) => (date ? new Date(date).toLocaleDateString('uk-UA') : '—')
 
-const formatDate = (date) => new Date(date).toLocaleDateString('uk-UA');
-
-const moderate = async (cert) => {
+async function moderate(cert) {
     try {
         await axios.post(`/api/admin/factories/${cert.id}/moderate-certificate`, {
             status: cert.certificate_status,
             expiration_date: cert.certificate_expiration,
-        });
-        alert('Сертифікат успішно оновлено.');
-        loadUnverified();
+        })
+        alert('Сертифікат успішно оновлено.')
+        await loadUnverified()
+        await loadVerified()
     } catch (err) {
-        console.error('❌ Помилка оновлення сертифіката', err);
-        alert('Не вдалося оновити сертифікат.');
+        console.error('❌ Помилка оновлення сертифіката', err)
+        alert('Не вдалося оновити сертифікат.')
     }
-};
+}
 
-const loadUnverified = async () => {
+async function revokeVerify(cert) {
+    if (!confirm('Скасувати верифікацію цього виробника?')) return
     try {
-        const res = await axios.get('/api/admin/factories-with-certificates');
-        // фильтруем только с сертификатами в статусе pending
-        unverifiedCertificates.value = res.data.filter(cert => cert.certificate_status === 'pending');
+        await axios.post(`/api/admin/factories/${cert.id}/unverify`)
+        alert('Верифікацію скасовано.')
+        await loadVerified()
+        await loadUnverified()
     } catch (err) {
-        console.error('❌ Помилка завантаження неварифікованих', err);
+        console.error('❌ Помилка скасування верифікації', err)
+        alert('Не вдалося скасувати верифікацію.')
     }
-};
+}
 
-const loadVerified = async () => {
+async function deleteCert(cert) {
+    if (!confirm('Видалити сертифікат? Файл буде видалено безповоротно.')) return
     try {
-        const res = await axios.get('/api/admin/factories-with-certificates');
-        verifiedCertificates.value = res.data.filter(cert => cert.certificate_status === 'valid');
+        await axios.delete(`/api/admin/factories/${cert.id}/certificate`)
+        alert('Сертифікат видалено.')
+        await loadUnverified()
+        await loadVerified()
     } catch (err) {
-        console.error('❌ Помилка завантаження верифікованих', err);
+        console.error('❌ Помилка видалення сертифіката', err)
+        alert('Не вдалося видалити сертифікат.')
     }
-};
+}
+
+async function loadUnverified() {
+    try {
+        const res = await axios.get('/api/admin/factories-with-certificates')
+        // на модерации — pending/invalid
+        unverifiedCertificates.value = res.data.filter(
+            f => (f.certificate_status === 'pending' || f.certificate_status === 'invalid')
+        )
+    } catch (err) {
+        console.error('❌ Помилка завантаження неварифікованих', err)
+    }
+}
+
+async function loadVerified() {
+    try {
+        // Верифіковані показываем по флагу is_verified (а не по статусу сертифіката)
+        const res = await axios.get('/api/admin/factories-with-certificates')
+        verifiedCertificates.value = res.data.filter(f => !!f.is_verified)
+    } catch (err) {
+        console.error('❌ Помилка завантаження верифікованих', err)
+    }
+}
 
 watch(activeTab, (tab) => {
-    if (tab === 'certificates') loadUnverified();
-    else loadVerified();
-});
+    if (tab === 'certificates') loadUnverified()
+    else loadVerified()
+})
 
 onMounted(() => {
-    loadUnverified();
-});
+    loadUnverified()
+})
 </script>
 
 <style scoped>
@@ -167,113 +200,46 @@ onMounted(() => {
     padding-top: 120px;
     position: relative;
 }
-
-.cert__bg {
-    position: absolute;
-    top: 10px;
-    width: 100%;
-    height: 140px;
-    background-size: cover;
-    z-index: 0;
-}
-
-.cert__top {
-    position: absolute;
-    top: 60px;
-    right: 16px;
-    z-index: 2;
-}
+.cert__bg { position: absolute; top: 10px; width: 100%; height: 140px; background-size: cover; z-index: 0; }
+.cert__top { position: absolute; top: 60px; right: 16px; z-index: 2; }
 
 .cert__role {
-    background: white;
-    padding: 8px 14px;
-    border-radius: 12px;
-    border: none;
-    font-weight: 500;
-    font-size: 13px;
-    color: #333;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    background: white; padding: 8px 14px; border-radius: 12px; border: none;
+    font-weight: 500; font-size: 13px; color: #333; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     cursor: pointer;
 }
 
 .cert__card {
-    width: 100%;
-    max-width: 400px;
-    background: #fff;
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
-    z-index: 1;
-    padding: 24px 16px;
+    width: 100%; max-width: 400px; background: #fff; border-radius: 20px 20px 0 0;
+    box-shadow: 0 -2px 20px rgba(0,0,0,0.1); z-index: 1; padding: 24px 16px;
 }
 
-.cert__tabs {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 24px;
-}
-
+.cert__tabs { display: flex; justify-content: space-between; margin-bottom: 24px; }
 .cert__tabs span {
-    flex: 1;
-    text-align: center;
-    font-weight: 600;
-    font-size: 15px;
-    color: #aaa;
-    cursor: pointer;
-    padding-bottom: 6px;
-    position: relative;
+    flex: 1; text-align: center; font-weight: 600; font-size: 15px; color: #aaa; cursor: pointer;
+    padding-bottom: 6px; position: relative;
 }
-
-.cert__tabs .active {
-    color: #000;
-}
-
+.cert__tabs .active { color: #000; }
 .cert__tabs .active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 20%;
-    width: 60%;
-    height: 2px;
-    background: #3498db;
-    border-radius: 4px;
+    content: ''; position: absolute; bottom: 0; left: 20%; width: 60%; height: 2px; background: #3498db; border-radius: 4px;
 }
 
-.cert__list {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
+.cert__list { display: flex; flex-direction: column; gap: 16px; }
 .cert__item {
-    background: #fff;
-    border-radius: 16px;
-    border: 1px solid #eee;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    text-align: center;
+    background: #fff; border-radius: 16px; border: 1px solid #eee; padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center;
 }
+.cert__item h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
 
-.cert__item h3 {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 12px;
-}
+.moderation-controls { display: grid; gap: 8px; margin-top: 10px; }
+.moderation-controls .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
 .cert__btn {
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 16px 45px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 10px;
+    background: #3498db; color: white; border: none; border-radius: 10px; padding: 10px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
 }
+.cert__btn--danger { background: #e53935; }
+.cert__btn--warning { background: #f39c12; }
 
-.cert__placeholder {
-    text-align: center;
-    color: #777;
-    margin-top: 40px;
-}
+.cert__placeholder { text-align: center; color: #777; margin-top: 40px; }
 </style>

@@ -19,7 +19,7 @@ use App\Http\Controllers\FactoryOrderController;
 
 /**
  * -------------------------
- * ВОДИТЕЛЬ: публичные (без авторизации)
+ * ВОДИТЕЛЬ: публичные
  * -------------------------
  */
 Route::prefix('driver')->group(function () {
@@ -29,24 +29,17 @@ Route::prefix('driver')->group(function () {
 
 /**
  * -------------------------
- * ВОДИТЕЛЬ: приватные (через auth:sanctum)
+ * ВОДИТЕЛЬ: приватные
  * -------------------------
  */
 Route::prefix('driver')->middleware('auth:sanctum')->group(function () {
-    // профиль (нужен фронту для bottles/balance)
     Route::get('profile', [DriverAuthController::class, 'profile']);
-
-    // финансы
     Route::post('top-up', [BalanceController::class, 'topUp']);
     Route::get('balance', [BalanceController::class, 'getBalance']);
     Route::post('pay',    [FondyController::class, 'initialize']);
-
-    // заказы
     Route::get('orders/new',    [DriverOrderController::class, 'newOrders']);
     Route::get('orders/active', [DriverOrderController::class, 'activeOrders']);
     Route::post('orders/{order}/accept', [DriverOrderController::class, 'accept']);
-
-    // logout водителя
     Route::post('logout', [DriverAuthController::class, 'logout']);
 });
 
@@ -55,7 +48,7 @@ Route::post('/fondy/callback', [FondyController::class, 'callback'])->name('fond
 
 /**
  * -------------------------
- * ПОЛЬЗОВАТЕЛЬ (клиент)
+ * ПОЛЬЗОВАТЕЛЬ
  * -------------------------
  */
 Route::prefix('user')->group(function () {
@@ -64,7 +57,6 @@ Route::prefix('user')->group(function () {
     Route::middleware('auth:sanctum')->post('logout', [UserAuthController::class, 'logout']);
 });
 
-// клиентские заказы
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/active', [OrderController::class, 'activeOrders']);
@@ -72,9 +64,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 /**
- * -------------------------
- * Broadcasting (если нужно)
- * -------------------------
+ * Broadcasting
  */
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
@@ -101,18 +91,28 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/factories-with-certificates',    [FactoryModerationController::class, 'factoriesWithCertificates']);
 });
 
-// просмотр / модерация фабрик
 Route::prefix('factories')->group(function () {
-    Route::get('{id}',           [FactoryModerationController::class, 'show']);
-    Route::put('{id}/approve',   [FactoryModerationController::class, 'approve']);
-    Route::post('{id}/reject',   [FactoryModerationController::class, 'reject']);
+    Route::get('{id}',         [FactoryModerationController::class, 'show']);
+    Route::put('{id}/approve', [FactoryModerationController::class, 'approve']);
+    Route::post('{id}/reject', [FactoryModerationController::class, 'reject']);
 });
 
-// загрузка сертификата фабрики (под токеном пользователя фабрики)
 Route::middleware('auth:sanctum')->post('/factory/upload-certificate', [FactoryAuthController::class, 'uploadCertificate']);
 
-// заказы фабрики (для кабинета производителя)
+/**
+ * -------------------------
+ * Фабричные заказы
+ * -------------------------
+ */
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/factory-orders', [FactoryOrderController::class, 'store']);
-    Route::get('/factory-orders',  [FactoryOrderController::class, 'forFactory']);
+    Route::post('/factory-orders', [FactoryOrderController::class, 'store']);        // водитель создаёт
+    Route::get('/factory-orders/mine', [FactoryOrderController::class, 'mine']);     // водитель: мои заказы
+    Route::get('/factory-orders', [FactoryOrderController::class, 'forFactory']);    // производитель: список
+    Route::post('/factory-orders/{order}/accept',   [FactoryOrderController::class, 'acceptByFactory']);
+    Route::post('/factory-orders/{order}/complete', [FactoryOrderController::class, 'completeByFactory']);
+});
+Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+    // ...
+    Route::post('/factories/{id}/unverify', [FactoryModerationController::class, 'unverify']);
+    Route::delete('/factories/{id}/certificate', [FactoryModerationController::class, 'deleteCertificate']);
 });

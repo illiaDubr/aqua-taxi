@@ -29,5 +29,6 @@ class Factory extends Authenticatable
         'is_verified' => 'boolean',
         'verified_until' => 'date',
         'certificate_expiration' => 'date',
+        'water_types' => 'array'
     ];
 }

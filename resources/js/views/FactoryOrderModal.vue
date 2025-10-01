@@ -1,135 +1,107 @@
 <template>
-    <div class="modal-overlay" @click.self="close">
-        <div class="modal-content">
-            <button class="modal-close" @click="close">×</button>
-            <h2>Замовлення води</h2>
-            <div class="modal-section">
-                <p><strong>Тип води:</strong> {{ waterType }}</p>
-                <p><strong>Ціна за бутель:</strong> {{ pricePerBottle }} грн</p>
+    <div class="modal">
+        <div class="modal__card">
+            <h3>Замовлення у виробника</h3>
+
+            <label>Тип води</label>
+            <select v-model="selectedType">
+                <option disabled value="">— оберіть тип —</option>
+                <option v-for="t in types" :key="t.code" :value="t.code">
+                    {{ t.name }} — {{ t.price.toFixed(2) }} грн/бут
+                </option>
+            </select>
+
+            <label>Кількість (бут.)</label>
+            <input type="number" min="1" v-model.number="qty" />
+
+            <div class="summary">
+                <div>Ціна за бутиль: <b>{{ currentPrice?.toFixed(2) ?? '—' }} грн</b></div>
+                <div>Разом: <b>{{ total.toFixed(2) }} грн</b></div>
             </div>
 
-            <div class="modal-section">
-                <label for="quantity">Кількість бутлів:</label>
-                <input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    v-model="quantity"
-                    class="input"
-                />
+            <div class="actions">
+                <button @click="onClose">Скасувати</button>
+                <button :disabled="!canSubmit || loading" @click="createOrder">
+                    {{ loading ? 'Створення…' : 'Створити замовлення' }}
+                </button>
             </div>
 
-            <p class="total">Всього: <strong>{{ totalPrice }} грн</strong></p>
-
-            <button class="modal-button" @click="createOrder">
-                Замовити
-            </button>
+            <p v-if="error" class="error">{{ error }}</p>
+            <p v-if="success" class="ok">Замовлення створено!</p>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import axios from 'axios';
+import { computed, ref } from 'vue'
+import axios from 'axios'
 
 const props = defineProps({
-    factoryId: Number,
-    waterType: String,
-    pricePerBottle: Number,
-    onClose: Function
-});
+    factoryId: { type: Number, required: true },
+    waterType: { type: [Array, Object], required: true }, // массив объектов из factories.water_types
+    onClose:   { type: Function, required: true }
+})
 
-const quantity = ref(1);
+const loading = ref(false)
+const error   = ref('')
+const success = ref(false)
 
-const totalPrice = computed(() => (quantity.value * props.pricePerBottle).toFixed(2));
+const qty = ref(1)
+const selectedType = ref('')
 
-const createOrder = async () => {
+const types = computed(() => {
+    const arr = Array.isArray(props.waterType) ? props.waterType : []
+    // нормализуем цену/код
+    return arr.map(it => ({
+        code: String(it.code ?? it.name ?? '').toLowerCase(),
+        name: it.name ?? it.code ?? '—',
+        price: Number(it.price ?? 0)
+    }))
+})
+
+const currentPrice = computed(() => {
+    const t = types.value.find(t => t.code === selectedType.value)
+    return t ? t.price : null
+})
+
+const total = computed(() => {
+    const p = currentPrice.value ?? 0
+    const q = Number.isFinite(qty.value) ? qty.value : 0
+    return +(p * q).toFixed(2)
+})
+
+const canSubmit = computed(() => {
+    return !!selectedType.value && qty.value >= 1 && Number.isFinite(currentPrice.value)
+})
+
+async function createOrder() {
+    if (!canSubmit.value) return
+    loading.value = true
+    error.value = ''
+    success.value = false
     try {
         await axios.post('/api/factory-orders', {
             factory_id: props.factoryId,
-            water_type: props.waterType,
-            price_per_bottle: props.pricePerBottle,
-            quantity: quantity.value,
-        });
-        alert('Замовлення створено!');
-        props.onClose(); // закрываем после отправки
+            water_type: selectedType.value,
+            quantity: qty.value
+        })
+        success.value = true
+        setTimeout(() => props.onClose(), 600)
     } catch (e) {
-        console.error('Помилка створення замовлення', e);
-        alert('Не вдалося створити замовлення');
+        error.value = e?.response?.data?.message || 'Помилка створення'
+    } finally {
+        loading.value = false
     }
-};
-
-const close = () => {
-    props.onClose();
-};
+}
 </script>
 
 <style scoped>
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background: white;
-    padding: 24px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    position: relative;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-.modal-close {
-    position: absolute;
-    top: 12px;
-    right: 16px;
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-    color: #888;
-}
-
-.modal-section {
-    margin-bottom: 16px;
-}
-
-.input {
-    width: 100%;
-    padding: 8px 12px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-}
-
-.total {
-    font-size: 18px;
-    margin-bottom: 16px;
-    text-align: right;
-}
-
-.modal-button {
-    width: 100%;
-    padding: 12px;
-    background-color: #007BFF;
-    border: none;
-    color: white;
-    font-size: 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-}
-
-.modal-button:hover {
-    background-color: #0056b3;
-}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal__card{background:#fff;border-radius:12px;padding:16px;min-width:320px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+label{display:block;margin:8px 0 4px;font-weight:600}
+select,input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
+.summary{margin:12px 0;display:grid;gap:6px}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+.error{color:#c62828;margin-top:8px}
+.ok{color:#2e7d32;margin-top:8px}
 </style>
