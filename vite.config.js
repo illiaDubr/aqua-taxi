@@ -4,12 +4,12 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 export default defineConfig({
-    plugins: [vue()],
     plugins: [
         laravel({
-            input: ['resources/js/app.js'],   // добавь css/scss если есть
-            buildDirectory: 'build',          // => public/build
-            refresh: true,
+            // укажи свои входы, если нужны ещё css/scss
+            input: ['resources/js/app.js'],
+            buildDirectory: 'build', // => public/build
+            refresh: false,
         }),
         vue(),
     ],
@@ -17,16 +17,9 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, 'resources/js'),
         },
-        alias: { '@': path.resolve(__dirname, 'resources/js') },
-    },
-    // Эти поля не обязательны с laravel-vite-plugin, но не мешают:
-    build: {
-        outDir: 'public/build',
-        emptyOutDir: true,
-        manifest: true,
-        rollupOptions: {
-            input: '/resources/js/app.js', // если у тебя другой вход — поправь
-        },
     },
     server: {
         host: true,
+        port: 5173,
+    },
+})
