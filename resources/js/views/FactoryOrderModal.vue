@@ -1,107 +1,132 @@
 <template>
-    <div class="modal">
-        <div class="modal__card">
-            <h3>Замовлення у виробника</h3>
+    <div class="auth">
+        <div class="auth__bg"></div>
+        <div class="auth__top">
+            <img :src="logo" alt="logo" class="auth__logo" />
+        </div>
 
-            <label>Тип води</label>
-            <select v-model="selectedType">
-                <option disabled value="">— оберіть тип —</option>
-                <option v-for="t in types" :key="t.code" :value="t.code">
-                    {{ t.name }} — {{ t.price.toFixed(2) }} грн/бут
-                </option>
-            </select>
-
-            <label>Кількість (бут.)</label>
-            <input type="number" min="1" v-model.number="qty" />
-
-            <div class="summary">
-                <div>Ціна за бутиль: <b>{{ currentPrice?.toFixed(2) ?? '—' }} грн</b></div>
-                <div>Разом: <b>{{ total.toFixed(2) }} грн</b></div>
+        <div class="auth__card">
+            <div class="auth__tabs">
+                <span :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">Реєстрація</span>
+                <span :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">Вхід</span>
             </div>
 
-            <div class="actions">
-                <button @click="onClose">Скасувати</button>
-                <button :disabled="!canSubmit || loading" @click="createOrder">
-                    {{ loading ? 'Створення…' : 'Створити замовлення' }}
-                </button>
-            </div>
+            <transition name="fade" mode="out-in">
+                <form @submit.prevent="submitForm" class="auth__form" :key="activeTab">
+                    <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" required />
+                    <input v-if="activeTab === 'register'" class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model.trim="phone" required />
+                    <input v-if="activeTab === 'register'" class="auth__input" type="text" placeholder="Ім’я" v-model.trim="name" required />
+                    <input v-if="activeTab === 'register'" class="auth__input" type="text" placeholder="Прізвище" v-model.trim="surname" required />
 
-            <p v-if="error" class="error">{{ error }}</p>
-            <p v-if="success" class="ok">Замовлення створено!</p>
+                    <div class="auth__password-wrapper">
+                        <input
+                            class="auth__input"
+                            :type="showPassword ? 'text' : 'password'"
+                            :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
+                            v-model="password"
+                            required
+                        />
+                        <span class="auth__eye-icon" @click="showPassword = !showPassword">
+              <!-- иконки оставил как у тебя -->
+              <svg v-if="showPassword" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M12 5c-7.633 0-12 6.5-12 6.5s4.367 6.5 12 6.5 12-6.5 12-6.5-4.367-6.5-12-6.5zm0 11c-2.485 0-4.5-2.239-4.5-5s2.015-5 4.5-5 4.5 2.239 4.5 5-2.015 5-4.5 5zm0-8c-1.657 0-3 1.567-3 3s1.343 3 3 3 3-1.567 3-3-1.343-3-3-3z"/></svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#999" viewBox="0 0 24 24"><path d="M2.293 2.293l19.414 19.414-1.414 1.414-2.387-2.387c-1.841.773-3.875 1.266-5.906 1.266-7.633 0-12-6.5-12-6.5 1.337-1.989 3.267-4.129 5.837-5.58l-2.544-2.544 1.414-1.414zm5.163 5.163l1.729 1.729c-.118.282-.185.594-.185.915 0 1.657 1.343 3 3 3 .321 0 .633-.067.915-.185l1.729 1.729c-.81.303-1.676.456-2.644.456-2.485 0-4.5-2.239-4.5-5 0-.968.153-1.834.456-2.644zm6.462-1.066c.795.229 1.553.539 2.271.924l-1.511 1.511c-.226-.063-.462-.098-.707-.098-1.657 0-3 1.343-3 3 0 .245.035.481.098.707l-1.511 1.511c-.385-.718-.695-1.476-.924-2.271.81-1.307 1.964-2.461 3.384-3.384z"/></svg>
+            </span>
+                    </div>
+
+                    <label v-if="activeTab === 'register'" class="auth__checkbox">
+                        <input type="checkbox" v-model="agree" />
+                        <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
+                    </label>
+
+                    <button type="submit" class="auth__submit">{{ activeTab === 'register' ? 'Наступний крок' : 'Увійти' }}</button>
+                </form>
+            </transition>
         </div>
     </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import axios from 'axios'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+import logo from '@/assets/logo2.png';
 
-const props = defineProps({
-    factoryId: { type: Number, required: true },
-    waterType: { type: [Array, Object], required: true }, // массив объектов из factories.water_types
-    onClose:   { type: Function, required: true }
-})
+const router = useRouter();
 
-const loading = ref(false)
-const error   = ref('')
-const success = ref(false)
+const activeTab = ref('register');
+const email = ref('');
+const phone = ref('');
+const name = ref('');
+const surname = ref('');
+const password = ref('');
+const agree = ref(false);
+const showPassword = ref(false);
 
-const qty = ref(1)
-const selectedType = ref('')
+const submitForm = async () => {
+    if (activeTab.value === 'register') {
+        if (!agree.value) {
+            alert('Потрібно погодитись з договором оферти');
+            return;
+        }
+        try {
+            await axios.post('/api/user/register', {
+                email: email.value.trim(),
+                phone: phone.value.trim(),
+                password: password.value,
+                name: name.value.trim(),
+                surname: surname.value.trim()
+            });
+            alert('✅ Реєстрація успішна. Увійдіть.');
+            activeTab.value = 'login';
+        } catch (e) {
+            console.error(e);
+            alert('Помилка реєстрації');
+        }
+    } else {
+        try {
+            const res = await axios.post('/api/user/login', {
+                email: email.value.trim(),
+                password: password.value
+            });
 
-const types = computed(() => {
-    const arr = Array.isArray(props.waterType) ? props.waterType : []
-    // нормализуем цену/код
-    return arr.map(it => ({
-        code: String(it.code ?? it.name ?? '').toLowerCase(),
-        name: it.name ?? it.code ?? '—',
-        price: Number(it.price ?? 0)
-    }))
-})
+            const token = res.data?.token;
+            if (!token) {
+                alert('Сервер не повернув токен');
+                return;
+            }
+            localStorage.setItem('user_token', token);
+            localStorage.setItem('active_token', 'user_token'); // <-- ключевой момент для интерцептора
+            // axios.defaults.headers.common.Authorization = `Bearer ${token}`; // можно не ставить, если есть интерцептор
 
-const currentPrice = computed(() => {
-    const t = types.value.find(t => t.code === selectedType.value)
-    return t ? t.price : null
-})
-
-const total = computed(() => {
-    const p = currentPrice.value ?? 0
-    const q = Number.isFinite(qty.value) ? qty.value : 0
-    return +(p * q).toFixed(2)
-})
-
-const canSubmit = computed(() => {
-    return !!selectedType.value && qty.value >= 1 && Number.isFinite(currentPrice.value)
-})
-
-async function createOrder() {
-    if (!canSubmit.value) return
-    loading.value = true
-    error.value = ''
-    success.value = false
-    try {
-        await axios.post('/api/factory-orders', {
-            factory_id: props.factoryId,
-            water_type: selectedType.value,
-            quantity: qty.value
-        })
-        success.value = true
-        setTimeout(() => props.onClose(), 600)
-    } catch (e) {
-        error.value = e?.response?.data?.message || 'Помилка створення'
-    } finally {
-        loading.value = false
+            router.push('/orders'); // или твой роут формы заказа
+        } catch (e) {
+            console.error(e);
+            alert('Невірні дані для входу');
+        }
     }
-}
+};
 </script>
 
-<style scoped>
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal__card{background:#fff;border-radius:12px;padding:16px;min-width:320px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-label{display:block;margin:8px 0 4px;font-weight:600}
-select,input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
-.summary{margin:12px 0;display:grid;gap:6px}
-.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-.error{color:#c62828;margin-top:8px}
-.ok{color:#2e7d32;margin-top:8px}
+<style>
+/* твои стили без изменений (чуть ужалено для ответа) */
+.auth__password-wrapper{position:relative;}
+.auth__eye-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;}
+body{font-family:'Montserrat',sans-serif;margin:0;padding:0;}
+.auth{position:relative;min-height:100vh;padding:60px 0 0;background:linear-gradient(to bottom,#00aaff 0%,#f8f9fa 60%);display:flex;flex-direction:column;align-items:center;}
+.auth__bg{position:absolute;top:180px;left:0;width:100%;height:200px;background:url('@/assets/city.png') no-repeat center top;background-size:cover;z-index:0;pointer-events:none;}
+.auth__top,.auth__card{position:relative;z-index:1;}
+.auth__top{padding-top:0;margin-bottom:50px;}
+.auth__logo{width:96px;height:96px;border-radius:24px;box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.auth__card{width:100%;max-width:360px;background:#fff;border-radius:24px;padding:24px;box-shadow:0 8px 24px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:55px;}
+.auth__tabs{display:flex;justify-content:space-around;align-content:center;}
+.auth__tabs span{font-size:18px;font-weight:600;color:#ccc;cursor:pointer;padding-bottom:4px;transition:.2s;}
+.auth__tabs .active{font-size:24px;color:#3498db;border-bottom:2px solid #3498db;}
+.auth__form{display:flex;flex-direction:column;gap:16px;transition:.2s;}
+.auth__input{width:100%;padding:14px;font-size:15px;border:1px solid #ccc;border-radius:12px;outline:none;}
+.auth__checkbox{display:flex;align-items:center;font-size:13px;color:#7f8c8d;gap:8px;}
+.auth__checkbox input{width:16px;height:16px;margin-top:2px;}
+.auth__checkbox a{color:#3498db;text-decoration:underline;}
+.auth__submit{padding:14px;font-size:15px;font-weight:600;background:#3498db;color:#fff;border:none;border-radius:12px;cursor:pointer;}
+.fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
+.fade-enter-from,.fade-leave-to{opacity:0;}
 </style>

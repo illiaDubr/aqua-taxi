@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Factory;
 use App\Models\FactoryOrder;
+use App\Models\Driver;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-
+use App\Models\Order;
 class FactoryOrderController extends Controller
 {
     /**
@@ -30,10 +31,8 @@ class FactoryOrderController extends Controller
 
         $factory = Factory::select('id','water_types')->findOrFail($data['factory_id']);
 
-        // Нормализуем water_type
         $needle = mb_strtolower(trim($data['water_type']));
         $price  = $this->resolvePricePerBottle($factory, $needle);
-
         if ($price === null) {
             return response()->json(['message' => 'Unsupported water_type for this factory'], 422);
         }
@@ -41,6 +40,7 @@ class FactoryOrderController extends Controller
         $total = round($price * (int)$data['quantity'], 2);
 
         $order = FactoryOrder::create([
+            'user_id'          => null,            // ← добавили
             'driver_id'        => $user->id,
             'factory_id'       => $factory->id,
             'water_type'       => $needle,
@@ -63,28 +63,35 @@ class FactoryOrderController extends Controller
      */
     public function forFactory(Request $request)
     {
-        $user = Auth::user();
-        if (!$this->isFactory($user)) {
+        $user = $request->user();
+
+        // Защита от неправильного типа токена/отсутствия пользователя
+        if (!$user instanceof Factory) {
             return response()->json(['message' => 'Only factories can view this list'], 403);
         }
 
-        $factoryId = $this->factoryIdFromUser($user);
-        if (!$factoryId) {
-            return response()->json(['message' => 'Factory is not linked to user'], 422);
+        $status = $request->query('status');
+        $since  = $request->query('updated_since');
+
+        $q = Order::query();
+
+        if ($status === 'new') {
+            // Новые заказы, которые ещё никем не приняты
+            $q->where('status', 'new');
+        } elseif ($status === 'accepted') {
+            // Принятые ТЕКУЩЕЙ фабрикой
+            $q->where('status', 'accepted')
+                ->where('factory_id', $user->id);
+        } elseif ($status !== null) {
+            return response()->json(['message' => 'Unknown status'], 422);
         }
 
-        [$statuses, $updatedSince] = $this->parseFilters($request);
-
-        $q = FactoryOrder::query()->where('factory_id', $factoryId);
-
-        if ($statuses) {
-            $q->whereIn('status', $statuses);
-        }
-        if ($updatedSince) {
-            $q->where('updated_at', '>=', $updatedSince);
+        if ($since) {
+            // допускаем ISO-строку; БД сама приведёт
+            $q->where('updated_at', '>=', $since);
         }
 
-        $orders = $q->orderByDesc('id')->limit(200)->get();
+        $orders = $q->orderByDesc('id')->get();
 
         return response()->json([
             'orders' => $orders,
@@ -93,7 +100,7 @@ class FactoryOrderController extends Controller
     }
 
     /**
-     * Водитель: его собственные заказы у фабрик.
+     * Водитель: свои заказы у фабрик.
      */
     public function mine(Request $request)
     {
@@ -124,84 +131,89 @@ class FactoryOrderController extends Controller
     /**
      * Производитель принимает заказ (new -> accepted).
      */
-    public function acceptByFactory(FactoryOrder $order)
+    public function acceptByFactory(Request $request, Order $order)
     {
-        $user = Auth::user();
-        if (!$this->isFactory($user)) {
+        $user = $request->user();
+        if (!$user instanceof Factory) {
             return response()->json(['message' => 'Only factories can accept orders'], 403);
         }
 
-        $factoryId = $this->factoryIdFromUser($user);
-        if ((int)$order->factory_id !== (int)$factoryId) {
-            return response()->json(['message' => 'Not your order'], 403);
-        }
-
         if ($order->status !== 'new') {
-            return response()->json(['message' => 'Order cannot be accepted in current status'], 422);
+            return response()->json(['message' => 'Order is not new'], 422);
         }
 
-        $order->status = 'accepted';
-        $order->accepted_at = now();
-        $order->save();
+        DB::transaction(function () use ($order, $user) {
+            $order->status      = 'accepted';
+            $order->factory_id  = $user->id;
+            $order->accepted_at = now();
+            $order->save();
+        });
 
-        return response()->json([
-            'order' => $order->fresh(),
-            'meta'  => ['server_time' => now()->toISOString()],
-        ]);
+        return response()->json(['message' => 'Accepted', 'order' => $order->fresh()]);
     }
+
 
     /**
      * Производитель завершает заказ (accepted -> completed).
      */
-    public function completeByFactory(FactoryOrder $order)
+    public function completeByFactory(Request $request, Order $order)
     {
-        $user = Auth::user();
-        if (!$this->isFactory($user)) {
+        $user = $request->user();
+        if (!$user instanceof Factory) {
             return response()->json(['message' => 'Only factories can complete orders'], 403);
         }
 
-        $factoryId = $this->factoryIdFromUser($user);
-        if ((int)$order->factory_id !== (int)$factoryId) {
-            return response()->json(['message' => 'Not your order'], 403);
+        if (!($order->status === 'accepted' && (int)$order->factory_id === (int)$user->id)) {
+            return response()->json(['message' => 'Order not accepted by this factory'], 422);
         }
 
-        if ($order->status !== 'accepted') {
-            return response()->json(['message' => 'Order cannot be completed in current status'], 422);
-        }
+        DB::transaction(function () use ($order) {
+            $order->status        = 'completed';
+            $order->completed_at  = now();
+            $order->save();
+        });
 
-        $order->status = 'completed';
-        $order->completed_at = now();
-        $order->save();
-
-        return response()->json([
-            'order' => $order->fresh(),
-            'meta'  => ['server_time' => now()->toISOString()],
-        ]);
+        return response()->json(['message' => 'Completed', 'order' => $order->fresh()]);
     }
 
     // ========= ВСПОМОГАТЕЛЬНОЕ =========
 
     private function isDriver($user): bool
     {
-        return $user && method_exists($user, 'isDriver')
-            ? $user->isDriver()
-            : (bool)($user->driver ?? false);
+        if (!$user) return false;
+        if (method_exists($user, 'isDriver')) return (bool)$user->isDriver();
+        // токен выписан на модель Driver или есть флаг/связь driver
+        return $user instanceof Driver || (bool)($user->driver ?? false);
     }
 
     private function isFactory($user): bool
     {
-        return $user && method_exists($user, 'isFactory')
-            ? $user->isFactory()
-            : (bool)($user->factory_id ?? false);
+        if (!$user) return false;
+        if (method_exists($user, 'isFactory')) return (bool)$user->isFactory();
+        // ВАЖНО: если аутентифицирована именно модель Factory — это и есть производитель
+        return $user instanceof Factory || isset($user->factory_id);
     }
 
     private function factoryIdFromUser($user): ?int
     {
-        return isset($user->factory_id) && $user->factory_id
-            ? (int)$user->factory_id
-            : null;
+        if (!$user) return null;
+
+        // Если это сама модель Factory (когда логинимся именно фабрикой)
+        if ($user instanceof Factory) {
+            return (int)$user->id;
+        }
+
+        // Если используешь "общую" модель User с полем factory_id
+        if (isset($user->factory_id) && $user->factory_id) {
+            return (int)$user->factory_id;
+        }
+
+        return null;
     }
 
+    /**
+     * Возвращает [array|null $statuses, CarbonImmutable|null $updatedSince]
+     */
     private function parseFilters(Request $request): array
     {
         $statuses = null;
@@ -218,13 +230,21 @@ class FactoryOrderController extends Controller
             try {
                 $updatedSince = CarbonImmutable::parse($request->string('updated_since'));
             } catch (\Throwable $e) {
-                // Игнорируем
+                // игнор
             }
         }
 
         return [$statuses, $updatedSince];
     }
 
+    /**
+     * Извлекаем цену по water_type из JSON поля фабрики.
+     * Ожидаемый формат в Factory.water_types:
+     * [
+     *   { "code": "silver", "name": "Срібна", "price": 33.5 },
+     *   { "code": "deep",   "name": "Глибокого очищення", "price": 28.0 }
+     * ]
+     */
     private function resolvePricePerBottle(Factory $factory, string $waterType): ?float
     {
         $raw = $factory->water_types;

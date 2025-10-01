@@ -1,84 +1,84 @@
 <?php
 
-
 namespace App\Http\Controllers;
 
-use App\Models\Driver;
+use App\Models\Driver; // твоя модель водителя
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class DriverAuthController extends Controller
 {
     public function register(Request $request)
     {
-        $validated = $request->validate([
-            'email' => 'required|email|unique:drivers,email',
-            'phone' => 'required|string|unique:drivers,phone',
-            'password' => 'required|string|min:6',
-            'name' => 'required|string|max:255',
-            'surname' => 'required|string|max:255',
+        $data = $request->validate([
+            'email'    => ['required','email','unique:drivers,email'],
+            'password' => ['required','string','min:6'],
+            'phone'    => ['nullable','string'],
+            'name'     => ['nullable','string','max:100'],
         ]);
 
-        try {
-            $driver = Driver::create([
-                'email' => $validated['email'],
-                'phone' => $validated['phone'],
-                'password' => Hash::make($validated['password']),
-                'name' => $validated['name'],
-                'surname' => $validated['surname'],
-                'balance' => 0.00,
-            ]);
+        $driver = Driver::create([
+            'email'    => $data['email'],
+            'password' => Hash::make($data['password']),
+            'phone'    => $data['phone'] ?? null,
+            'name'     => $data['name'] ?? null,
+        ]);
 
-            $token = $driver->createToken('driver-token')->plainTextToken;
+        // сразу выдаём токен водителя
+        $token = $driver->createToken('driver_token', ['driver'])->plainTextToken;
 
-            return response()->json([
-                'driver' => $driver,
-                'token' => $token
-            ], 201);
-
-        } catch (\Exception $e) {
-            \Log::error('Регистрация водителя ошибка', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'request' => $request->all()
-            ]);
-
-            return response()->json([
-                'message' => 'Помилка сервера при реєстрації водія',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'token'  => $token,
+            'driver' => $driver,
+        ], 201);
     }
-
 
     public function login(Request $request)
     {
-        $validated = $request->validate([
-            'email' => 'required|email|exists:drivers,email',
-            'password' => 'required|string',
+        $data = $request->validate([
+            'email'    => ['required','email'],
+            'password' => ['required','string'],
         ]);
 
-        $driver = Driver::where('email', $validated['email'])->first();
+        /** @var Driver|null $driver */
+        $driver = Driver::where('email', $data['email'])->first();
 
-        if (!Hash::check($validated['password'], $driver->password)) {
-            throw ValidationException::withMessages([
-                'password' => ['Невірний пароль'],
-            ]);
+        if (!$driver || !Hash::check($data['password'], $driver->password)) {
+            return response()->json(['message' => 'Невірні дані'], 401);
         }
 
-        $token = $driver->createToken('driver-token')->plainTextToken;
+        // ВАЖНО: ability = driver
+        $token = $driver->createToken('driver_token', ['driver'])->plainTextToken;
 
         return response()->json([
+            'token'  => $token,
             'driver' => $driver,
-            'token' => $token,
-            'balance' => $driver->balance,
+        ]);
+    }
+
+    public function profile(Request $request)
+    {
+        $user = $request->user();
+
+        // убережёмся от “чужого” токена → 403, а не 500
+        if (!$user || !$request->user()->tokenCan('driver')) {
+            return response()->json(['message' => 'Only drivers'], 403);
+        }
+
+        // безопасный ответ (если нет колонок — вернём 0)
+        return response()->json([
+            'id'      => $user->id,
+            'email'   => $user->email,
+            'name'    => $user->name ?? null,
+            'phone'   => $user->phone ?? null,
+            'balance' => $user->balance ?? 0,
+            'bottles' => $user->bottles ?? 0,
         ]);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->tokens()->delete();
-        return response()->json(['message' => 'Вихід виконано успішно']);
+        $request->user()?->currentAccessToken()?->delete();
+        return response()->json(['message' => 'OK']);
     }
 }

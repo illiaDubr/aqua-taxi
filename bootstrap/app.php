@@ -4,18 +4,28 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
-return Application::configure(basePath: dirname(__DIR__))
-    ->withProviders([
+// 👇 добавь эти use
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
-    ])
+return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        api: __DIR__.'/../routes/api.php',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // 👇 здесь регистрируем алиасы, чтобы работали 'abilities:*' и 'ability:*' в роутинге
+        $middleware->alias([
+            'abilities' => CheckAbilities::class,
+            'ability'   => CheckForAnyAbility::class,
+        ]);
+
+        // если нужно – можно добавить глобальные/групповые миддлвары тут же
+        // $middleware->append(...);
+        // $middleware->web([...]);
+        // $middleware->api([...]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -350,8 +350,8 @@ const handleLogin = async () => {
         const res = await axios.post('/api/factory/login', { email: email.value, password: password.value })
         const token = res.data.token
         const factory = res.data.user
-        localStorage.setItem('token', token)
-        localStorage.setItem('factory', JSON.stringify(factory))
+        localStorage.setItem('factory_token', token)
+        localStorage.setItem('active_token', 'factory_token') // пометка, какой токен активен
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
         alert('Успішний вхід!')
         router.push('/factory-page')
@@ -464,7 +464,7 @@ body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; }
     .wt-row { grid-template-columns: 1fr 1fr; }
     .wt-remove { grid-column: 1 / -1; justify-self: end; }
 }
-\
+
 /* Анимация */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }

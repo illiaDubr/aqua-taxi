@@ -34,7 +34,9 @@
                     <button class="topup-button" @click="manualRefreshActive" :disabled="loadingActive">
                         {{ loadingActive ? 'Оновлення…' : 'Оновити список' }}
                     </button>
-                    <small class="muted" v-if="lastSeenActive">Останнє оновлення: {{ fmtTime(lastSeenActive) }}</small>
+                    <small class="muted" v-if="lastSeenActive">
+                        Останнє оновлення: {{ fmtTime(lastSeenActive) }}
+                    </small>
                 </div>
 
                 <div v-if="!ordersActive.length && !loadingActive" class="empty">
@@ -109,7 +111,10 @@
             </div>
 
             <!-- Лоадеры -->
-            <div v-if="(currentTab==='new' && loadingNew) || (currentTab==='active' && loadingActive)" class="loader">
+            <div
+                v-if="(currentTab==='new' && loadingNew) || (currentTab==='active' && loadingActive)"
+                class="loader"
+            >
                 Завантаження…
             </div>
         </div>
@@ -120,41 +125,45 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 
-/** --- Состояния --- */
-const currentTab = ref('active')
-const isOnline = ref(true)
-const balance = ref(0)
+/** --- State --- */
+const currentTab     = ref('active')
+const isOnline       = ref(true)
+const balance        = ref(0)
 
-const ordersNew = ref([])
-const ordersActive = ref([])
+const ordersNew      = ref([])
+const ordersActive   = ref([])
 
-const loadingNew = ref(false)
-const loadingActive = ref(false)
-const errorNew = ref('')
-const errorActive = ref('')
+const loadingNew     = ref(false)
+const loadingActive  = ref(false)
+const errorNew       = ref('')
+const errorActive    = ref('')
 
-const lastSeenNew = ref(null)
+const lastSeenNew    = ref(null)
 const lastSeenActive = ref(null)
 
 const pollTimer = ref(null)
-// реактивная мапа занятых id
-const busy = ref({})
+const busy      = ref({})
 
-// контроллер для отмены висящих запросов
 let abortCtl = null
 
-/** --- Helpers --- */
+/** --- Auth helpers (важно!) --- */
+function getFactoryToken () {
+    // токен фабрики вы храните как 'token' (из AuthFactory.vue). Если переименуете — добавьте сюда.
+    return localStorage.getItem('factory_token') || localStorage.getItem('token') || ''
+}
+function cfg(extra = {}) {
+    const t = getFactoryToken()
+    return {
+        headers: t ? { Authorization: `Bearer ${t}` } : {},
+        ...extra,
+    }
+}
+
+/** --- UI helpers --- */
 function toggleStatus() { isOnline.value = !isOnline.value }
-function topUp() { /* TODO: модалка пополнения, пока заглушка */ }
-
-function money(v) {
-    const n = Number(v ?? 0)
-    return `${n.toFixed(2)} грн`
-}
-function fmtTime(iso) {
-    try { return new Date(iso).toLocaleString() } catch { return '' }
-}
-
+function topUp() {}
+function money(v) { const n = Number(v ?? 0); return `${n.toFixed(2)} грн` }
+function fmtTime(iso) { try { return new Date(iso).toLocaleString() } catch { return '' } }
 function mergeOrders(targetRef, incoming) {
     const cur = targetRef.value
     const map = new Map(cur.map(o => [o.id, o]))
@@ -175,26 +184,39 @@ async function withAbort(getter) {
     abortCtl = new AbortController()
     try {
         return await getter({ signal: abortCtl.signal })
-    } finally {
-        // не чистим тут — пусть внешний код отменяет при необходимости
-    }
+    } finally {}
 }
 
 /** --- API --- */
+function handleAuthError(e, where) {
+    const st = e?.response?.status
+    if (st === 401 || st === 403) {
+        const msg = e?.response?.data?.message || 'Only factories can view this list'
+        if (where === 'new')   errorNew.value   = msg
+        if (where === 'active')errorActive.value= msg
+        stopPolling()
+        return true
+    }
+    return false
+}
+
 async function pollNew() {
     loadingNew.value = true
-    errorNew.value = ''
+    errorNew.value   = ''
     try {
         const params = { status: 'new' }
         if (lastSeenNew.value) params.updated_since = lastSeenNew.value
+
         const { data } = await withAbort(({ signal }) =>
-            axios.get('/api/factory-orders', { params, signal })
+            axios.get('/api/factory-orders', cfg({ params, signal }))
         )
         mergeOrders(ordersNew, data?.orders)
         lastSeenNew.value = data?.meta?.server_time || new Date().toISOString()
     } catch (e) {
         if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-            errorNew.value = e?.response?.data?.message || 'Помилка завантаження'
+            if (!handleAuthError(e, 'new')) {
+                errorNew.value = e?.response?.data?.message || 'Помилка завантаження'
+            }
         }
     } finally {
         loadingNew.value = false
@@ -203,18 +225,21 @@ async function pollNew() {
 
 async function pollActive() {
     loadingActive.value = true
-    errorActive.value = ''
+    errorActive.value   = ''
     try {
         const params = { status: 'accepted' }
         if (lastSeenActive.value) params.updated_since = lastSeenActive.value
+
         const { data } = await withAbort(({ signal }) =>
-            axios.get('/api/factory-orders', { params, signal })
+            axios.get('/api/factory-orders', cfg({ params, signal }))
         )
         mergeOrders(ordersActive, data?.orders)
         lastSeenActive.value = data?.meta?.server_time || new Date().toISOString()
     } catch (e) {
         if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-            errorActive.value = e?.response?.data?.message || 'Помилка завантаження'
+            if (!handleAuthError(e, 'active')) {
+                errorActive.value = e?.response?.data?.message || 'Помилка завантаження'
+            }
         }
     } finally {
         loadingActive.value = false
@@ -224,7 +249,7 @@ async function pollActive() {
 async function accept(id) {
     busy.value[id] = true
     try {
-        await axios.post(`/api/factory-orders/${id}/accept`)
+        await axios.post(`/api/factory-orders/${id}/accept`, {}, cfg())
         const idx = ordersNew.value.findIndex(x => x.id === id)
         if (idx !== -1) {
             const o = { ...ordersNew.value[idx], status: 'accepted', accepted_at: new Date().toISOString() }
@@ -234,8 +259,10 @@ async function accept(id) {
             await pollActive()
         }
     } catch (e) {
-        errorNew.value = e?.response?.data?.message || 'Не вдалося прийняти замовлення'
-        await Promise.allSettled([pollNew(), pollActive()])
+        if (!handleAuthError(e, 'new')) {
+            errorNew.value = e?.response?.data?.message || 'Не вдалося прийняти замовлення'
+            await Promise.allSettled([pollNew(), pollActive()])
+        }
     } finally {
         delete busy.value[id]
     }
@@ -244,13 +271,15 @@ async function accept(id) {
 async function complete(id) {
     busy.value[id] = true
     try {
-        await axios.post(`/api/factory-orders/${id}/complete`)
+        await axios.post(`/api/factory-orders/${id}/complete`, {}, cfg())
         const before = ordersActive.value.length
         ordersActive.value = ordersActive.value.filter(x => x.id !== id)
         if (before === ordersActive.value.length) await pollActive()
     } catch (e) {
-        errorActive.value = e?.response?.data?.message || 'Не вдалося завершити замовлення'
-        await pollActive()
+        if (!handleAuthError(e, 'active')) {
+            errorActive.value = e?.response?.data?.message || 'Не вдалося завершити замовлення'
+            await pollActive()
+        }
     } finally {
         delete busy.value[id]
     }
@@ -259,7 +288,12 @@ async function complete(id) {
 /** --- Polling --- */
 function startPolling(fn) {
     stopPolling()
-    fn() // сразу первый запрос
+    // если нет токена фабрики — дальше не идём
+    if (!getFactoryToken()) {
+        errorNew.value = errorActive.value = 'Потрібен вхід як виробник'
+        return
+    }
+    fn()
     pollTimer.value = setInterval(fn, 60_000)
 }
 function stopPolling() {
@@ -280,10 +314,8 @@ function switchTab(tab) {
 
 /** --- Mount --- */
 onMounted(() => {
-    // axios.defaults.withCredentials = true // если используешь Sanctum-куки
     switchTab('active')
 })
-
 onBeforeUnmount(() => stopPolling())
 </script>
 

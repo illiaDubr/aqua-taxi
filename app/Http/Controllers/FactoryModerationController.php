@@ -52,9 +52,25 @@ class FactoryModerationController extends Controller
         return response()->json(['message' => 'Сертифікат оновлено.', 'factory' => $factory], 200);
     }
 
+    /**
+     * FIX: учитываем и certificate_path, и legacy certificate_file.
+     * На выходе всегда приводим к certificate_path.
+     */
     public function factoriesWithCertificates()
     {
-        $factories = Factory::whereNotNull('certificate_path')->get();
+        $factories = Factory::query()
+            ->where(function ($q) {
+                $q->whereNotNull('certificate_path')
+                    ->orWhereNotNull('certificate_file');
+            })
+            ->get()
+            ->map(function ($f) {
+                if (!$f->certificate_path && $f->certificate_file) {
+                    $f->certificate_path = $f->certificate_file;
+                }
+                return $f;
+            });
+
         return response()->json($factories, 200);
     }
 
@@ -83,12 +99,13 @@ class FactoryModerationController extends Controller
                     Storage::disk('public')->delete($path);
                 }
             } catch (\Throwable $e) {
-                // по желанию: логируем $e->getMessage()
+                // опционально залогировать
             }
         }
 
         $factory->certificate_path = null;
-        $factory->certificate_status = null;       // или 'invalid' — по политике
+        // по твоей бизнес-логике можно поставить 'invalid', но тогда запись попадёт в список модерации
+        $factory->certificate_status = null;
         $factory->certificate_expiration = null;
         $factory->save();
 

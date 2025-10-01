@@ -125,20 +125,22 @@ class FactoryAuthController extends Controller
     {
         $credentials = $request->only('email', 'password');
 
-        $factory = Factory::where('email', $credentials['email'])->first();
+        $factory = \App\Models\Factory::where('email', $credentials['email'])->first();
 
-        if (!$factory || !Hash::check($credentials['password'], $factory->password)) {
+        if (!$factory || !\Illuminate\Support\Facades\Hash::check($credentials['password'], $factory->password)) {
             return response()->json(['message' => 'Невірні дані'], 401);
         }
 
-        $token = $factory->createToken('factory_token')->plainTextToken;
+        // по желанию: сбрасываем все старые токены
+        $factory->tokens()->delete();
+
+        // ВАЖНО: abilities для фабрики
+        $token = $factory->createToken('factory', ['factory'])->plainTextToken;
 
         return response()->json([
-            'token' => $token,
-            // фронт ждёт res.data.user — вернём совместимое поле:
-            'user'  => $factory,
-            // оставим и factory, чтобы не ломать другие места
-            'factory' => $factory
+            'token'   => $token,
+            'user'    => $factory,
+            'factory' => $factory,
         ]);
     }
 

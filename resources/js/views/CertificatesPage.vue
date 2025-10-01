@@ -31,16 +31,16 @@
                         <p v-if="cert.warehouse_address"><strong>Адреса складу:</strong> {{ cert.warehouse_address }}</p>
                         <p v-if="cert.lat && cert.lng"><strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}</p>
 
-                        <div v-if="cert.certificate_path">
+                        <div v-if="cert.certificate_path || cert.certificate_file">
                             <img
-                                v-if="isImage(cert.certificate_path)"
-                                :src="fullUrl(cert.certificate_path)"
+                                v-if="isImage(cert.certificate_path || cert.certificate_file)"
+                                :src="fullUrl(cert.certificate_path || cert.certificate_file)"
                                 alt="Certificate"
                                 style="max-width: 100%; margin: 10px 0;"
                             />
                             <a
                                 v-else
-                                :href="fullUrl(cert.certificate_path)"
+                                :href="fullUrl(cert.certificate_path || cert.certificate_file)"
                                 target="_blank"
                                 style="display: block; margin: 10px 0;"
                             >Скачати сертифікат (PDF)</a>
@@ -54,10 +54,14 @@
                             <select v-model="cert.certificate_status">
                                 <option value="valid">Валідний</option>
                                 <option value="invalid">Невалідний</option>
+                                <option value="pending">Очікує перевірки</option>
                             </select>
 
                             <div class="actions">
                                 <button class="cert__btn" @click="moderate(cert)">Зберегти</button>
+                                <button class="cert__btn cert__btn--success" @click="verify(cert)">
+                                    Верифікувати виробника
+                                </button>
                                 <button class="cert__btn cert__btn--danger" @click="deleteCert(cert)">
                                     Видалити сертифікат
                                 </button>
@@ -109,9 +113,8 @@ const activeTab = ref('certificates')
 const unverifiedCertificates = ref([])
 const verifiedCertificates = ref([])
 
-const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path)
+const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path || '')
 const fullUrl = (p) => {
-    // приводим к виду /storage/...
     const clean = String(p || '').replace(/^\/+/, '')
     return `${window.location.origin}/${clean.startsWith('storage/') ? clean : 'storage/' + clean}`
 }
@@ -123,7 +126,6 @@ async function moderate(cert) {
             status: cert.certificate_status,
             expiration_date: cert.certificate_expiration,
         })
-        alert('Сертифікат успішно оновлено.')
         await loadUnverified()
         await loadVerified()
     } catch (err) {
@@ -132,11 +134,29 @@ async function moderate(cert) {
     }
 }
 
+/** НОВОЕ: явная верификация виробника */
+async function verify(cert) {
+    // дата верификации: по умолчанию = дата окончания сертификата
+    let verified_until = cert.certificate_expiration
+    if (!verified_until) {
+        // если нет — попросим ввести
+        verified_until = prompt('Вкажіть дату закінчення верифікації (YYYY-MM-DD):', new Date().toISOString().slice(0,10))
+        if (!verified_until) return
+    }
+    try {
+        await axios.post(`/api/admin/factories/${cert.id}/approve`, { verified_until })
+        await loadVerified()
+        await loadUnverified()
+    } catch (err) {
+        console.error('❌ Помилка верифікації', err)
+        alert('Не вдалося верифікувати виробника.')
+    }
+}
+
 async function revokeVerify(cert) {
     if (!confirm('Скасувати верифікацію цього виробника?')) return
     try {
         await axios.post(`/api/admin/factories/${cert.id}/unverify`)
-        alert('Верифікацію скасовано.')
         await loadVerified()
         await loadUnverified()
     } catch (err) {
@@ -149,7 +169,6 @@ async function deleteCert(cert) {
     if (!confirm('Видалити сертифікат? Файл буде видалено безповоротно.')) return
     try {
         await axios.delete(`/api/admin/factories/${cert.id}/certificate`)
-        alert('Сертифікат видалено.')
         await loadUnverified()
         await loadVerified()
     } catch (err) {
@@ -158,11 +177,15 @@ async function deleteCert(cert) {
     }
 }
 
+/** Pending/Invalid */
 async function loadUnverified() {
     try {
         const res = await axios.get('/api/admin/factories-with-certificates')
-        // на модерации — pending/invalid
-        unverifiedCertificates.value = res.data.filter(
+        const rows = (res.data || []).map(f => ({
+            ...f,
+            certificate_path: f.certificate_path || f.certificate_file || null
+        }))
+        unverifiedCertificates.value = rows.filter(
             f => (f.certificate_status === 'pending' || f.certificate_status === 'invalid')
         )
     } catch (err) {
@@ -170,11 +193,11 @@ async function loadUnverified() {
     }
 }
 
+/** Верифіковані — берём с /api/factories/verified */
 async function loadVerified() {
     try {
-        // Верифіковані показываем по флагу is_verified (а не по статусу сертифіката)
-        const res = await axios.get('/api/admin/factories-with-certificates')
-        verifiedCertificates.value = res.data.filter(f => !!f.is_verified)
+        const res = await axios.get('/api/factories/verified')
+        verifiedCertificates.value = res.data || []
     } catch (err) {
         console.error('❌ Помилка завантаження верифікованих', err)
     }
@@ -240,6 +263,7 @@ onMounted(() => {
 }
 .cert__btn--danger { background: #e53935; }
 .cert__btn--warning { background: #f39c12; }
+.cert__btn--success { background: #2e7d32; }
 
 .cert__placeholder { text-align: center; color: #777; margin-top: 40px; }
 </style>
