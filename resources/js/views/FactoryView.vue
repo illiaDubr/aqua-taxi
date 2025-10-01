@@ -48,7 +48,7 @@
                 <div v-for="o in ordersActive" :key="o.id" class="order-card">
                     <div class="order-meta">
                         <div class="order-title">
-                            <b>#{{ o.id }}</b> • {{ o.water_type }} • {{ o.quantity }} бут
+                            <b>#{{ o.id }}</b> • {{ waterName(o.water_type, o.factory?.water_types) }} • {{ o.quantity }} бут
                         </div>
                         <div class="order-sub">
                             {{ money(o.total_price) }} • Ціна/бут: {{ money(o.price_per_bottle) }}
@@ -88,7 +88,7 @@
                 <div v-for="o in ordersNew" :key="o.id" class="order-card">
                     <div class="order-meta">
                         <div class="order-title">
-                            <b>#{{ o.id }}</b> • {{ o.water_type }} • {{ o.quantity }} бут
+                            <b>#{{ o.id }}</b> • {{ waterName(o.water_type, o.factory?.water_types) }} • {{ o.quantity }} бут
                         </div>
                         <div class="order-sub">
                             {{ money(o.total_price) }} • Ціна/бут: {{ money(o.price_per_bottle) }}
@@ -149,7 +149,6 @@ let abortCtl = null
 
 /** --- Auth helpers --- */
 function getFactoryToken () {
-    // подхватываем возможные варианты хранения
     return localStorage.getItem('factory_token')
         || localStorage.getItem('token')
         || ''
@@ -166,7 +165,29 @@ function cfg(extra = {}) {
 function toggleStatus() { isOnline.value = !isOnline.value }
 function topUp() {}
 function money(v) { const n = Number(v ?? 0); return `${n.toFixed(2)} грн` }
-function fmtTime(iso) { try { return new Date(iso).toLocaleString() } catch { return '' } }
+function fmtTime(iso) { try { return new Date(iso).toLocaleString('uk-UA') } catch { return '' } }
+
+/** water_type → человекочитаемо */
+function waterName(code, types) {
+    const raw = (code ?? '').toString().trim().toLowerCase()
+    if (!raw) return '—'
+    // если фабрика вернула water_types — ищем name там
+    if (Array.isArray(types)) {
+        const hit = types.find(t => {
+            const c = (t.code ?? '').toString().toLowerCase()
+            const n = (t.name ?? '').toString().toLowerCase()
+            return raw === c || raw === n
+        })
+        if (hit?.name) return hit.name
+    }
+    // локальный словарь
+    if (raw === 'silver') return 'Срібна'
+    if (raw === 'deep')   return 'Глибокого очищення'
+    // фолбэк — капитализация
+    return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
+
+/** --- Merge без дублей --- */
 function mergeOrders(targetRef, incoming) {
     const cur = targetRef.value
     const map = new Map(cur.map(o => [o.id, o]))
@@ -177,7 +198,7 @@ function mergeOrders(targetRef, incoming) {
     targetRef.value = Array.from(map.values()).sort((a,b) => b.id - a.id)
 }
 
-/** --- Abort helpers --- */
+/** --- Abort helpers (axios + AbortController) --- */
 function cancelInFlight() {
     if (abortCtl) abortCtl.abort()
     abortCtl = null
@@ -194,7 +215,7 @@ function handleAuthError(e, where) {
     const st = e?.response?.status
     if (st === 401 || st === 403) {
         const msg = e?.response?.data?.message || 'Only factories can view this list'
-        if (where === 'new')   errorNew.value    = msg
+        if (where === 'new')    errorNew.value    = msg
         if (where === 'active') errorActive.value = msg
         stopPolling()
         return true
@@ -253,6 +274,7 @@ async function accept(id) {
     busy.value[id] = true
     try {
         await axios.post(`/api/factory-orders/${id}/accept`, {}, cfg())
+        // переносим карточку из "новых" в "активные"
         const idx = ordersNew.value.findIndex(x => x.id === id)
         if (idx !== -1) {
             const o = { ...ordersNew.value[idx], status: 'accepted', accepted_at: new Date().toISOString() }
@@ -275,6 +297,7 @@ async function complete(id) {
     busy.value[id] = true
     try {
         await axios.post(`/api/factory-orders/${id}/complete`, {}, cfg())
+        // убираем из активных
         const before = ordersActive.value.length
         ordersActive.value = ordersActive.value.filter(x => x.id !== id)
         if (before === ordersActive.value.length) await pollActive()
@@ -290,7 +313,7 @@ async function complete(id) {
 
 /** --- Polling (fake realtime) --- */
 function refreshNow () {
-    if (currentTab.value === 'new')   pollNew()
+    if (currentTab.value === 'new')    pollNew()
     if (currentTab.value === 'active') pollActive()
 }
 
@@ -302,10 +325,10 @@ function startPolling(fn) {
         return
     }
 
-    // первый запрос сразу
+    // первый запрос
     fn()
 
-    // далее — раз в минуту, только если вкладка видима и есть интернет
+    // далее — раз в минуту, если вкладка видима и есть интернет
     pollTimer.value = window.setInterval(() => {
         if (document.visibilityState === 'visible' && navigator.onLine) {
             fn()
@@ -331,7 +354,7 @@ function switchTab(tab) {
     else stopPolling()
 }
 
-/** --- Events (visibility/online + внешние триггеры) --- */
+/** --- Events --- */
 const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
         refreshNow()
@@ -347,7 +370,6 @@ const handleExternalRefresh = () => refreshNow()
 /** --- Mount/Unmount --- */
 onMounted(() => {
     switchTab('active')
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('online',  handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -388,87 +410,39 @@ onBeforeUnmount(() => {
 .status-toggle .toggle-circle { width: 12px; height: 12px; background-color: white; border-radius: 50%; transition: transform 0.3s ease; }
 .status-toggle.offline .toggle-circle { transform: translateX(-80px) scale(0.9); }
 
-.producer-orders {
-    background: #00aaff;
-    position: relative;
-    z-index: 1;
-    font-family: 'Montserrat', sans-serif;
-}
+.producer-orders { background: #00aaff; position: relative; z-index: 1; font-family: 'Montserrat', sans-serif; }
 .producer-orders__topbar {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
-    color: white;
+    position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center;
+    padding: 12px; color: white;
 }
 
-.balance-box {
-    display: flex;
-    align-items: center;
-    background-color: white;
-    border-radius: 20px;
-    padding: 4px 10px;
-    color: #333;
-    gap: 4px;
-}
+.balance-box { display: flex; align-items: center; background-color: white; border-radius: 20px; padding: 4px 10px; color: #333; gap: 4px; }
 .balance-box .amount { font-weight: 600; font-size: 14px; }
 .balance-box .plus { background: none; border: none; font-size: 18px; cursor: pointer; color: #007BFF; }
 
-.tabs {
-    display: flex;
-    padding: 10px;
-    border-radius: 15px;
-    justify-content: space-around;
-    margin-top: 16px;
-    border-bottom: 2px solid #eee;
-}
-.tabs button {
-    flex: 1; padding: 12px; background: none; border: none;
-    font-size: 15px; font-weight: 500; color: #999; position: relative;
-}
+.tabs { display: flex; padding: 10px; border-radius: 15px; justify-content: space-around; margin-top: 16px; border-bottom: 2px solid #eee; }
+.tabs button { flex: 1; padding: 12px; background: none; border: none; font-size: 15px; font-weight: 500; color: #999; position: relative; }
 .tabs .active { color: #000; }
-.tabs .active::after {
-    content: ''; position: absolute; bottom: 0; left: 25%; right: 25%;
-    height: 3px; background-color: #2196F3; border-radius: 4px;
-}
+.tabs .active::after { content: ''; position: absolute; bottom: 0; left: 25%; right: 25%; height: 3px; background-color: #2196F3; border-radius: 4px; }
 
 .alert {
-    background: #fff4f4;
-    border: 1px solid #ffbcbc;
-    padding: 12px;
-    border-radius: 12px;
-    color: #d32f2f;
-    font-size: 14px;
-    margin: 10px;
-    text-align: center;
+    background: #fff4f4; border: 1px solid #ffbcbc; padding: 12px; border-radius: 12px; color: #d32f2f;
+    font-size: 14px; margin: 10px; text-align: center;
 }
 
 .content { margin-top: 16px; padding: 0 10px 16px; }
-.toolbar {
-    display: flex; align-items: center; gap: 12px;
-    justify-content: flex-start; margin: 0 10px 8px;
-}
+.toolbar { display: flex; align-items: center; gap: 12px; justify-content: flex-start; margin: 0 10px 8px; }
 .muted { color: #7a7a7a; }
 
-.topup-button {
-    background-color: #2196F3;
-    color: white;
-    padding: 10px 16px;
-    font-size: 14px;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-}
+.topup-button { background-color: #2196F3; color: white; padding: 10px 16px; font-size: 14px; border: none; border-radius: 12px; cursor: pointer; }
 
 .empty { padding: 16px; text-align: center; color: #777; }
 .error { margin: 10px; color: #c62828; text-align: center; }
 .loader { margin: 10px; color: #333; text-align: center; }
 
 .order-card {
-    background: #fff; border-radius: 12px; padding: 12px;
-    margin: 10px; display: flex; justify-content: space-between; align-items: center;
+    background: #fff; border-radius: 12px; padding: 12px; margin: 10px;
+    display: flex; justify-content: space-between; align-items: center;
     border: 1px solid #eee;
 }
 .order-meta { display: grid; gap: 6px; }
@@ -479,9 +453,7 @@ onBeforeUnmount(() => {
 .badge--active { background:#d6f5e0; }
 
 .order-actions { display:flex; gap:10px; }
-.btn {
-    border: none; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: 600;
-}
+.btn { border: none; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
 .btn-accept { background:#2e7d32; color:#fff; }
 .btn-complete { background:#1565c0; color:#fff; }
 </style>

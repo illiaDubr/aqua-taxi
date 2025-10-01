@@ -6,6 +6,7 @@ use App\Models\Driver; // твоя модель водителя
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
+
 class DriverAuthController extends Controller
 {
     public function register(Request $request)
@@ -13,18 +14,19 @@ class DriverAuthController extends Controller
         $data = $request->validate([
             'email'    => ['required','email','unique:drivers,email'],
             'password' => ['required','string','min:6'],
-            'phone'    => ['nullable','string'],
+            'phone'    => ['nullable','string','max:30'],
             'name'     => ['nullable','string','max:100'],
+            'surname'  => ['nullable','string','max:255'], // если колонка NOT NULL — сделай required
         ]);
 
         $driver = Driver::create([
-            'email'    => $data['email'],
+            'email'    => trim($data['email']),
             'password' => Hash::make($data['password']),
-            'phone'    => $data['phone'] ?? null,
-            'name'     => $data['name'] ?? null,
+            'phone'    => $data['phone']   ?? null,
+            'name'     => $data['name']    ?? null,
+            'surname'  => $data['surname'] ?? null, // ← добавлено
         ]);
 
-        // сразу выдаём токен водителя
         $token = $driver->createToken('driver_token', ['driver'])->plainTextToken;
 
         return response()->json([

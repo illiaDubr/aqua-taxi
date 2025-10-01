@@ -12,7 +12,7 @@ class FactoryOrder extends Model
     protected $table = 'factory_orders';
 
     protected $fillable = [
-        'user_id',          // ← ДОБАВИЛИ
+        'user_id',
         'driver_id',
         'factory_id',
         'water_type',
@@ -33,4 +33,20 @@ class FactoryOrder extends Model
         'created_at'       => 'datetime',
         'updated_at'       => 'datetime',
     ];
+
+    // 🔗 СВЯЗИ
+    public function factory()
+    {
+        return $this->belongsTo(Factory::class); // FK: factory_id
+    }
+
+    public function driver()
+    {
+        return $this->belongsTo(Driver::class); // FK: driver_id
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class); // FK: user_id (если нужно)
+    }
 }

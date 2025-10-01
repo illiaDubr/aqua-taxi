@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Order;
+use Illuminate\Support\Facades\DB;
 class FactoryOrderController extends Controller
 {
     /**
@@ -63,35 +64,25 @@ class FactoryOrderController extends Controller
      */
     public function forFactory(Request $request)
     {
-        $user = $request->user();
-
-        // Защита от неправильного типа токена/отсутствия пользователя
-        if (!$user instanceof Factory) {
+        $user = Auth::user();
+        if (!$this->isFactory($user)) {
             return response()->json(['message' => 'Only factories can view this list'], 403);
         }
 
-        $status = $request->query('status');
-        $since  = $request->query('updated_since');
+        [$statuses, $updatedSince] = $this->parseFilters($request);
 
-        $q = Order::query();
+        $q = FactoryOrder::query()
+            ->where('factory_id', $this->factoryIdFromUser($user))
+            ->with(['driver:id,name,phone']); // опционально: показать на фронте
 
-        if ($status === 'new') {
-            // Новые заказы, которые ещё никем не приняты
-            $q->where('status', 'new');
-        } elseif ($status === 'accepted') {
-            // Принятые ТЕКУЩЕЙ фабрикой
-            $q->where('status', 'accepted')
-                ->where('factory_id', $user->id);
-        } elseif ($status !== null) {
-            return response()->json(['message' => 'Unknown status'], 422);
+        if ($statuses) {
+            $q->whereIn('status', $statuses); // ожидаем new|accepted|completed|canceled
+        }
+        if ($updatedSince) {
+            $q->where('updated_at', '>=', $updatedSince);
         }
 
-        if ($since) {
-            // допускаем ISO-строку; БД сама приведёт
-            $q->where('updated_at', '>=', $since);
-        }
-
-        $orders = $q->orderByDesc('id')->get();
+        $orders = $q->orderByDesc('id')->limit(200)->get();
 
         return response()->json([
             'orders' => $orders,
@@ -131,20 +122,23 @@ class FactoryOrderController extends Controller
     /**
      * Производитель принимает заказ (new -> accepted).
      */
-    public function acceptByFactory(Request $request, Order $order)
+    public function acceptByFactory(Request $request, FactoryOrder $order) // ← тип меняем на FactoryOrder
     {
-        $user = $request->user();
-        if (!$user instanceof Factory) {
+        $user = Auth::user();
+        if (!$this->isFactory($user)) {
             return response()->json(['message' => 'Only factories can accept orders'], 403);
         }
 
+        // Заказ должен принадлежать этой фабрике и быть новым
+        if ($order->factory_id !== (int)$this->factoryIdFromUser($user)) {
+            return response()->json(['message' => 'Order does not belong to this factory'], 403);
+        }
         if ($order->status !== 'new') {
             return response()->json(['message' => 'Order is not new'], 422);
         }
 
-        DB::transaction(function () use ($order, $user) {
+        DB::transaction(function () use ($order) {
             $order->status      = 'accepted';
-            $order->factory_id  = $user->id;
             $order->accepted_at = now();
             $order->save();
         });
@@ -156,25 +150,29 @@ class FactoryOrderController extends Controller
     /**
      * Производитель завершает заказ (accepted -> completed).
      */
-    public function completeByFactory(Request $request, Order $order)
+    public function completeByFactory(Request $request, FactoryOrder $order) // ← тип меняем
     {
-        $user = $request->user();
-        if (!$user instanceof Factory) {
+        $user = Auth::user();
+        if (!$this->isFactory($user)) {
             return response()->json(['message' => 'Only factories can complete orders'], 403);
         }
 
-        if (!($order->status === 'accepted' && (int)$order->factory_id === (int)$user->id)) {
-            return response()->json(['message' => 'Order not accepted by this factory'], 422);
+        if ($order->factory_id !== (int)$this->factoryIdFromUser($user)) {
+            return response()->json(['message' => 'Order does not belong to this factory'], 403);
+        }
+        if ($order->status !== 'accepted') {
+            return response()->json(['message' => 'Order is not accepted'], 422);
         }
 
         DB::transaction(function () use ($order) {
-            $order->status        = 'completed';
-            $order->completed_at  = now();
+            $order->status       = 'completed';
+            $order->completed_at = now();
             $order->save();
         });
 
         return response()->json(['message' => 'Completed', 'order' => $order->fresh()]);
     }
+
 
     // ========= ВСПОМОГАТЕЛЬНОЕ =========
 
