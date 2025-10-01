@@ -18,10 +18,11 @@
             </div>
         </div>
 
-        <!-- Фильтр по типу воды -->
+        <!-- Фильтр по типу воды (коды -> названия) -->
         <div class="driver-map__filter-panel">
-            <button :class="{ active: selectedWaterType === 'срібна' }" @click="setWaterFilter('срібна')">Показати срібну воду</button>
-            <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати глибоке очищення</button>
+            <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
+            <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
+            <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
         </div>
 
         <!-- Алерт -->
@@ -45,122 +46,140 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
-import axios from 'axios';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { ref, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
-const mapContainer = ref();
-const map = ref(null);
-const bottles = ref(0);
-const balance = ref(0);
-const newOrders = ref([]);
-const newOrderAlert = ref(false);
-const showTopUpModal = ref(false);
-const topUpAmount = ref('');
-const router = useRouter();
-const renderedOrderIds = ref([]);
-const orderMarkers = ref({});
-const currentTab = ref('new');
-const selectedWaterType = ref(null); // 'silver' | 'deep' | null
+const mapContainer = ref()
+const map = ref(null)
+const bottles = ref(0)
+const balance = ref(0)
+const newOrders = ref([])
+const newOrderAlert = ref(false)
+const showTopUpModal = ref(false)
+const topUpAmount = ref('')
+const router = useRouter()
+const renderedOrderIds = ref([])
+const orderMarkers = ref({})
+const currentTab = ref('new')
+const selectedWaterType = ref(null) // 'silver' | 'deep' | null
 
-// Хелперы для красивых лейблов
+// === Маппинги названий
+const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
 const deliveryLabel = (opt) => {
     switch (opt) {
-        case 'home': return 'В квартиру';
-        case 'entrance': return 'Під під’їзд (−20%)';
-        case 'coffee': return 'Кав’ярня';
-        default: return '—';
+        case 'home': return 'В квартиру'
+        case 'entrance': return 'Під під’їзд (−20%)'
+        case 'coffee': return 'Кав’ярня'
+        default: return '—'
     }
-};
-const waterLabel = (t) => t || '—';
-const bottleLabel = (opt) => opt === 'buy' ? 'Придбати бутелі' : 'Свої бутелі';
-const payLabel = (p) => p === 'cash' ? 'Готівка' : 'Картка';
-const fmt = (n) => Number(n ?? 0).toFixed(2);
+}
+const bottleLabel = (opt) => opt === 'buy' ? 'Придбати бутелі' : 'Свої бутелі'
+const payLabel = (p) => p === 'cash' ? 'Готівка' : 'Картка'
+const fmt = (n) => Number(n ?? 0).toFixed(2)
+
+// Нормализация входящих значений на всякий случай (поддержка старых заказов)
+const normalizeWaterCode = (val) => {
+    if (val == null) return null
+    const v = String(val).toLowerCase()
+    if (v === 'silver' || v.includes('срібн')) return 'silver'
+    if (v === 'deep' || v.includes('глибок')) return 'deep'
+    return null
+}
+const waterLabel = (val) => {
+    const code = normalizeWaterCode(val)
+    return WATER_LABELS[code] ?? '—'
+}
 
 const setWaterFilter = (type) => {
-    selectedWaterType.value = type;
-    fetchOrders();
-};
-const goToMap = () => router.push('/map');
+    // type: 'silver' | 'deep' | null
+    selectedWaterType.value = type
+    fetchOrders()
+}
+const goToMap = () => router.push('/map')
 const switchTab = (tab) => {
-    currentTab.value = tab;
-    fetchOrders();
-};
+    currentTab.value = tab
+    fetchOrders()
+}
 
 const fetchDriverData = async () => {
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         const res = await axios.get('/api/driver/profile', {
             headers: { Authorization: `Bearer ${token}` }
-        });
-        bottles.value = res.data.bottles;
-        balance.value = res.data.balance;
+        })
+        bottles.value = res.data.bottles
+        balance.value = res.data.balance
     } catch (e) {
-        console.error('❌ Помилка отримання даних водія', e);
+        console.error('❌ Помилка отримання даних водія', e)
     }
-};
+}
 
 const payWithFondy = async () => {
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        const { url, params } = res.data;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = url;
+        const { url, params } = res.data
+        const form = document.createElement('form')
+        form.method = 'POST'
+        form.action = url
 
         Object.entries(params).forEach(([key, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-        });
+            const input = document.createElement('input')
+            input.type = 'hidden'
+            input.name = key
+            input.value = value
+            form.appendChild(input)
+        })
 
-        document.body.appendChild(form);
-        form.submit();
+        document.body.appendChild(form)
+        form.submit()
     } catch (error) {
-        alert('❌ Помилка при генерації платежу');
-        console.error(error);
+        alert('❌ Помилка при генерації платежу')
+        console.error(error)
     }
-};
+}
 
 const fetchOrders = async () => {
     try {
+        // очистить маркеры
         Object.values(orderMarkers.value).forEach(marker => {
-            map.value?.removeLayer(marker);
-        });
-        orderMarkers.value = {};
-        renderedOrderIds.value = [];
-        newOrders.value = [];
+            map.value?.removeLayer(marker)
+        })
+        orderMarkers.value = {}
+        renderedOrderIds.value = []
+        newOrders.value = []
 
-        const token = localStorage.getItem('driver_token');
-        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new';
+        const token = localStorage.getItem('driver_token')
+        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
         const res = await axios.get(endpoint, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        let orders = res.data;
+        // нормализуем типы на случай старых записей
+        let orders = res.data.map(o => ({
+            ...o,
+            water_type: normalizeWaterCode(o.water_type)
+        }))
 
-        if (selectedWaterType.value === 'silver') {
-            orders = orders.filter(order => order.water_type === 'Срібна');
-        } else if (selectedWaterType.value === 'deep') {
-            orders = orders.filter(order => order.water_type === 'Глибокого очищення');
+        // фильтр по коду
+        if (selectedWaterType.value) {
+            orders = orders.filter(o => o.water_type === selectedWaterType.value)
         }
 
         orders.forEach(order => {
-            if (!order.latitude || !order.longitude) return;
-            const lat = parseFloat(order.latitude);
-            const lng = parseFloat(order.longitude);
-            if (isNaN(lat) || isNaN(lng)) return;
+            if (!order.latitude || !order.longitude) return
+            const lat = parseFloat(order.latitude)
+            const lng = parseFloat(order.longitude)
+            if (isNaN(lat) || isNaN(lng)) return
 
-            renderedOrderIds.value.push(order.id);
-            newOrders.value.push(order);
+            renderedOrderIds.value.push(order.id)
+            newOrders.value.push(order)
 
             const icon = L.icon({
                 iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -168,97 +187,92 @@ const fetchOrders = async () => {
                 iconAnchor: [12, 41],
                 popupAnchor: [1, -34],
                 shadowUrl: null
-            });
+            })
 
             const popupHtml = `
-                <div class="order-popup">
-                  <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
-                  <b>Адреса:</b> ${
+        <div class="order-popup">
+          <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
+          <b>Адреса:</b> ${
                 currentTab.value === 'active'
                     ? `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}" target="_blank">${order.address ?? '—'}</a>`
                     : (order.address ?? '—')
             }<br>
-                  <b>Кількість:</b> ${order.quantity} бут.<br>
-                  <b>Тип води:</b> ${waterLabel(order.water_type)}<br>
-                  <b>Бутелі:</b> ${bottleLabel(order.bottle_option)}<br>
-                  <b>Доставка:</b> ${deliveryLabel(order.delivery_option)}<br>
-                  <b>Оплата:</b> ${payLabel(order.payment_method)}<br>
-                  <b>Сума:</b> ${fmt(order.total_price)} грн<br>
-                  ${
-                currentTab.value === 'active' && order.user
-                    ? `<b>Замовник:</b> ${order.user.name ?? ''} ${order.user.surname ?? ''}<br>
-                             <b>Телефон:</b> ${order.user.phone ?? '—'}<br>`
-                    : ''
-            }
-                  ${
+          <b>Кількість:</b> ${order.quantity} бут.<br>
+          <b>Тип води:</b> ${waterLabel(order.water_type)}<br>
+          <b>Бутелі:</b> ${bottleLabel(order.bottle_option)}<br>
+          <b>Доставка:</b> ${deliveryLabel(order.delivery_option)}<br>
+          <b>Оплата:</b> ${payLabel(order.payment_method)}<br>
+          <b>Сума:</b> ${fmt(order.total_price)} грн<br>
+          ${
                 currentTab.value === 'new'
                     ? `<br><button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>`
                     : ''
             }
-                </div>
-            `;
+        </div>
+      `
 
-            const marker = L.marker([lat, lng], { icon })
+            const m = L.marker([lat, lng], { icon })
                 .addTo(map.value)
-                .bindPopup(popupHtml);
+                .bindPopup(popupHtml)
 
-            orderMarkers.value[order.id] = marker;
+            orderMarkers.value[order.id] = m
 
             const pulse = L.circle([lat, lng], {
                 radius: 60,
                 color: '#3498db',
                 fillColor: '#3498db',
                 fillOpacity: 0.3
-            }).addTo(map.value);
+            }).addTo(map.value)
 
-            setTimeout(() => map.value?.removeLayer(pulse), 3000);
-            map.value?.setView([lat, lng], 14);
-        });
+            setTimeout(() => map.value?.removeLayer(pulse), 3000)
+            map.value?.setView([lat, lng], 14)
+        })
     } catch (error) {
-        console.error('❌ Помилка завантаження замовлень', error);
+        console.error('❌ Помилка завантаження замовлень', error)
     }
-};
+}
 
 onMounted(async () => {
-    await fetchDriverData();
-    await nextTick();
-    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13);
+    await fetchDriverData()
+    await nextTick()
+    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map.value);
-    await fetchOrders();
-});
+    }).addTo(map.value)
+    await fetchOrders()
+})
 
+// глобальный обработчик принятия заказа (как было)
 window.acceptOrder = async function(orderId) {
-    const confirmAccept = confirm('Підтвердити прийняття замовлення?');
-    if (!confirmAccept) return;
+    const confirmAccept = confirm('Підтвердити прийняття замовлення?')
+    if (!confirmAccept) return
 
     try {
-        const token = localStorage.getItem('driver_token');
+        const token = localStorage.getItem('driver_token')
         await axios.post(`/api/driver/orders/${orderId}/accept`, {}, {
             headers: { Authorization: `Bearer ${token}` }
-        });
+        })
 
-        alert('✅ Замовлення прийнято');
-        map.value?.closePopup();
+        alert('✅ Замовлення прийнято')
+        map.value?.closePopup()
 
-        const marker = orderMarkers.value[orderId];
+        const marker = orderMarkers.value[orderId]
         if (marker) {
-            map.value?.removeLayer(marker);
-            delete orderMarkers.value[orderId];
+            map.value?.removeLayer(marker)
+            delete orderMarkers.value[orderId]
         }
 
-        newOrders.value = newOrders.value.filter(o => o.id !== orderId);
-        renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId);
+        newOrders.value = newOrders.value.filter(o => o.id !== orderId)
+        renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId)
     } catch (error) {
         if (error.response?.status === 409) {
-            alert('❌ Це замовлення вже прийнято іншим водієм');
+            alert('❌ Це замовлення вже прийнято іншим водієм')
         } else {
-            alert('❌ Помилка при прийнятті замовлення');
-            console.error(error);
+            alert('❌ Помилка при прийнятті замовлення')
+            console.error(error)
         }
     }
-};
+}
 </script>
 
 <style>
@@ -271,7 +285,6 @@ window.acceptOrder = async function(orderId) {
     flex-direction: column;
     gap: 10px;
 }
-
 .driver-map__filter-panel button {
     background-color: white;
     color: #0095FF;
@@ -282,11 +295,11 @@ window.acceptOrder = async function(orderId) {
     cursor: pointer;
     transition: 0.3s;
 }
-
 .driver-map__filter-panel button.active {
     background-color: #0095FF;
     color: white;
 }
+
 .order-switcher {
     display: flex;
     justify-content: center;
@@ -319,17 +332,9 @@ window.acceptOrder = async function(orderId) {
     cursor: pointer;
     font-weight: 600;
 }
+.accept-button:hover { background-color: #43a047; }
 
-.accept-button:hover {
-    background-color: #43a047;
-}
-
-
-.driver-map {
-    position: relative;
-    width: 100%;
-    height: 100vh;
-}
+.driver-map { position: relative; width: 100%; height: 100vh; }
 .driver-map__top-panel {
     position: absolute;
     width: 100%;
@@ -350,75 +355,32 @@ window.acceptOrder = async function(orderId) {
     margin: 0 5px;
 }
 .driver-map__block button {
-    background: none;
-    border: none;
-    font-size: 20px;
-    font-weight: bold;
-    cursor: pointer;
+    background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer;
 }
-.driver-map__container {
-    height: 100%;
-    width: 100%;
-}
+.driver-map__container { height: 100%; width: 100%; }
+
 .order-alert {
     position: absolute;
-    top: 90px;
-    left: 50%;
+    top: 90px; left: 50%;
     transform: translateX(-50%);
-    background-color: #4caf50;
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-weight: 600;
-    z-index: 9999;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    background-color: #4caf50; color: white;
+    padding: 12px 20px; border-radius: 8px; font-weight: 600;
+    z-index: 9999; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
 .order-list {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background: white;
-    padding: 10px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    font-size: 14px;
-    z-index: 9999;
+    position: absolute; bottom: 20px; left: 20px;
+    background: white; padding: 10px; border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2); font-size: 14px; z-index: 9999;
 }
-.modal {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-}
-.modal__overlay {
-    position: absolute;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-}
+
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center; z-index: 999; }
+.modal__overlay { position: absolute; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); }
 .modal__content {
-    position: relative;
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    width: 300px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    position: relative; background: white; border-radius: 16px; padding: 24px;
+    width: 300px; display: flex; flex-direction: column; gap: 16px;
 }
-.modal__content input {
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-}
-.modal__content button {
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 12px;
-    cursor: pointer;
-}
+.modal__content input { padding: 12px; border-radius: 8px; border: 1px solid #ccc; }
+.modal__content button { background: #3498db; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; }
 </style>

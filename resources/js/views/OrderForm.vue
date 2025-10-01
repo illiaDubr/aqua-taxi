@@ -8,12 +8,12 @@ import 'leaflet/dist/leaflet.css'
 const route = useRoute()
 const router = useRouter()
 
-// === Имя товара реактивно из параметра маршрута ===
+// === Имя товара из параметра маршрута ===
 const productName = computed(() => {
     return decodeURIComponent(route.params.productId || 'Срібна вода, 19л')
 })
 
-// === Тип воды из имени товара (устойчиво к ", 19л", падежам и т.п.)
+// === Код типа воды: 'silver' | 'deep' (иначе null) ===
 const waterType = computed(() => {
     const n = (productName.value || '')
         .toLowerCase()
@@ -21,15 +21,16 @@ const waterType = computed(() => {
         .replace(/[(),]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-    if (n.includes('срібн')) return 'Срібна'
-    if (n.includes('глибок')) return 'Глибокого очищення'
+
+    if (n.includes('срібн')) return 'silver'
+    if (n.includes('глибок')) return 'deep'
     return null
 })
 
-// === Базовые цены по типам воды ===
-const PRODUCT_PRICES = {
-    'Срібна вода, 19л': 120,
-    'Глибокого очищення, 19л': 130,
+// === Цены по коду типа воды ===
+const WATER_TYPE_PRICES = {
+    silver: 120,
+    deep: 130,
 }
 
 // --- form state
@@ -44,23 +45,23 @@ const paymentMethod = ref('cash')
 const deliveryOption = ref('home') // home | entrance | coffee
 
 // --- карта / ручной выбор локации
-const manualMode = ref(false)           // как только включим — назад нельзя
+const manualMode = ref(false) // как только включим — назад нельзя
 const mapRef = ref(null)
 const map = ref(null)
 const marker = ref(null)
 const lat = ref(null)
 const lng = ref(null)
 
-// --- базовая цена зависит от выбранного типа воды
-const basePrice = computed(() => PRODUCT_PRICES[productName.value] ?? 120)
+// --- базовая цена от waterType
+const basePrice = computed(() => WATER_TYPE_PRICES[waterType.value] ?? 120)
 
 // --- расчёт суммы
 const totalAmount = computed(() => {
     const qty = parseInt(quantity.value, 10)
     if (isNaN(qty)) return 0
 
-    // спец-тариф для кав'ярні
     if (deliveryOption.value === 'coffee') {
+        // спец-тариф для кав'ярні
         return qty >= 5 ? qty * 70 : 0
     }
 
@@ -116,7 +117,7 @@ const activateManual = async () => {
     })
 }
 
-// Если по какой-то причине рендер задержится — подстрахуемся
+// Подстраховка на случай задержки рендера
 watchEffect(async () => {
     if (manualMode.value && mapRef.value && !map.value) {
         await nextTick()
@@ -162,7 +163,7 @@ const createOrder = async () => {
             return
         }
 
-        // подстраховка: не отправляем заказ с неизвестным типом воды
+        // не отправляем заказ с неизвестным типом воды
         if (!waterType.value) {
             alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.')
             return
@@ -171,8 +172,8 @@ const createOrder = async () => {
         const token = localStorage.getItem('user_token')
 
         const payload = {
-            product_name: productName.value,   // полное название (например, "Срібна вода, 19л")
-            water_type: waterType.value,       // нормализованный тип ("Срібна" | "Глибокого очищення")
+            product_name: productName.value, // полное название (например, "Срібна вода, 19л")
+            water_type: waterType.value,     // 'silver' | 'deep'
             quantity: Number(quantity.value),
             bottle_option: bottleOption.value,
             delivery_time_type: timeOption.value,
@@ -182,9 +183,10 @@ const createOrder = async () => {
             delivery_option: deliveryOption.value,
             lat: manualMode.value ? lat.value : Number(result?.lat),
             lng: manualMode.value ? lng.value : Number(result?.lon),
-        }
-        if (!manualMode.value && address.value.trim()) {
-            payload.address = address.value.trim()
+            ...( !manualMode.value && address.value.trim()
+                    ? { address: address.value.trim() }
+                    : {}
+            ),
         }
 
         await axios.post('/api/orders', payload, {
@@ -229,7 +231,7 @@ const createOrder = async () => {
                 <label>Введіть ваші дані</label>
                 <input type="text" placeholder="Ваша адреса" v-model="address" />
 
-                <!-- КНОПКА ТОЛЬКО ДЛЯ ВКЛЮЧЕНИЯ. НАЗАД НЕЛЬЗЯ -->
+                <!-- КНОПКА ТОЛЬКО ВКЛЮЧАЕТ КАРТУ -->
                 <button
                     v-if="!manualMode"
                     type="button"
@@ -270,7 +272,7 @@ const createOrder = async () => {
                 </div>
             </div>
 
-            <!-- бутли -->
+            <!-- бутлі -->
             <div class="form__group">
                 <label>Бутелі</label>
                 <div class="form__switch">

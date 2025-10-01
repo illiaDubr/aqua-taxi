@@ -10,9 +10,9 @@ use App\Events\OrderStatusUpdated;
 use App\Events\NewOrderCreated;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+
 class OrderController extends Controller
 {
-
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -23,9 +23,11 @@ class OrderController extends Controller
             'delivery_time_type' => 'required|in:now,custom',
             'custom_time'        => 'nullable|date',
             'payment_method'     => 'required|in:cash,card',
-
-            // новая опция
             'delivery_option'    => 'required|in:home,entrance,coffee',
+
+            // новое: что пришло с фронта
+            'product_name'       => 'nullable|string|max:255',
+            'water_type'         => 'required|in:silver,deep', // ← кодовое значение
 
             // координаты
             'lat'        => 'nullable|numeric|between:-90,90',
@@ -48,7 +50,7 @@ class OrderController extends Controller
         // Геокодинг при отсутствии координат
         if (($latitude === null || $longitude === null) && !empty($validated['address'])) {
             try {
-                $geo = \Illuminate\Support\Facades\Http::withHeaders([
+                $geo = Http::withHeaders([
                     'User-Agent' => 'AquaTaxi/1.0 (admin@aqua-taxi.com)',
                 ])->timeout(6)->get('https://nominatim.openstreetmap.org/search', [
                     'format' => 'json', 'q' => $validated['address'], 'limit' => 1,
@@ -58,7 +60,7 @@ class OrderController extends Controller
                     $longitude = $j[0]['lon'] ?? null;
                 }
             } catch (\Throwable $e) {
-                \Log::error('GEO search error', ['e'=>$e->getMessage()]);
+                Log::error('GEO search error', ['e'=>$e->getMessage()]);
             }
         }
 
@@ -68,7 +70,7 @@ class OrderController extends Controller
             && $latitude !== null && $longitude !== null) {
 
             try {
-                $rev = \Illuminate\Support\Facades\Http::withHeaders([
+                $rev = Http::withHeaders([
                     'User-Agent' => 'AquaTaxi/1.0 (admin@aqua-taxi.com)',
                 ])->timeout(6)->get('https://nominatim.openstreetmap.org/reverse', [
                     'format' => 'json', 'lat' => $latitude, 'lon' => $longitude,
@@ -79,7 +81,7 @@ class OrderController extends Controller
                     $addressToSave = mb_substr($r['display_name'], 0, 255);
                 }
             } catch (\Throwable $e) {
-                \Log::error('GEO reverse error', ['e'=>$e->getMessage()]);
+                Log::error('GEO reverse error', ['e'=>$e->getMessage()]);
             }
 
             if (empty($addressToSave)) {
@@ -87,49 +89,51 @@ class OrderController extends Controller
             }
         }
 
-        // === Расчёт цены ===
-        $PRICE_PER_BOTTLE = 120;
-        $total = 0;
+        // === Расчёт цены от water_type ===
+        $basePrices = ['silver' => 120, 'deep' => 130];
+        $base = $basePrices[$validated['water_type']] ?? 120;
+        $qty  = (int) $validated['quantity'];
 
         switch ($validated['delivery_option']) {
             case 'home':
-                $total = $validated['quantity'] * $PRICE_PER_BOTTLE;
+                $total = $qty * $base;
                 break;
 
             case 'entrance':
-                $total = $validated['quantity'] * $PRICE_PER_BOTTLE * 0.8;
+                $total = (int) round($qty * $base * 0.8);
                 break;
 
             case 'coffee':
-                if ($validated['quantity'] < 5) {
+                if ($qty < 5) {
                     return response()->json([
                         'message' => 'Для доставки в кав’ярню мінімальне замовлення — 5 бутлів'
                     ], 422);
                 }
-                $total = $validated['quantity'] * 70;
+                $total = $qty * 70; // спец-тариф
                 break;
         }
 
-        // Сохранение заказа
-        $order = \App\Models\Order::create([
+        // Сохранение заказа (добавили product_name и water_type)
+        $order = Order::create([
+            'user_id'            => Auth::id(),
             'address'            => $addressToSave,
-            'quantity'           => (int)$validated['quantity'],
+            'latitude'           => $latitude !== null ? (float)$latitude : null,
+            'longitude'          => $longitude !== null ? (float)$longitude : null,
+
+            'product_name'       => $request->input('product_name'), // опционально
+            'water_type'         => $validated['water_type'],        // 'silver' | 'deep'
+
+            'quantity'           => $qty,
             'bottle_option'      => $validated['bottle_option'],
+            'delivery_option'    => $validated['delivery_option'],
             'delivery_time_type' => $validated['delivery_time_type'],
             'custom_time'        => $validated['custom_time'] ?? null,
             'payment_method'     => $validated['payment_method'],
             'total_price'        => $total,
-            'user_id'            => \Illuminate\Support\Facades\Auth::id(),
-            'latitude'           => $latitude !== null ? (float)$latitude : null,
-            'longitude'          => $longitude !== null ? (float)$longitude : null,
-            'delivery_option'    => $validated['delivery_option'],
         ]);
 
         return response()->json($order, 201);
     }
-
-
-
 
     public function complete(Request $request, Order $order)
     {
@@ -142,12 +146,11 @@ class OrderController extends Controller
             'rating' => $request->rating,
         ]);
 
-        event(new \App\Events\OrderStatusUpdated($order));
+        event(new OrderStatusUpdated($order));
         event(new NewOrderCreated($order));
 
         return response()->json(['message' => 'Order completed'], 200);
     }
-
 
     public function accept(Order $order)
     {
@@ -167,20 +170,18 @@ class OrderController extends Controller
             'order' => $order,
         ]);
     }
+
     public function activeOrders(Request $request)
     {
         $userId = $request->user()->id;
 
         $orders = Order::query()
-            ->with(['driver:id,name,surname,phone']) // подгружаем данные водителя
-            ->where('user_id', $userId)              // фильтр по клиенту
+            ->with(['driver:id,name,surname,phone'])
+            ->where('user_id', $userId)
             ->whereIn('status', ['new', 'in_progress'])
             ->orderByDesc('created_at')
             ->get();
 
         return response()->json($orders);
     }
-
-
-
 }
