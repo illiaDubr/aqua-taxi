@@ -5,21 +5,15 @@ import path from 'path'
 
 export default defineConfig({
     plugins: [
-        laravel({
-            // укажи свои входы, если нужны ещё css/scss
-            input: ['resources/js/app.js'],
-            buildDirectory: 'build', // => public/build
-            refresh: false,
-        }),
+        laravel({ input: ['resources/js/app.js'], buildDirectory: 'build', refresh: false }),
         vue(),
     ],
-    resolve: {
-        alias: {
-            '@': path.resolve(__dirname, 'resources/js'),
-        },
+    resolve: { alias: { '@': path.resolve(__dirname, 'resources/js') } },
+    build: {
+        outDir: 'public/build',
+        emptyOutDir: true,
+        manifest: true,
+        cssMinify: false,     // <-- временно отключаем минификацию CSS
     },
-    server: {
-        host: true,
-        port: 5173,
-    },
+    server: { host: true, port: 5173 },
 })
