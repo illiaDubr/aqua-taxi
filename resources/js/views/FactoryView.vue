@@ -141,15 +141,18 @@ const errorActive    = ref('')
 const lastSeenNew    = ref(null)
 const lastSeenActive = ref(null)
 
+const POLL_MS = 60_000
 const pollTimer = ref(null)
 const busy      = ref({})
 
 let abortCtl = null
 
-/** --- Auth helpers (важно!) --- */
+/** --- Auth helpers --- */
 function getFactoryToken () {
-    // токен фабрики вы храните как 'token' (из AuthFactory.vue). Если переименуете — добавьте сюда.
-    return localStorage.getItem('factory_token') || localStorage.getItem('token') || ''
+    // подхватываем возможные варианты хранения
+    return localStorage.getItem('factory_token')
+        || localStorage.getItem('token')
+        || ''
 }
 function cfg(extra = {}) {
     const t = getFactoryToken()
@@ -182,24 +185,24 @@ function cancelInFlight() {
 async function withAbort(getter) {
     cancelInFlight()
     abortCtl = new AbortController()
-    try {
-        return await getter({ signal: abortCtl.signal })
-    } finally {}
+    try { return await getter({ signal: abortCtl.signal }) }
+    finally {}
 }
 
-/** --- API --- */
+/** --- Errors --- */
 function handleAuthError(e, where) {
     const st = e?.response?.status
     if (st === 401 || st === 403) {
         const msg = e?.response?.data?.message || 'Only factories can view this list'
-        if (where === 'new')   errorNew.value   = msg
-        if (where === 'active')errorActive.value= msg
+        if (where === 'new')   errorNew.value    = msg
+        if (where === 'active') errorActive.value = msg
         stopPolling()
         return true
     }
     return false
 }
 
+/** --- API --- */
 async function pollNew() {
     loadingNew.value = true
     errorNew.value   = ''
@@ -285,20 +288,36 @@ async function complete(id) {
     }
 }
 
-/** --- Polling --- */
+/** --- Polling (fake realtime) --- */
+function refreshNow () {
+    if (currentTab.value === 'new')   pollNew()
+    if (currentTab.value === 'active') pollActive()
+}
+
 function startPolling(fn) {
     stopPolling()
-    // если нет токена фабрики — дальше не идём
+
     if (!getFactoryToken()) {
         errorNew.value = errorActive.value = 'Потрібен вхід як виробник'
         return
     }
+
+    // первый запрос сразу
     fn()
-    pollTimer.value = setInterval(fn, 60_000)
+
+    // далее — раз в минуту, только если вкладка видима и есть интернет
+    pollTimer.value = window.setInterval(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+            fn()
+        }
+    }, POLL_MS)
 }
+
 function stopPolling() {
-    if (pollTimer.value) clearInterval(pollTimer.value)
-    pollTimer.value = null
+    if (pollTimer.value) {
+        clearInterval(pollTimer.value)
+        pollTimer.value = null
+    }
     cancelInFlight()
 }
 
@@ -312,11 +331,36 @@ function switchTab(tab) {
     else stopPolling()
 }
 
-/** --- Mount --- */
+/** --- Events (visibility/online + внешние триггеры) --- */
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        refreshNow()
+        startPolling(currentTab.value === 'new' ? pollNew : pollActive)
+    } else {
+        stopPolling()
+    }
+}
+const handleOnline  = () => startPolling(currentTab.value === 'new' ? pollNew : pollActive)
+const handleOffline = () => stopPolling()
+const handleExternalRefresh = () => refreshNow()
+
+/** --- Mount/Unmount --- */
 onMounted(() => {
     switchTab('active')
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('online',  handleOnline)
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('factory-orders:refresh', handleExternalRefresh)
 })
-onBeforeUnmount(() => stopPolling())
+
+onBeforeUnmount(() => {
+    stopPolling()
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.removeEventListener('online',  handleOnline)
+    window.removeEventListener('offline', handleOffline)
+    window.removeEventListener('factory-orders:refresh', handleExternalRefresh)
+})
 </script>
 
 <style scoped>

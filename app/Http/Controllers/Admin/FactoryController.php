@@ -71,7 +71,15 @@ class FactoryController extends Controller
             })
             ->whereNotNull('lat')
             ->whereNotNull('lng')
-            ->get();
+            ->get([
+                'id',
+                'email',
+                'website',
+                'warehouse_address',
+                'lat',
+                'lng',
+                'water_types', // <-- добавить
+            ]);
 
         return response()->json($rows);
     }

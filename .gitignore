@@ -19,3 +19,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+.env
+docker-compose.yml
+Dockerfile
+vite.config.js

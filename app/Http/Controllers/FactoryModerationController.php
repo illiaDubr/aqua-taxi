@@ -11,7 +11,11 @@ class FactoryModerationController extends Controller
 {
     public function show($id)
     {
-        $factory = Factory::findOrFail($id);
+        $factory = \App\Models\Factory::findOrFail($id);
+        // если в БД JSON-строка — превратим в массив
+        if (is_string($factory->water_types)) {
+            $factory->water_types = json_decode($factory->water_types, true) ?? [];
+        }
         return response()->json($factory);
     }
 

@@ -35,7 +35,7 @@ const selectRole = (role) => {
     router.push({ name: 'authUser' });
 };
     const goToAuthDriver = () => {
-    router.push({ name: 'authdriver' });
+    router.push({ name: 'authDriver' });
 };
 const goToAuthFactory = () => {
     router.push({ name: 'authFactory' });
