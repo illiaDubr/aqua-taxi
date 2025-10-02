@@ -150,28 +150,62 @@ class FactoryOrderController extends Controller
     /**
      * Производитель завершает заказ (accepted -> completed).
      */
-    public function completeByFactory(Request $request, FactoryOrder $order) // ← тип меняем
+    public function completeByFactory(Request $request, FactoryOrder $order)
     {
-        $user = Auth::user();
-        if (!$this->isFactory($user)) {
+        $factoryUser = Auth::user();
+
+        // 1) Проверка прав и принадлежности заказа фабрике
+        if (!$this->isFactory($factoryUser)) {
             return response()->json(['message' => 'Only factories can complete orders'], 403);
         }
-
-        if ($order->factory_id !== (int)$this->factoryIdFromUser($user)) {
+        $factoryId = (int) $this->factoryIdFromUser($factoryUser);
+        if ((int)$order->factory_id !== $factoryId) {
             return response()->json(['message' => 'Order does not belong to this factory'], 403);
         }
-        if ($order->status !== 'accepted') {
+
+        // 2) Разрешённые статусы к завершению
+        if (!in_array($order->status, ['accepted','in_progress'], true)) {
             return response()->json(['message' => 'Order is not accepted'], 422);
         }
 
-        DB::transaction(function () use ($order) {
-            $order->status       = 'completed';
-            $order->completed_at = now();
-            $order->save();
+        // 3) Найдём водителя
+        if (!$order->driver_id) {
+            return response()->json(['message' => 'Order has no driver assigned'], 422);
+        }
+        $driver = Driver::query()->find($order->driver_id);
+        if (!$driver) {
+            return response()->json(['message' => 'Driver not found'], 404);
+        }
+
+        // 4) Завершаем заказ и увеличиваем бутыли на количество из заказа
+        DB::transaction(function () use ($order, $driver) {
+            // блокируем строку заказа от гонок
+            $locked = FactoryOrder::whereKey($order->id)->lockForUpdate()->first();
+
+            if (!in_array($locked->status, ['accepted','in_progress'], true)) {
+                abort(409, 'Order status changed');
+            }
+
+            $qty = max(0, (int) $locked->quantity); // защита от мусора
+
+            // статус заказа
+            $locked->status = 'completed';
+            $locked->completed_at = now();
+            $locked->save();
+
+            // прибавляем бутыли водителю
+            $driver->bottles = max(0, (int)$driver->bottles + $qty);
+            $driver->save();
         });
 
-        return response()->json(['message' => 'Completed', 'order' => $order->fresh()]);
+        return response()->json([
+            'message' => 'Completed',
+            'order'   => $order->fresh(),
+            'driver'  => $driver->only(['id', 'bottles', 'balance']),
+        ]);
     }
+
+
 
 
     // ========= ВСПОМОГАТЕЛЬНОЕ =========

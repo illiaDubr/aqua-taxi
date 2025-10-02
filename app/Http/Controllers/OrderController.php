@@ -10,7 +10,8 @@ use App\Events\OrderStatusUpdated;
 use App\Events\NewOrderCreated;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\DB;   // ← нужно для DB::transaction()
+use App\Models\Driver;
 class OrderController extends Controller
 {
     public function store(Request $request)
@@ -137,38 +138,73 @@ class OrderController extends Controller
 
     public function complete(Request $request, Order $order)
     {
-        $request->validate([
-            'rating' => 'required|integer|min:1|max:5'
+        $data = $request->validate([
+            'rating' => ['nullable','integer','min:1','max:5'],
         ]);
+        $rating = (int) ($data['rating'] ?? 5);
 
-        $order->update([
-            'status' => 'completed',
-            'rating' => $request->rating,
-        ]);
+        $user = Auth::user();
+        if ((int)$order->user_id !== (int)$user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        if (!in_array($order->status, ['accepted','in_progress'], true)) {
+            return response()->json(['message' => 'Order is not deliverable'], 422);
+        }
 
-        event(new OrderStatusUpdated($order));
-        event(new NewOrderCreated($order));
+        $updatedDriver = null;
 
-        return response()->json(['message' => 'Order completed'], 200);
-    }
+        DB::transaction(function () use ($order, $rating, &$updatedDriver) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
 
-    public function accept(Order $order)
-    {
-        $driver = auth()->user();
+            if (!in_array($locked->status, ['accepted','in_progress'], true)) {
+                abort(409, 'Order status changed');
+            }
 
-        $order->update([
-            'status' => 'in_progress',
-            'driver_id' => $driver->id,
-        ]);
+            // === СПИСАНИЕ БУТЛЕЙ У ВОДИТЕЛЯ ===
+            if ($locked->driver_id) {
+                $opt = strtolower((string)$locked->bottle_option);
+                $qty = max(0, (int)$locked->quantity);
 
-        $order->load('driver');
+                // списываем только если клиент покупал бутыли у водителя
 
-        broadcast(new OrderStatusUpdated($order))->toOthers();
+                    // атомарно: bottles = GREATEST(bottles - qty, 0)
+                    DB::table('drivers')
+                        ->where('id', $locked->driver_id)
+                        ->lockForUpdate()
+                        ->update([
+                            'bottles' => DB::raw('GREATEST(bottles - '.((int)$qty).', 0)')
+                        ]);
+
+                    // отдаём свежие данные водителя в ответ
+                    $driverRow = DB::table('drivers')
+                        ->select('id','bottles','balance')
+                        ->where('id', $locked->driver_id)
+                        ->first();
+                    if ($driverRow) {
+                        $updatedDriver = [
+                            'id'      => (int)$driverRow->id,
+                            'bottles' => (int)$driverRow->bottles,
+                            'balance' => (float)$driverRow->balance,
+                        ];
+                    }
+
+            }
+
+            // === ЗАВЕРШАЕМ ЗАКАЗ ===
+            $locked->status = 'completed';
+            $locked->rating = $rating;
+            // если поля нет — закомментируй строку ниже
+            $locked->completed_at = now();
+            $locked->save();
+        });
+
+        event(new OrderStatusUpdated($order->fresh()));
 
         return response()->json([
-            'message' => 'Order accepted',
-            'order' => $order,
-        ]);
+            'message' => 'Order completed',
+            'order'   => $order->fresh(),
+            'driver'  => $updatedDriver, // null, если списание не применялось
+        ], 200);
     }
 
     public function activeOrders(Request $request)

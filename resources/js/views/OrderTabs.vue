@@ -54,7 +54,7 @@ import 'leaflet/dist/leaflet.css'
 
 const mapContainer = ref()
 const map = ref(null)
-const bottles = ref(0)
+const bottles = ref(0)          // ← показываем то, что приходит из профиля
 const balance = ref(0)
 const newOrders = ref([])
 const newOrderAlert = ref(false)
@@ -65,6 +65,12 @@ const renderedOrderIds = ref([])
 const orderMarkers = ref({})
 const currentTab = ref('new')
 const selectedWaterType = ref(null) // 'silver' | 'deep' | null
+
+// --- утилита заголовков авторизации
+const authHeaders = () => {
+    const token = localStorage.getItem('driver_token')
+    return { Authorization: `Bearer ${token}` }
+}
 
 // === Маппинги названий
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
@@ -80,7 +86,7 @@ const bottleLabel = (opt) => opt === 'buy' ? 'Придбати бутелі' : '
 const payLabel = (p) => p === 'cash' ? 'Готівка' : 'Картка'
 const fmt = (n) => Number(n ?? 0).toFixed(2)
 
-// Нормализация входящих значений на всякий случай (поддержка старых заказов)
+// Нормализация входящих значений (поддержка старых заказов)
 const normalizeWaterCode = (val) => {
     if (val == null) return null
     const v = String(val).toLowerCase()
@@ -94,7 +100,6 @@ const waterLabel = (val) => {
 }
 
 const setWaterFilter = (type) => {
-    // type: 'silver' | 'deep' | null
     selectedWaterType.value = type
     fetchOrders()
 }
@@ -104,14 +109,14 @@ const switchTab = (tab) => {
     fetchOrders()
 }
 
+// --- тянем профиль водителя и выставляем бутылeй/баланс
 const fetchDriverData = async () => {
     try {
-        const token = localStorage.getItem('driver_token')
-        const res = await axios.get('/api/driver/profile', {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-        bottles.value = res.data.bottles
-        balance.value = res.data.balance
+        const res = await axios.get('/api/driver/profile', { headers: authHeaders() })
+        // поддержка разных форматов ответа: {driver: {...}} или просто {...}
+        const d = res.data?.driver ?? res.data ?? {}
+        bottles.value = Number(d.bottles ?? 0)   // ← тут берём количество бутлей
+        balance.value = Number(d.balance ?? 0)
     } catch (e) {
         console.error('❌ Помилка отримання даних водія', e)
     }
@@ -119,16 +124,15 @@ const fetchDriverData = async () => {
 
 const payWithFondy = async () => {
     try {
-        const token = localStorage.getItem('driver_token')
-        const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-
+        const res = await axios.post(
+            '/api/driver/pay',
+            { amount: parseFloat(topUpAmount.value) },
+            { headers: authHeaders() }
+        )
         const { url, params } = res.data
         const form = document.createElement('form')
         form.method = 'POST'
         form.action = url
-
         Object.entries(params).forEach(([key, value]) => {
             const input = document.createElement('input')
             input.type = 'hidden'
@@ -136,7 +140,6 @@ const payWithFondy = async () => {
             input.value = value
             form.appendChild(input)
         })
-
         document.body.appendChild(form)
         form.submit()
     } catch (error) {
@@ -155,19 +158,17 @@ const fetchOrders = async () => {
         renderedOrderIds.value = []
         newOrders.value = []
 
-        const token = localStorage.getItem('driver_token')
-        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
-        const res = await axios.get(endpoint, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
+        const endpoint = currentTab.value === 'active'
+            ? '/api/driver/orders/active'
+            : '/api/driver/orders/new'
 
-        // нормализуем типы на случай старых записей
-        let orders = res.data.map(o => ({
+        const res = await axios.get(endpoint, { headers: authHeaders() })
+
+        let orders = (res.data ?? []).map(o => ({
             ...o,
             water_type: normalizeWaterCode(o.water_type)
         }))
 
-        // фильтр по коду
         if (selectedWaterType.value) {
             orders = orders.filter(o => o.water_type === selectedWaterType.value)
         }
@@ -233,7 +234,7 @@ const fetchOrders = async () => {
 }
 
 onMounted(async () => {
-    await fetchDriverData()
+    await fetchDriverData()                 // ← тянем профиль сразу при входе
     await nextTick()
     map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -242,16 +243,13 @@ onMounted(async () => {
     await fetchOrders()
 })
 
-// глобальный обработчик принятия заказа (как было)
+// глобальный обработчик принятия заказа
 window.acceptOrder = async function(orderId) {
     const confirmAccept = confirm('Підтвердити прийняття замовлення?')
     if (!confirmAccept) return
 
     try {
-        const token = localStorage.getItem('driver_token')
-        await axios.post(`/api/driver/orders/${orderId}/accept`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
+        await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
 
         alert('✅ Замовлення прийнято')
         map.value?.closePopup()
@@ -264,6 +262,9 @@ window.acceptOrder = async function(orderId) {
 
         newOrders.value = newOrders.value.filter(o => o.id !== orderId)
         renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId)
+
+        // на всякий случай подтянем свежий профиль — если кол-во бутлей меняется после действий
+        await fetchDriverData()
     } catch (error) {
         if (error.response?.status === 409) {
             alert('❌ Це замовлення вже прийнято іншим водієм')
@@ -274,6 +275,7 @@ window.acceptOrder = async function(orderId) {
     }
 }
 </script>
+
 
 <style>
 .driver-map__filter-panel {
