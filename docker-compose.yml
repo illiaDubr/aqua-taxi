@@ -18,10 +18,10 @@ services:
         container_name: aqua-nginx
         ports:
             - "80:80"
-            # - "443:443"
         volumes:
             - .:/var/www:ro
-            - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro   # <-- единственный конфиг
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+            - ./docker/nginx/cors_map.conf:/etc/nginx/conf.d/cors_map.conf:ro   # <— добавили map
         depends_on:
             - app
             - reverb
