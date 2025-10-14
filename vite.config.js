@@ -3,17 +3,48 @@ import laravel from 'laravel-vite-plugin'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     plugins: [
-        laravel({ input: ['resources/js/app.js'], buildDirectory: 'build', refresh: false }),
+        laravel({
+            input: ['resources/js/app.js'],
+            buildDirectory: 'build',
+            refresh: false,
+        }),
         vue(),
     ],
-    resolve: { alias: { '@': path.resolve(__dirname, 'resources/js') } },
+
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, 'resources/js'),
+        },
+    },
+
+    // Настройки билда
     build: {
         outDir: 'public/build',
         emptyOutDir: true,
         manifest: true,
-        cssMinify: false,     // <-- временно отключаем минификацию CSS
+        cssCodeSplit: true,
+        minify: 'esbuild',
+        sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vue: ['vue'],
+                },
+            },
+        },
     },
-    server: { host: true, port: 5173 },
-})
+
+    // Dev-сервер — используется только локально
+    server: {
+        host: 'localhost',
+        port: 5173,
+        strictPort: true,
+        origin: 'http://localhost:5173',
+        cors: true,
+        hmr: {
+            host: 'localhost',
+        },
+    },
+}))
