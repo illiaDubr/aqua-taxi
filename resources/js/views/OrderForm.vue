@@ -26,13 +26,13 @@ const waterType = computed(() => {
 
 // --- state
 const address = ref('')
-const quantity = ref('')                     // select строкой → приводим ниже к числу
-const bottleOption = ref('own')              // 'own' | 'buy'
-const bottleQuality = ref('ideal')           // 'ideal' | 'average' | 'bad' (только для own)
-const timeOption = ref('now')                // 'now' | 'custom'
+const quantity = ref('')               // select строкой → ниже приводим к числу
+const bottleOption = ref('own')        // 'own' | 'buy'
+const bottleQuality = ref('ideal')     // 'ideal' | 'average' | 'bad' (только для own)
+const timeOption = ref('now')          // 'now' | 'custom'
 const customTime = ref('')
 const paymentMethod = ref('cash')
-const deliveryOption = ref('home')           // 'home' | 'entrance' | 'coffee'
+const deliveryOption = ref('home')     // 'home' | 'entrance' | 'coffee'
 
 // --- карта/ручной выбор
 const manualMode = ref(false)
@@ -85,8 +85,8 @@ const totalAmount = computed(() => {
     // защита для кофе-режима
     if (deliveryOption.value === 'coffee' && qty < 5) return 0
 
-    const waterPart   = Math.round(unitWaterPrice.value * discountFactor.value) * qty
-    const bottlePart  = unitBottleSurcharge.value * qty
+    const waterPart  = Math.round(unitWaterPrice.value * discountFactor.value) * qty
+    const bottlePart = unitBottleSurcharge.value * qty
     return waterPart + bottlePart
 })
 
@@ -97,7 +97,7 @@ const pricingMeta = computed(() => {
     const tier = qty >= 2 ? 'many' : 'one'
     return {
         water_type: wt,
-        tier,                                    // 'one' | 'many'
+        tier, // 'one' | 'many'
         base_unit_water_price: UNIT_PRICES[wt]?.[tier] ?? 0,
         discount_applied: deliveryOption.value === 'entrance' ? 0.2 : 0,
         unit_bottle_surcharge: unitBottleSurcharge.value,
@@ -157,7 +157,6 @@ watchEffect(async () => {
 })
 
 // --- отправка заказа
-// --- отправка заказа
 const createOrder = async () => {
     try {
         let result = null
@@ -182,37 +181,36 @@ const createOrder = async () => {
 
         const token = localStorage.getItem('user_token')
 
-            +   // адрес для бэка: либо введённый, либо "<lat>, <lng>" в ручном режиме
-            +   const addressText = address.value.trim() || (manualMode.value ? `${lat.value}, ${lng.value}` : '')
-            +   if (!addressText) {
-            +     alert('❌ Вкажіть адресу або оберіть точку на карті')
-            +     return
-            +   }
+        // адрес для бэка: либо введённый, либо "<lat>, <lng>" в ручном режиме
+        const addressText = address.value.trim() || (manualMode.value ? `${lat.value}, ${lng.value}` : '')
+        if (!addressText) {
+            alert('❌ Вкажіть адресу або оберіть точку на карті')
+            return
+        }
 
         const payload = {
-                product_name: productName.value,
-                water_type: waterType.value,
-                quantity: qty,
-                bottle_option: bottleOption.value,
-                bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null,
-                delivery_time_type: timeOption.value,
-                custom_time: customTime.value || null,
-                payment_method: paymentMethod.value,
-                delivery_option: deliveryOption.value,
-                unit_water_price: unitWaterPrice.value,
-                unit_bottle_surcharge: unitBottleSurcharge.value,
-                total_price: Number(totalAmount.value) || 0,
-                pricing_meta: pricingMeta.value,
-                lat: manualMode.value ? lat.value : Number(result?.lat),
-                lng: manualMode.value ? lng.value : Number(result?.lon),
+            product_name: productName.value,
+            water_type: waterType.value,
+            quantity: qty,
+            bottle_option: bottleOption.value,
+            bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null,
+            delivery_time_type: timeOption.value,
+            custom_time: customTime.value || null,
+            payment_method: paymentMethod.value,
+            delivery_option: deliveryOption.value,
+            unit_water_price: unitWaterPrice.value,
+            unit_bottle_surcharge: unitBottleSurcharge.value,
+            total_price: Number(totalAmount.value) || 0,
+            pricing_meta: pricingMeta.value,
+            lat: manualMode.value ? lat.value : Number(result?.lat),
+            lng: manualMode.value ? lng.value : Number(result?.lon),
+            address: addressText,
+        }
 
-               address: addressText,
-    }
+        await axios.post('/api/orders', payload, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
 
-        try {
-            await axios.post('/api/orders', payload, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
         router.push({
             name: 'orders',
             query: {
@@ -234,12 +232,13 @@ const createOrder = async () => {
             alert('❌ ' + msg)
             return
         }
-
         // прочие ошибки
         alert('❌ Помилка створення замовлення')
         console.error(error)
     }
+}
 </script>
+
 
 <template>
     <div class="form">
