@@ -157,6 +157,7 @@ watchEffect(async () => {
 })
 
 // --- отправка заказа
+// --- отправка заказа
 const createOrder = async () => {
     try {
         let result = null
@@ -176,41 +177,42 @@ const createOrder = async () => {
 
         const qty = Number.parseInt(quantity.value, 10) || 0
         if (!qty) { alert('❌ Оберіть кількість'); return }
-
-        if (deliveryOption.value === 'coffee' && qty < 5) {
-            alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів')
-            return
-        }
-
-        if (!waterType.value) {
-            alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.')
-            return
-        }
+        if (deliveryOption.value === 'coffee' && qty < 5) { alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів'); return }
+        if (!waterType.value) { alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.'); return }
 
         const token = localStorage.getItem('user_token')
 
+            +   // адрес для бэка: либо введённый, либо "<lat>, <lng>" в ручном режиме
+            +   const addressText = address.value.trim() || (manualMode.value ? `${lat.value}, ${lng.value}` : '')
+            +   if (!addressText) {
+            +     alert('❌ Вкажіть адресу або оберіть точку на карті')
+            +     return
+            +   }
+
         const payload = {
-            product_name: productName.value,
-            water_type: waterType.value,                 // 'silver' | 'deep'
-            quantity: qty,
-            bottle_option: bottleOption.value,           // 'own' | 'buy'
-            bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null, // 'ideal'|'average'|'bad'
-            delivery_time_type: timeOption.value,
-            custom_time: customTime.value || null,
-            payment_method: paymentMethod.value,
-            delivery_option: deliveryOption.value,
-            // цены: и поштучная, и итог (чтобы бэк не считал по старому)
-            unit_water_price: unitWaterPrice.value,
-            unit_bottle_surcharge: unitBottleSurcharge.value,
-            total_price: Number(totalAmount.value) || 0,
-            pricing_meta: pricingMeta.value,             // для дебага на бэке
-            lat: manualMode.value ? lat.value : Number(result?.lat),
-            lng: manualMode.value ? lng.value : Number(result?.lon),
-            ...( !manualMode.value && address.value.trim() ? { address: address.value.trim() } : {} ),
-        }
+                product_name: productName.value,
+                water_type: waterType.value,
+                quantity: qty,
+                bottle_option: bottleOption.value,
+                bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null,
+                delivery_time_type: timeOption.value,
+                custom_time: customTime.value || null,
+                payment_method: paymentMethod.value,
+                delivery_option: deliveryOption.value,
+                unit_water_price: unitWaterPrice.value,
+                unit_bottle_surcharge: unitBottleSurcharge.value,
+                total_price: Number(totalAmount.value) || 0,
+                pricing_meta: pricingMeta.value,
+                lat: manualMode.value ? lat.value : Number(result?.lat),
+                lng: manualMode.value ? lng.value : Number(result?.lon),
 
-        await axios.post('/api/orders', payload, { headers: { Authorization: `Bearer ${token}` } })
+               address: addressText,
+    }
 
+        try {
+            await axios.post('/api/orders', payload, {
+                headers: { Authorization: `Bearer ${token}` },
+            })
         router.push({
             name: 'orders',
             query: {
@@ -221,16 +223,22 @@ const createOrder = async () => {
             },
         })
     } catch (error) {
+        // 422: показываем какие поля упали
         if (axios.isAxiosError(error) && error.response?.status === 422) {
             const errs = error.response.data?.errors || {}
-            const msg = Object.values(errs).flat().join('\n') || error.response.data?.message || 'Validation error'
+            const lines = Object.entries(errs).map(([k, v]) => {
+                const arr = Array.isArray(v) ? v : [v]
+                return `${k}: ${arr.join(', ')}`
+            })
+            const msg = lines.length ? lines.join('\n') : (error.response.data?.message || 'Validation error')
             alert('❌ ' + msg)
             return
         }
+
+        // прочие ошибки
         alert('❌ Помилка створення замовлення')
         console.error(error)
     }
-}
 </script>
 
 <template>
