@@ -54,7 +54,7 @@ import 'leaflet/dist/leaflet.css'
 
 const mapContainer = ref()
 const map = ref(null)
-const bottles = ref(0)          // ← показываем то, что приходит из профиля
+const bottles = ref(0)
 const balance = ref(0)
 const newOrders = ref([])
 const newOrderAlert = ref(false)
@@ -72,8 +72,10 @@ const authHeaders = () => {
     return { Authorization: `Bearer ${token}` }
 }
 
-// === Маппинги названий
+// === Маппинги и хелперы
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
+const QUALITY_LABELS = { ideal: 'Ідеальний', average: 'Середній', bad: 'Поганий' }
+
 const deliveryLabel = (opt) => {
     switch (opt) {
         case 'home': return 'В квартиру'
@@ -85,8 +87,8 @@ const deliveryLabel = (opt) => {
 const bottleLabel = (opt) => opt === 'buy' ? 'Придбати бутелі' : 'Свої бутелі'
 const payLabel = (p) => p === 'cash' ? 'Готівка' : 'Картка'
 const fmt = (n) => Number(n ?? 0).toFixed(2)
+const qualityLabel = (q) => QUALITY_LABELS[String(q ?? '').toLowerCase()] ?? '—'
 
-// Нормализация входящих значений (поддержка старых заказов)
 const normalizeWaterCode = (val) => {
     if (val == null) return null
     const v = String(val).toLowerCase()
@@ -99,6 +101,18 @@ const waterLabel = (val) => {
     return WATER_LABELS[code] ?? '—'
 }
 
+const getCustomer = (o) => {
+    const user = o.user ?? o.customer ?? {}
+    const name = o.user_name ?? o.customer_name ?? user.name ?? '—'
+    const phone = o.user_phone ?? o.customer_phone ?? user.phone ?? '—'
+    return { name, phone }
+}
+const tel = (p) => {
+    if (!p) return ''
+    const digits = String(p).replace(/[^\d+]/g, '')
+    return digits || ''
+}
+
 const setWaterFilter = (type) => {
     selectedWaterType.value = type
     fetchOrders()
@@ -109,19 +123,19 @@ const switchTab = (tab) => {
     fetchOrders()
 }
 
-// --- тянем профиль водителя и выставляем бутылeй/баланс
+// --- профиль водителя
 const fetchDriverData = async () => {
     try {
         const res = await axios.get('/api/driver/profile', { headers: authHeaders() })
-        // поддержка разных форматов ответа: {driver: {...}} или просто {...}
         const d = res.data?.driver ?? res.data ?? {}
-        bottles.value = Number(d.bottles ?? 0)   // ← тут берём количество бутлей
+        bottles.value = Number(d.bottles ?? 0)
         balance.value = Number(d.balance ?? 0)
     } catch (e) {
         console.error('❌ Помилка отримання даних водія', e)
     }
 }
 
+// --- платеж
 const payWithFondy = async () => {
     try {
         const res = await axios.post(
@@ -148,6 +162,7 @@ const payWithFondy = async () => {
     }
 }
 
+// --- заказы
 const fetchOrders = async () => {
     try {
         // очистить маркеры
@@ -190,6 +205,23 @@ const fetchOrders = async () => {
                 shadowUrl: null
             })
 
+            const customer = getCustomer(order)
+
+            const qualityRow =
+                currentTab.value === 'new' && order.bottle_option === 'own' && order.bottle_quality
+                    ? `<b>Якість бутиля:</b> <span class="quality-pill">${qualityLabel(order.bottle_quality)}</span><br>`
+                    : ''
+
+            const customerRows =
+                currentTab.value === 'active'
+                    ? `<b>Клієнт:</b> ${customer.name}<br>
+             <b>Телефон:</b> ${
+                        tel(customer.phone)
+                            ? `<a href="tel:${tel(customer.phone)}">${customer.phone}</a>`
+                            : (customer.phone ?? '—')
+                    }<br>`
+                    : ''
+
             const popupHtml = `
         <div class="order-popup">
           <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
@@ -201,9 +233,11 @@ const fetchOrders = async () => {
           <b>Кількість:</b> ${order.quantity} бут.<br>
           <b>Тип води:</b> ${waterLabel(order.water_type)}<br>
           <b>Бутелі:</b> ${bottleLabel(order.bottle_option)}<br>
+          ${qualityRow}
           <b>Доставка:</b> ${deliveryLabel(order.delivery_option)}<br>
           <b>Оплата:</b> ${payLabel(order.payment_method)}<br>
           <b>Сума:</b> ${fmt(order.total_price)} грн<br>
+          ${customerRows}
           ${
                 currentTab.value === 'new'
                     ? `<br><button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>`
@@ -234,7 +268,7 @@ const fetchOrders = async () => {
 }
 
 onMounted(async () => {
-    await fetchDriverData()                 // ← тянем профиль сразу при входе
+    await fetchDriverData()
     await nextTick()
     map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -263,8 +297,12 @@ window.acceptOrder = async function(orderId) {
         newOrders.value = newOrders.value.filter(o => o.id !== orderId)
         renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId)
 
-        // на всякий случай подтянем свежий профиль — если кол-во бутлей меняется после действий
+        // обновим профиль — если кол-во бутлей меняется
         await fetchDriverData()
+
+        // и сразу перерисуем списки (активные заказы)
+        currentTab.value = 'active'
+        await fetchOrders()
     } catch (error) {
         if (error.response?.status === 409) {
             alert('❌ Це замовлення вже прийнято іншим водієм')
@@ -275,7 +313,6 @@ window.acceptOrder = async function(orderId) {
     }
 }
 </script>
-
 
 <style>
 .driver-map__filter-panel {
@@ -385,4 +422,10 @@ window.acceptOrder = async function(orderId) {
 }
 .modal__content input { padding: 12px; border-radius: 8px; border: 1px solid #ccc; }
 .modal__content button { background: #3498db; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; }
+
+/* Бейдж для отображения качества в попапе */
+.order-popup .quality-pill {
+    display:inline-block; padding:2px 8px; border-radius:999px;
+    background:#eef4ff; border:1px solid #d8e2ff; font-size:12px; font-weight:700;
+}
 </style>

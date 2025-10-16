@@ -16,7 +16,7 @@ class Order extends Model
     protected $fillable = [
         'user_id','driver_id','address','quantity','bottle_option',
         'delivery_time_type','custom_time','payment_method','total_price',
-        'latitude','longitude','delivery_option','water_type','status','rating'
+        'latitude','longitude','delivery_option','water_type','status','rating','purchase_bottle_count'
     ];
 
     protected $casts = [

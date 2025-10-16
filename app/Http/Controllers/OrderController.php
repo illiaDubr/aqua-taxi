@@ -25,7 +25,7 @@ class OrderController extends Controller
             'custom_time'        => 'nullable|date',
             'payment_method'     => 'required|in:cash,card',
             'delivery_option'    => 'required|in:home,entrance,coffee',
-
+            'purchase_bottle_count' => ['required','integer','min:0'],
             // новое: что пришло с фронта
             'product_name'       => 'nullable|string|max:255',
             'water_type'         => 'required|in:silver,deep', // ← кодовое значение

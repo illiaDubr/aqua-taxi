@@ -27,50 +27,27 @@ const waterType = computed(() => {
     return null
 })
 
-// === Цены по коду типа воды ===
-const WATER_TYPE_PRICES = {
-    silver: 120,
-    deep: 130,
-}
-
 // --- form state
 const address = ref('')
 const quantity = ref('')
-const bottleOption = ref('own')
-const timeOption = ref('now')
+const bottleOption = ref('own')        // own | buy
+const bottleQuality = ref('ideal')     // ideal | average | bad (для own)
+const timeOption = ref('now')          // now | custom
 const customTime = ref('')
 const paymentMethod = ref('cash')
 
 // новая опция
-const deliveryOption = ref('home') // home | entrance | coffee
+const deliveryOption = ref('home')     // home | entrance | coffee
 
 // --- карта / ручной выбор локации
-const manualMode = ref(false) // как только включим — назад нельзя
+const manualMode = ref(false) // включаем 1 раз и без обратного выключения
 const mapRef = ref(null)
 const map = ref(null)
 const marker = ref(null)
 const lat = ref(null)
 const lng = ref(null)
 
-// --- базовая цена от waterType
-const basePrice = computed(() => WATER_TYPE_PRICES[waterType.value] ?? 120)
-
-// --- расчёт суммы
-const totalAmount = computed(() => {
-    const qty = parseInt(quantity.value, 10)
-    if (isNaN(qty)) return 0
-
-    if (deliveryOption.value === 'coffee') {
-        // спец-тариф для кав'ярні
-        return qty >= 5 ? qty * 70 : 0
-    }
-
-    const price = basePrice.value
-    if (deliveryOption.value === 'entrance') return Math.round(qty * price * 0.8)
-    return qty * price
-})
-
-// --- валидация адреса через Nominatim
+// === Валидация адреса через Nominatim
 const validateAddress = async (addr) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`
     const response = await fetch(url, {
@@ -79,6 +56,46 @@ const validateAddress = async (addr) => {
     const data = await response.json()
     return data.length ? data[0] : null
 }
+
+// === Пер-бутыльная цена по правилам
+const perBottlePrice = (qty, type) => {
+    if (deliveryOption.value === 'coffee') {
+        // спец-тариф для кав'ярні (оставил как было)
+        return qty >= 5 ? 70 : 0
+    }
+    if (type === 'deep') {
+        return qty === 1 ? 250 : 180
+    }
+    if (type === 'silver') {
+        return qty === 1 ? 260 : 190
+    }
+    // дефолт на случай неизвестного типа
+    return qty === 1 ? 260 : 190
+}
+
+// === Итог
+const totalAmount = computed(() => {
+    const qty = parseInt(quantity.value, 10)
+    if (isNaN(qty)) return 0
+    if (!waterType.value) return 0
+
+    // базовая сумма за воду
+    const pricePerBottle = perBottlePrice(qty, waterType.value)
+    if (pricePerBottle === 0 && deliveryOption.value === 'coffee') return 0 // защита для < 5 шт
+    let total = qty * pricePerBottle
+
+    // скидка -20% для доставки "Під під’їзд"
+    if (deliveryOption.value === 'entrance') {
+        total = Math.round(total * 0.8)
+    }
+
+    // Наценка за покупку бутлей: +350 грн за каждый
+    if (bottleOption.value === 'buy') {
+        total += qty * 350
+    }
+
+    return total
+})
 
 // --- уничтожение карты
 const destroyMap = () => {
@@ -169,13 +186,16 @@ const createOrder = async () => {
             return
         }
 
+        const qty = Number(quantity.value)
         const token = localStorage.getItem('user_token')
 
         const payload = {
             product_name: productName.value, // полное название (например, "Срібна вода, 19л")
             water_type: waterType.value,     // 'silver' | 'deep'
-            quantity: Number(quantity.value),
-            bottle_option: bottleOption.value,
+            quantity: qty,
+            bottle_option: bottleOption.value,                   // own | buy
+            bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null, // ideal | average | bad
+            purchase_bottle_count: bottleOption.value === 'buy' ? qty : 0,
             delivery_time_type: timeOption.value,
             custom_time: customTime.value || null,
             payment_method: paymentMethod.value,
@@ -273,12 +293,46 @@ const createOrder = async () => {
             </div>
 
             <!-- бутлі -->
-            <div class="form__group">
+            <div class="form__group bottle-section">
                 <label>Бутелі</label>
-                <div class="form__switch">
-                    <button :class="{ active: bottleOption === 'own' }" @click="bottleOption = 'own'">Свої бутелі</button>
-                    <button :class="{ active: bottleOption === 'buy' }" @click="bottleOption = 'buy'">Придбати бутелі</button>
+
+                <!-- сегмент-контрол -->
+                <div class="segmented">
+                    <button
+                        :class="{ active: bottleOption === 'own' }"
+                        @click="bottleOption = 'own'"
+                        type="button"
+                    >
+                        Свої бутелі
+                    </button>
+                    <button
+                        :class="{ active: bottleOption === 'buy' }"
+                        @click="bottleOption = 'buy'"
+                        type="button"
+                    >
+                        Придбати бутлі
+                    </button>
                 </div>
+
+                <!-- качество только для своих -->
+                <transition name="fade-slide">
+                    <div v-if="bottleOption === 'own'" class="quality-row">
+                        <span class="quality-badge">Якість</span>
+                        <select v-model="bottleQuality" class="quality-select">
+                            <option value="ideal">Ідеальний</option>
+                            <option value="average">Середній</option>
+                            <option value="bad">Поганий</option>
+                        </select>
+                    </div>
+                </transition>
+
+                <!-- чип с подсказкой для покупки -->
+                <transition name="fade-slide">
+                    <div v-if="bottleOption === 'buy'" class="info-chip">
+                        <span class="chip-dot" aria-hidden="true"></span>
+                        +350 грн за кожен бутиль
+                    </div>
+                </transition>
             </div>
 
             <!-- время -->
@@ -312,6 +366,118 @@ const createOrder = async () => {
 </template>
 
 <style scoped>
+
+.bottle-section .segmented {
+    display: flex;
+    gap: 6px;
+    background: #f3f4f6;
+    padding: 6px;
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.03);
+}
+
+.bottle-section .segmented button {
+    flex: 1;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #374151;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .06s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+.bottle-section .segmented button:hover {
+    transform: translateY(-1px);
+}
+
+.bottle-section .segmented button.active {
+    background: #2563eb;           /* насыщенный синий */
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(37,99,235,.28);
+}
+
+/* Ряд качества */
+.quality-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1f2937;
+    background: #e5f0ff;
+    border: 1px solid #cfe0ff;
+    border-radius: 999px;
+}
+
+/* Селект качества — компактнее и с красивым фокусом */
+.quality-select {
+    flex: 1;
+    text-align: center;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    font-size: 14px;
+    color: #111827;
+    transition: box-shadow .15s ease, border-color .15s ease;
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #6b7280 50%),
+        linear-gradient(135deg, #6b7280 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(50% - 3px),
+        calc(100% - 12px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+}
+
+.quality-select:focus {
+    outline: none;
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.15);
+}
+
+/* Инфо-чип для покупки */
+.info-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #0f5132;
+    background: #d1e7dd;
+    border: 1px solid #badbcc;
+    border-radius: 999px;
+}
+
+.info-chip .chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #198754;
+}
+
+/* Плавное появление блока качества/чипа */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+    transition: opacity .18s ease, transform .18s ease;
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+}
 .form__switch {
     display: flex;
     gap: 12px;
@@ -454,7 +620,7 @@ const createOrder = async () => {
     color: #334155;
     border-radius: 8px;
     user-select: none;
-    pointer-events: none; /* специально — чтобы не кликалось */
+    pointer-events: none;
 }
 
 .geo-warning {
@@ -472,5 +638,14 @@ const createOrder = async () => {
     margin-top: 10px;
     border-radius: 8px;
     overflow: hidden;
+}
+
+.info-note {
+    font-size: 13px;
+    color: #0f5132;
+    background: #d1e7dd;
+    border: 1px solid #badbcc;
+    padding: 8px 10px;
+    border-radius: 8px;
 }
 </style>
