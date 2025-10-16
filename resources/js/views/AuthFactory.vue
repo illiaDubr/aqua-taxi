@@ -1,14 +1,15 @@
 <template>
     <div class="auth">
         <div class="auth__bg"></div>
+
         <div class="auth__top">
             <img :src="logo" alt="logo" class="auth__logo" />
         </div>
 
         <div class="auth__card">
             <div class="auth__tabs">
-                <span :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">Реєстрація</span>
-                <span :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">Вхід</span>
+                <span :class="{ active: activeTab === 'register' }" @click="switchTab('register')">Реєстрація</span>
+                <span :class="{ active: activeTab === 'login' }" @click="switchTab('login')">Вхід</span>
             </div>
 
             <transition name="fade" mode="out-in">
@@ -16,27 +17,27 @@
                     autocomplete="off"
                     @submit.prevent="activeTab === 'register' ? handleRegister() : handleLogin()"
                     class="auth__form"
-                    :key="step"
+                    :key="activeTab + '-' + step"
                 >
                     <!-- ===================== РЕЄСТРАЦІЯ ===================== -->
                     <template v-if="activeTab === 'register'">
                         <!-- STEP 1 -->
                         <div v-if="step === 1" class="auth__form">
-                            <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model="email" required />
-                            <input class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model="phone" required />
+                            <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" required />
+                            <input class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model.trim="phone" required />
 
                             <div class="auth__password-wrapper">
                                 <input
                                     class="auth__input"
                                     :type="showPassword ? 'text' : 'password'"
-                                    :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
-                                    v-model="password"
+                                    placeholder="Ваш пароль*"
+                                    v-model.trim="password"
                                     required
                                 />
                                 <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
                             </div>
 
-                            <input class="auth__input" type="text" placeholder="Ваш вебсайт*" v-model="website" required />
+                            <input class="auth__input" type="text" placeholder="Ваш вебсайт*" v-model.trim="website" required />
 
                             <label class="auth__checkbox">
                                 <input type="checkbox" v-model="agree" />
@@ -49,11 +50,18 @@
                         <!-- STEP 2 -->
                         <div v-else class="auth__form">
                             <div class="upload-wrapper">
-                                <input class="attacher" type="file" name="certificate" accept="image/png, image/jpeg, application/pdf" @change="handleFile" />
-                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG, PNG або PDF</p>
+                                <input
+                                    class="attacher"
+                                    type="file"
+                                    name="certificate"
+                                    accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+                                    @change="handleFile"
+                                />
+                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG, PNG або PDF (до 8 МБ)</p>
+                                <p v-if="fileError" class="file-err">{{ fileError }}</p>
                             </div>
 
-                            <input class="auth__input" type="text" placeholder="Ваша адреса складу" v-model="warehouse" required />
+                            <input class="auth__input" type="text" placeholder="Ваша адреса складу" v-model.trim="warehouse" required />
 
                             <!-- переключатель ручного выбора точки -->
                             <div class="manual-toggle">
@@ -63,12 +71,13 @@
                                 </label>
                             </div>
 
-                            <!-- Блок выбора точки: показывается при manualMode ИЛИ при geoError -->
+                            <!-- Блок выбора точки -->
                             <div v-if="manualMode || geoError" class="geo-select">
                                 <p class="geo-hint">
                                     Клікніть по карті, щоб обрати місцезнаходження складу.
                                     <span v-if="geoError"> (Автовизначення не вдалося — встановіть точку вручну.)</span>
                                 </p>
+
                                 <div ref="mapRef" class="map-container"></div>
 
                                 <div class="coords">
@@ -78,7 +87,7 @@
                                     <button type="button" class="mini-btn" @click="centerKyiv">Київ</button>
                                 </div>
 
-                                <p v-if="lat && lng" class="coords-view">📍 Обрані координати: {{ lat.toFixed(6) }}, {{ lng.toFixed(6) }}</p>
+                                <p v-if="lat && lng" class="coords-view">📍 {{ lat.toFixed(6) }}, {{ lng.toFixed(6) }}</p>
                             </div>
 
                             <!-- ====== Види води ====== -->
@@ -88,7 +97,9 @@
                                     <button type="button" class="wt-add" @click="addType">＋ Додати</button>
                                 </div>
 
-                                <div v-if="!waterTypesList.length" class="wt-empty">Поки не додано жодного типу. Додайте хоча б один.</div>
+                                <div v-if="!waterTypesList.length" class="wt-empty">
+                                    Поки не додано жодного типу. Додайте хоча б один.
+                                </div>
 
                                 <div v-for="(row, i) in waterTypesList" :key="row.uid" class="wt-row">
                                     <div class="wt-col">
@@ -132,24 +143,30 @@
                                 <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
                             </label>
 
-                            <button type="submit" class="auth__submit">Завершити реєстрацію</button>
+                            <button type="submit" class="auth__submit" :disabled="submitting">
+                                <span v-if="!submitting">Завершити реєстрацію</span>
+                                <span v-else>Надсилаємо…</span>
+                            </button>
                         </div>
                     </template>
 
                     <!-- ===================== ВХІД ===================== -->
                     <template v-else>
-                        <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model="email" required />
+                        <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" required />
                         <div class="auth__password-wrapper">
                             <input
                                 class="auth__input"
                                 :type="showPassword ? 'text' : 'password'"
-                                :placeholder="activeTab === 'register' ? 'Ваш пароль*' : 'Пароль*'"
-                                v-model="password"
+                                placeholder="Пароль*"
+                                v-model.trim="password"
                                 required
                             />
                             <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
                         </div>
-                        <button type="submit" class="auth__submit">Увійти</button>
+                        <button type="submit" class="auth__submit" :disabled="submitting">
+                            <span v-if="!submitting">Увійти</span>
+                            <span v-else>Входимо…</span>
+                        </button>
                     </template>
                 </form>
             </transition>
@@ -168,6 +185,7 @@ import 'leaflet/dist/leaflet.css'
 const router = useRouter()
 const activeTab = ref('register')
 const step = ref(1)
+const submitting = ref(false)
 
 const email = ref('')
 const phone = ref('')
@@ -176,6 +194,7 @@ const website = ref('')
 const warehouse = ref('')
 const agree = ref(false)
 const file = ref(null)
+const fileError = ref('')
 const showPassword = ref(false)
 
 const manualMode = ref(false)
@@ -188,15 +207,12 @@ const mapRef = ref(null)
 
 /** ======= Види води ======= */
 const presets = [
-    { value: 'silver',  label: 'Срібна',                name: 'Срібна',                price: 33.5 },
-    { value: 'deep',    label: 'Глибокого очищення',    name: 'Глибокого очищення',    price: 28.0 },
-    { value: 'mineral', label: 'Мінеральна',           name: 'Мінеральна',            price: 35.0 },
+    { value: 'silver',  label: 'Срібна',               name: 'Срібна',               price: 33.5 },
+    { value: 'deep',    label: 'Глибокого очищення',   name: 'Глибокого очищення',   price: 28.0 },
+    { value: 'mineral', label: 'Мінеральна',           name: 'Мінеральна',           price: 35.0 },
     { value: 'custom',  label: 'Інше' }
 ]
-
-const waterTypesList = ref([
-    { uid: cryptoRand(), preset: 'silver', name: 'Срібна', code: 'silver', price: 33.5, _err: null }
-])
+const waterTypesList = ref([{ uid: cryptoRand(), preset: 'silver', name: 'Срібна', code: 'silver', price: 33.5, _err: null }])
 const typesError = ref('')
 
 function cryptoRand() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
@@ -266,7 +282,7 @@ watchEffect(async () => {
         })
     }
 
-    // убрать карту, если не нужна
+    // убрать карту, если выключили ручной режим
     if (!(manualMode.value || geoError.value) && map.value) {
         map.value.remove()
         map.value = null
@@ -287,15 +303,22 @@ function useMyLocation() {
 function centerKyiv() { if (map.value) map.value.setView([50.4501, 30.5234], 13) }
 
 onBeforeUnmount(() => {
-    if (map.value) {
-        map.value.remove()
-        map.value = null
-        marker.value = null
-    }
+    if (map.value) { map.value.remove(); map.value = null; marker.value = null }
 })
 
+/** ======= Helpers ======= */
+const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+const normPhone = (v) => String(v || '').replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+const isStrongPass = (v) => String(v || '').length >= 6
+const normWebsite = (v) => {
+    let s = String(v || '').trim()
+    if (!s) return s
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s
+    return s
+}
+
 /** ======= Сабмиты ======= */
-const handleRegister = async () => {
+async function handleRegister() {
     if (step.value === 1) { goToStep2(); return }
 
     if (!warehouse.value || !file.value || !agree.value) {
@@ -309,67 +332,104 @@ const handleRegister = async () => {
     }
 
     const formData = new FormData()
-    formData.append('email', email.value)
-    formData.append('phone', phone.value)
-    formData.append('password', password.value)
-    formData.append('website', website.value)
-    formData.append('warehouse_address', warehouse.value)
+    formData.append('email', email.value.trim())
+    formData.append('phone', normPhone(phone.value))
+    formData.append('password', password.value.trim())
+    formData.append('website', normWebsite(website.value))
+    formData.append('warehouse_address', warehouse.value.trim())
     formData.append('certificate', file.value)
     formData.append('water_types', JSON.stringify(serializeWaterTypes()))
 
     try {
+        submitting.value = true
         if (manualMode.value) {
-            if (lat.value === null || lng.value === null) {
+            if (lat.value == null || lng.value == null) {
                 alert('Встановіть точку на карті або вимкніть ручний режим.')
+                submitting.value = false
                 return
             }
-            formData.append('lat', lat.value)
-            formData.append('lng', lng.value)
+            formData.append('lat', String(lat.value))
+            formData.append('lng', String(lng.value))
         }
         await axios.post('/api/factory/register', formData)
         alert('Реєстрація успішна!')
         activeTab.value = 'login'
-
         // reset map state
         map.value?.remove(); map.value = null; marker.value = null
-        lat.value = null; lng.value = null
-        geoError.value = false; manualMode.value = false
+        lat.value = null; lng.value = null; geoError.value = false; manualMode.value = false
+        step.value = 1
     } catch (err) {
-        if (err.response?.data?.error === 'geocoding_failed') {
+        if (err?.response?.data?.error === 'geocoding_failed') {
             geoError.value = true
             manualMode.value = true
         }
         console.error(err)
         alert('Помилка при реєстрації')
+    } finally {
+        submitting.value = false
     }
 }
 
-const handleLogin = async () => {
-    if (!email.value || !password.value) { alert('Введіть пошту та пароль'); return }
+async function handleLogin() {
+    if (!isEmail(email.value) || !isStrongPass(password.value)) {
+        alert('Перевірте пошту та пароль')
+        return
+    }
     try {
-        const res = await axios.post('/api/factory/login', { email: email.value, password: password.value })
+        submitting.value = true
+        const res = await axios.post('/api/factory/login', {
+            email: email.value.trim(),
+            password: password.value.trim()
+        })
         const token = res.data.token
-        const factory = res.data.user
         localStorage.setItem('factory_token', token)
-        localStorage.setItem('active_token', 'factory_token') // пометка, какой токен активен
+        localStorage.setItem('active_token', 'factory_token')
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
         alert('Успішний вхід!')
         router.push('/factory-page')
     } catch (err) {
         console.error(err)
         alert('Невірна пошта або пароль')
+    } finally {
+        submitting.value = false
     }
 }
 
-const goToStep2 = () => {
-    if (!email.value || !phone.value || !password.value || !website.value || !agree.value) {
-        alert('Будь ласка, заповніть усі поля та підтвердіть згоду.')
-        return
-    }
+function goToStep2() {
+    if (!isEmail(email.value)) { alert('Невірна пошта'); return }
+    if (!normPhone(phone.value) || normPhone(phone.value).length < 10) { alert('Невірний телефон'); return }
+    if (!isStrongPass(password.value)) { alert('Пароль має містити щонайменше 6 символів'); return }
+    if (!website.value) { alert('Вкажіть вебсайт'); return }
+    if (!agree.value) { alert('Потрібно погодитись з умовами'); return }
+    website.value = normWebsite(website.value)
     step.value = 2
 }
 
-const handleFile = (e) => { file.value = e.target.files[0] }
+function handleFile(e) {
+    fileError.value = ''
+    const f = e.target.files?.[0]
+    if (!f) { file.value = null; return }
+    const okTypes = ['image/jpeg', 'image/png', 'application/pdf']
+    const extOk = /\.(jpg|jpeg|png|pdf)$/i.test(f.name)
+    if (!okTypes.includes(f.type) && !extOk) {
+        fileError.value = 'Підтримуються лише JPG, PNG або PDF'
+        file.value = null
+        return
+    }
+    const maxBytes = 8 * 1024 * 1024
+    if (f.size > maxBytes) {
+        fileError.value = 'Файл завеликий (до 8 МБ)'
+        file.value = null
+        return
+    }
+    file.value = f
+}
+
+function switchTab(tab) {
+    activeTab.value = tab
+    // сброс состояния
+    if (tab === 'login') { step.value = 1 }
+}
 </script>
 
 <style>
@@ -390,6 +450,11 @@ const handleFile = (e) => { file.value = e.target.files[0] }
 .coords { display:flex; gap:8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
 .mini-btn { padding: 8px 10px; border: none; border-radius: 8px; background:#e5f2ff; color:#1663c7; cursor: pointer; font-weight: 600; }
 .coords-view { color:#444; font-size: 13px; margin-top: 6px; }
+
+/* file */
+.upload-wrapper { display:flex; flex-direction:column; gap:6px; }
+.upload-desc { font-size: 12px; color:#6b7280; }
+.file-err { color:#b91c1c; font-size:12px; }
 
 /* auth */
 .auth__password-wrapper { position: relative; }
@@ -421,17 +486,17 @@ body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; }
 
 /* кнопка */
 .auth__submit { padding: 14px; font-size: 15px; font-weight: 600; background: #3498db; color: white; border: none; border-radius: 12px; cursor: pointer; }
+.auth__submit:disabled { opacity: .7; cursor: not-allowed; }
 
 /* ======= Види води ======= */
 .water-types { background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
 .wt-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
 .wt-add { border:none; background:#0ea5e9; color:#fff; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:600; }
 
-/* фикс переполнения: поля не «вылезают» из карточки */
 .wt-row {
     position:relative;
     display:grid;
-    grid-template-columns: repeat(4, minmax(120px, 1fr)) auto; /* preset | name | code | price | [x] */
+    grid-template-columns: repeat(4, minmax(120px, 1fr)) auto;
     gap:8px;
     align-items:end;
     background:#fff;
@@ -439,19 +504,11 @@ body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; }
     border-radius:10px;
     padding:10px;
     margin-bottom:8px;
-    overflow: hidden; /* на всякий случай */
+    overflow: hidden;
 }
-.wt-col { display:flex; flex-direction:column; gap:6px; min-width: 0; } /* <-- ключевой фикс */
+.wt-col { display:flex; flex-direction:column; gap:6px; min-width: 0; }
 .wt-label { font-size:12px; color:#6b7280; }
-.wt-input {
-    width: 100%;
-    min-width: 0;               /* <-- ключевой фикс */
-    box-sizing: border-box;     /* чтобы padding не раздувал */
-    padding:10px;
-    border:1px solid #d1d5db;
-    border-radius:8px;
-    font-size:14px;
-}
+.wt-input { width: 100%; min-width: 0; box-sizing: border-box; padding:10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
 .wt-input, .wt-input select, .wt-input input { line-height: 1.2; height: 38px; }
 
 .wt-remove { border:none; background:#ef4444; color:#fff; border-radius:10px; padding:8px 10px; cursor:pointer; height:38px; align-self:center; }
@@ -459,7 +516,6 @@ body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; }
 .wt-errors { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
 .wt-err { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; padding:4px 8px; border-radius:8px; font-size:12px; }
 
-/* адаптив: на узких экранах складываем в 2 колонки */
 @media (max-width: 560px) {
     .wt-row { grid-template-columns: 1fr 1fr; }
     .wt-remove { grid-column: 1 / -1; justify-self: end; }
