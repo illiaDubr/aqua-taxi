@@ -26,24 +26,47 @@
                         <p v-if="cert.phone"><strong>Телефон:</strong> {{ cert.phone }}</p>
                         <p v-if="cert.website">
                             <strong>Сайт:</strong>
-                            <a :href="cert.website" target="_blank">{{ cert.website }}</a>
+                            <a :href="cert.website" target="_blank" rel="noopener">{{ cert.website }}</a>
                         </p>
                         <p v-if="cert.warehouse_address"><strong>Адреса складу:</strong> {{ cert.warehouse_address }}</p>
                         <p v-if="cert.lat && cert.lng"><strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}</p>
 
-                        <div v-if="cert.certificate_path || cert.certificate_file">
-                            <img
-                                v-if="isImage(cert.certificate_path || cert.certificate_file)"
-                                :src="fullUrl(cert.certificate_path || cert.certificate_file)"
-                                alt="Certificate"
-                                style="max-width: 100%; margin: 10px 0;"
-                            />
-                            <a
-                                v-else
-                                :href="fullUrl(cert.certificate_path || cert.certificate_file)"
-                                target="_blank"
-                                style="display: block; margin: 10px 0;"
-                            >Скачати сертифікат (PDF)</a>
+                        <div v-if="displayPath(cert)" style="margin:10px 0;">
+                            <!-- Изображения -->
+                            <template v-if="isImage(displayPath(cert))">
+                                <img
+                                    :src="publicUrl(displayPath(cert))"
+                                    alt="Certificate"
+                                    style="max-width:100%; border-radius:8px;"
+                                    @error="markImgError(cert)"
+                                    v-if="!cert._imgError"
+                                />
+                                <a
+                                    v-else
+                                    :href="publicUrl(displayPath(cert))"
+                                    target="_blank"
+                                    rel="noopener"
+                                >Відкрити зображення</a>
+                            </template>
+
+                            <!-- PDF -->
+                            <template v-else-if="isPdf(displayPath(cert))">
+                                <a
+                                    :href="publicUrl(displayPath(cert))"
+                                    class="cert__btn"
+                                    target="_blank"
+                                    rel="noopener"
+                                >Скачати сертифікат (PDF)</a>
+                            </template>
+
+                            <!-- Прочие файлы -->
+                            <template v-else>
+                                <a
+                                    :href="publicUrl(displayPath(cert))"
+                                    target="_blank"
+                                    rel="noopener"
+                                >Відкрити файл сертифіката</a>
+                            </template>
                         </div>
 
                         <div class="moderation-controls">
@@ -88,7 +111,7 @@
                                 Скасувати верифікацію
                             </button>
                             <button
-                                v-if="cert.certificate_path"
+                                v-if="displayPath(cert)"
                                 class="cert__btn cert__btn--danger"
                                 @click="deleteCert(cert)"
                             >
@@ -113,13 +136,50 @@ const activeTab = ref('certificates')
 const unverifiedCertificates = ref([])
 const verifiedCertificates = ref([])
 
-const isImage = (path) => /\.(jpeg|jpg|png)$/i.test(path || '')
-const fullUrl = (p) => {
-    const clean = String(p || '').replace(/^\/+/, '')
-    return `${window.location.origin}/${clean.startsWith('storage/') ? clean : 'storage/' + clean}`
+/** Определяем отображаемый путь к сертификату для строки */
+const displayPath = (row) => row?.certificate_path || row?.certificate_file || null
+
+/** Универсальный детектор типов */
+const isImage = (p) => /\.(jpe?g|png|gif|webp|svg)$/i.test(p || '')
+const isPdf   = (p) => /\.pdf$/i.test(p || '')
+
+/** Строим корректный публичный URL под nginx (/storage/...) */
+const publicUrl = (raw) => {
+    if (!raw) return ''
+    const s = String(raw).trim()
+
+    // Абсолютный URL — возвращаем как есть
+    if (/^https?:\/\//i.test(s)) return s
+
+    // Убираем ведущие слеши
+    let clean = s.replace(/^\/+/, '')
+
+    // Убираем возможные префиксы public/ и storage/app/public/
+    clean = clean.replace(/^public\//, '')
+    clean = clean.replace(/^storage\/app\/public\//, '')
+
+    // Если путь уже начинается с storage/ — оставим
+    // Иначе добавим 'storage/' перед относительным путем
+    if (!clean.startsWith('storage/')) {
+        // часто из Бэка приходит 'certificates/...' — делаем 'storage/certificates/...'
+        clean = 'storage/' + clean
+    }
+
+    // Аккуратно кодируем каждый сегмент пути (чтобы пробелы/кириллица не ломали URL)
+    const parts = clean.split('/').map(encodeURIComponent)
+    const encoded = parts.join('/')
+
+    // используем абсолютный хост текущего окна — корректно для http/https и домена
+    return `${window.location.origin}/${encoded}`
 }
+
+/** Формат даты */
 const formatDate = (date) => (date ? new Date(date).toLocaleDateString('uk-UA') : '—')
 
+/** Обработчик падения img */
+const markImgError = (cert) => { cert._imgError = true }
+
+/** Сохранить статус сертификата/дату */
 async function moderate(cert) {
     try {
         await axios.post(`/api/admin/factories/${cert.id}/moderate-certificate`, {
@@ -134,13 +194,14 @@ async function moderate(cert) {
     }
 }
 
-/** НОВОЕ: явная верификация виробника */
+/** Явная верификация виробника */
 async function verify(cert) {
-    // дата верификации: по умолчанию = дата окончания сертификата
     let verified_until = cert.certificate_expiration
     if (!verified_until) {
-        // если нет — попросим ввести
-        verified_until = prompt('Вкажіть дату закінчення верифікації (YYYY-MM-DD):', new Date().toISOString().slice(0,10))
+        verified_until = prompt(
+            'Вкажіть дату закінчення верифікації (YYYY-MM-DD):',
+            new Date().toISOString().slice(0,10)
+        )
         if (!verified_until) return
     }
     try {
@@ -153,6 +214,7 @@ async function verify(cert) {
     }
 }
 
+/** Снять верификацию */
 async function revokeVerify(cert) {
     if (!confirm('Скасувати верифікацію цього виробника?')) return
     try {
@@ -165,6 +227,7 @@ async function revokeVerify(cert) {
     }
 }
 
+/** Удалить сертификат (и файл) */
 async function deleteCert(cert) {
     if (!confirm('Видалити сертифікат? Файл буде видалено безповоротно.')) return
     try {
@@ -193,7 +256,7 @@ async function loadUnverified() {
     }
 }
 
-/** Верифіковані — берём с /api/factories/verified */
+/** Верифіковані */
 async function loadVerified() {
     try {
         const res = await axios.get('/api/factories/verified')
@@ -259,7 +322,7 @@ onMounted(() => {
 
 .cert__btn {
     background: #3498db; color: white; border: none; border-radius: 10px; padding: 10px 16px;
-    font-size: 14px; font-weight: 600; cursor: pointer;
+    font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display:inline-block;
 }
 .cert__btn--danger { background: #e53935; }
 .cert__btn--warning { background: #f39c12; }
