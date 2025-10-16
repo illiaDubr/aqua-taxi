@@ -127,7 +127,6 @@
         </div>
     </div>
 </template>
-
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
@@ -136,40 +135,53 @@ const activeTab = ref('certificates')
 const unverifiedCertificates = ref([])
 const verifiedCertificates = ref([])
 
-/** Определяем отображаемый путь к сертификату для строки */
+/** Берём путь к файлу из строки заказа */
 const displayPath = (row) => row?.certificate_path || row?.certificate_file || null
 
-/** Универсальный детектор типов */
-const isImage = (p) => /\.(jpe?g|png|gif|webp|svg)$/i.test(p || '')
-const isPdf   = (p) => /\.pdf$/i.test(p || '')
+/** Нормализация путей: \ -> /, убираем лишние префиксы и слеши */
+const normalizePath = (raw) => {
+    if (!raw) return ''
+    let s = String(raw).trim()
+
+    // абсолютный URL — возвращаем как есть
+    if (/^https?:\/\//i.test(s)) return s
+
+    // 1) Windows-слеши -> Unix
+    s = s.replace(/\\/g, '/')
+
+    // 2) убираем ведущие слеши
+    s = s.replace(/^\/+/, '')
+
+    // 3) чистим возможные префиксы
+    s = s.replace(/^public\//, '')
+    s = s.replace(/^storage\/app\/public\//, '')
+
+    // 4) гарантируем префикс storage/
+    if (!s.startsWith('storage/')) s = 'storage/' + s
+
+    // 5) убираем двойные слеши
+    s = s.replace(/\/{2,}/g, '/')
+
+    return s
+}
+
+/** Детекторы типов — работают на исходной строке (до кодирования) */
+const isImage = (p) => /(\.jpe?g|\.png|\.gif|\.webp|\.svg)$/i.test(String(p || '').replace(/\\/g,'/'))
+const isPdf   = (p) => /\.pdf$/i.test(String(p || '').replace(/\\/g,'/'))
 
 /** Строим корректный публичный URL под nginx (/storage/...) */
 const publicUrl = (raw) => {
     if (!raw) return ''
-    const s = String(raw).trim()
+    // Абсолютный URL?
+    if (/^https?:\/\//i.test(String(raw))) return String(raw)
 
-    // Абсолютный URL — возвращаем как есть
-    if (/^https?:\/\//i.test(s)) return s
+    const clean = normalizePath(raw)
+    // Кодируем КАЖДЫЙ сегмент, чтобы пробелы/кириллица не ломали URL
+    const encoded = clean
+        .split('/')
+        .map(seg => encodeURIComponent(decodeURIComponent(seg)))
+        .join('/')
 
-    // Убираем ведущие слеши
-    let clean = s.replace(/^\/+/, '')
-
-    // Убираем возможные префиксы public/ и storage/app/public/
-    clean = clean.replace(/^public\//, '')
-    clean = clean.replace(/^storage\/app\/public\//, '')
-
-    // Если путь уже начинается с storage/ — оставим
-    // Иначе добавим 'storage/' перед относительным путем
-    if (!clean.startsWith('storage/')) {
-        // часто из Бэка приходит 'certificates/...' — делаем 'storage/certificates/...'
-        clean = 'storage/' + clean
-    }
-
-    // Аккуратно кодируем каждый сегмент пути (чтобы пробелы/кириллица не ломали URL)
-    const parts = clean.split('/').map(encodeURIComponent)
-    const encoded = parts.join('/')
-
-    // используем абсолютный хост текущего окна — корректно для http/https и домена
     return `${window.location.origin}/${encoded}`
 }
 
@@ -275,6 +287,7 @@ onMounted(() => {
     loadUnverified()
 })
 </script>
+
 
 <style scoped>
 .cert {
