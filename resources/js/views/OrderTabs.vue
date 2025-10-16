@@ -66,26 +66,20 @@ const orderMarkers = ref({})
 const currentTab = ref('new')
 const selectedWaterType = ref(null) // 'silver' | 'deep' | null
 
-// --- утилита заголовков авторизации
-const authHeaders = () => {
-    const token = localStorage.getItem('driver_token')
-    return { Authorization: `Bearer ${token}` }
-}
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
-// === Маппинги и хелперы
+// === маппинги
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
 const QUALITY_LABELS = { ideal: 'Ідеальний', average: 'Середній', bad: 'Поганий' }
 
-const deliveryLabel = (opt) => {
-    switch (opt) {
-        case 'home': return 'В квартиру'
-        case 'entrance': return 'Під під’їзд (−20%)'
-        case 'coffee': return 'Кав’ярня'
-        default: return '—'
-    }
-}
-const bottleLabel = (opt) => opt === 'buy' ? 'Придбати бутелі' : 'Свої бутелі'
-const payLabel = (p) => p === 'cash' ? 'Готівка' : 'Картка'
+const deliveryLabel = (opt) => ({
+    home: 'В квартиру',
+    entrance: 'Під під’їзд (−20%)',
+    coffee: 'Кав’ярня'
+}[opt] ?? '—')
+
+const bottleLabel = (opt) => (opt === 'buy' ? 'Придбати бутелі' : opt === 'own' ? 'Свої бутелі' : '—')
+const payLabel = (p) => (p === 'cash' ? 'Готівка' : 'Картка')
 const fmt = (n) => Number(n ?? 0).toFixed(2)
 const qualityLabel = (q) => QUALITY_LABELS[String(q ?? '').toLowerCase()] ?? '—'
 
@@ -96,10 +90,7 @@ const normalizeWaterCode = (val) => {
     if (v === 'deep' || v.includes('глибок')) return 'deep'
     return null
 }
-const waterLabel = (val) => {
-    const code = normalizeWaterCode(val)
-    return WATER_LABELS[code] ?? '—'
-}
+const waterLabel = (val) => WATER_LABELS[normalizeWaterCode(val)] ?? '—'
 
 const getCustomer = (o) => {
     const user = o.user ?? o.customer ?? {}
@@ -107,23 +98,13 @@ const getCustomer = (o) => {
     const phone = o.user_phone ?? o.customer_phone ?? user.phone ?? '—'
     return { name, phone }
 }
-const tel = (p) => {
-    if (!p) return ''
-    const digits = String(p).replace(/[^\d+]/g, '')
-    return digits || ''
-}
+const tel = (p) => (p ? String(p).replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '') : '')
 
-const setWaterFilter = (type) => {
-    selectedWaterType.value = type
-    fetchOrders()
-}
+const setWaterFilter = (type) => { selectedWaterType.value = type; fetchOrders() }
 const goToMap = () => router.push('/map')
-const switchTab = (tab) => {
-    currentTab.value = tab
-    fetchOrders()
-}
+const switchTab = (tab) => { currentTab.value = tab; fetchOrders() }
 
-// --- профиль водителя
+// профиль водителя
 const fetchDriverData = async () => {
     try {
         const res = await axios.get('/api/driver/profile', { headers: authHeaders() })
@@ -135,63 +116,43 @@ const fetchDriverData = async () => {
     }
 }
 
-// --- платеж
+// пополнение
 const payWithFondy = async () => {
     try {
-        const res = await axios.post(
-            '/api/driver/pay',
-            { amount: parseFloat(topUpAmount.value) },
-            { headers: authHeaders() }
-        )
+        const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, { headers: authHeaders() })
         const { url, params } = res.data
         const form = document.createElement('form')
         form.method = 'POST'
         form.action = url
-        Object.entries(params).forEach(([key, value]) => {
+        Object.entries(params).forEach(([k, v]) => {
             const input = document.createElement('input')
-            input.type = 'hidden'
-            input.name = key
-            input.value = value
-            form.appendChild(input)
+            input.type = 'hidden'; input.name = k; input.value = v; form.appendChild(input)
         })
-        document.body.appendChild(form)
-        form.submit()
+        document.body.appendChild(form); form.submit()
     } catch (error) {
         alert('❌ Помилка при генерації платежу')
         console.error(error)
     }
 }
 
-// --- заказы
+// заказы
 const fetchOrders = async () => {
     try {
         // очистить маркеры
-        Object.values(orderMarkers.value).forEach(marker => {
-            map.value?.removeLayer(marker)
-        })
+        Object.values(orderMarkers.value).forEach(marker => { map.value?.removeLayer(marker) })
         orderMarkers.value = {}
         renderedOrderIds.value = []
         newOrders.value = []
 
-        const endpoint = currentTab.value === 'active'
-            ? '/api/driver/orders/active'
-            : '/api/driver/orders/new'
-
+        const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
         const res = await axios.get(endpoint, { headers: authHeaders() })
+        let orders = (res.data ?? []).map(o => ({ ...o, water_type: normalizeWaterCode(o.water_type) }))
 
-        let orders = (res.data ?? []).map(o => ({
-            ...o,
-            water_type: normalizeWaterCode(o.water_type)
-        }))
-
-        if (selectedWaterType.value) {
-            orders = orders.filter(o => o.water_type === selectedWaterType.value)
-        }
+        if (selectedWaterType.value) orders = orders.filter(o => o.water_type === selectedWaterType.value)
 
         orders.forEach(order => {
             if (!order.latitude || !order.longitude) return
-            const lat = parseFloat(order.latitude)
-            const lng = parseFloat(order.longitude)
+            const lat = parseFloat(order.latitude), lng = parseFloat(order.longitude)
             if (isNaN(lat) || isNaN(lng)) return
 
             renderedOrderIds.value.push(order.id)
@@ -208,7 +169,7 @@ const fetchOrders = async () => {
             const customer = getCustomer(order)
 
             const qualityRow =
-                currentTab.value === 'new' && order.bottle_option === 'own' && order.bottle_quality
+                order.bottle_option === 'own' && order.bottle_quality
                     ? `<b>Якість бутиля:</b> <span class="quality-pill">${qualityLabel(order.bottle_quality)}</span><br>`
                     : ''
 
@@ -216,9 +177,7 @@ const fetchOrders = async () => {
                 currentTab.value === 'active'
                     ? `<b>Клієнт:</b> ${customer.name}<br>
              <b>Телефон:</b> ${
-                        tel(customer.phone)
-                            ? `<a href="tel:${tel(customer.phone)}">${customer.phone}</a>`
-                            : (customer.phone ?? '—')
+                        tel(customer.phone) ? `<a href="tel:${tel(customer.phone)}">${customer.phone}</a>` : (customer.phone ?? '—')
                     }<br>`
                     : ''
 
@@ -238,27 +197,14 @@ const fetchOrders = async () => {
           <b>Оплата:</b> ${payLabel(order.payment_method)}<br>
           <b>Сума:</b> ${fmt(order.total_price)} грн<br>
           ${customerRows}
-          ${
-                currentTab.value === 'new'
-                    ? `<br><button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>`
-                    : ''
-            }
+          ${ currentTab.value === 'new' ? `<br><button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>` : '' }
         </div>
       `
 
-            const m = L.marker([lat, lng], { icon })
-                .addTo(map.value)
-                .bindPopup(popupHtml)
-
+            const m = L.marker([lat, lng], { icon }).addTo(map.value).bindPopup(popupHtml)
             orderMarkers.value[order.id] = m
 
-            const pulse = L.circle([lat, lng], {
-                radius: 60,
-                color: '#3498db',
-                fillColor: '#3498db',
-                fillOpacity: 0.3
-            }).addTo(map.value)
-
+            const pulse = L.circle([lat, lng], { radius: 60, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.3 }).addTo(map.value)
             setTimeout(() => map.value?.removeLayer(pulse), 3000)
             map.value?.setView([lat, lng], 14)
         })
@@ -271,48 +217,31 @@ onMounted(async () => {
     await fetchDriverData()
     await nextTick()
     map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map.value)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'Map data © OpenStreetMap contributors' }).addTo(map.value)
     await fetchOrders()
 })
 
-// глобальный обработчик принятия заказа
 window.acceptOrder = async function(orderId) {
     const confirmAccept = confirm('Підтвердити прийняття замовлення?')
     if (!confirmAccept) return
-
     try {
         await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
-
         alert('✅ Замовлення прийнято')
         map.value?.closePopup()
-
         const marker = orderMarkers.value[orderId]
-        if (marker) {
-            map.value?.removeLayer(marker)
-            delete orderMarkers.value[orderId]
-        }
-
+        if (marker) { map.value?.removeLayer(marker); delete orderMarkers.value[orderId] }
         newOrders.value = newOrders.value.filter(o => o.id !== orderId)
         renderedOrderIds.value = renderedOrderIds.value.filter(id => id !== orderId)
-
-        // обновим профиль — если кол-во бутлей меняется
         await fetchDriverData()
-
-        // и сразу перерисуем списки (активные заказы)
         currentTab.value = 'active'
         await fetchOrders()
     } catch (error) {
-        if (error.response?.status === 409) {
-            alert('❌ Це замовлення вже прийнято іншим водієм')
-        } else {
-            alert('❌ Помилка при прийнятті замовлення')
-            console.error(error)
-        }
+        if (error.response?.status === 409) alert('❌ Це замовлення вже прийнято іншим водієм')
+        else { alert('❌ Помилка при прийнятті замовлення'); console.error(error) }
     }
 }
 </script>
+
 
 <style>
 .driver-map__filter-panel {

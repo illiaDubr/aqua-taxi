@@ -8,12 +8,10 @@ import 'leaflet/dist/leaflet.css'
 const route = useRoute()
 const router = useRouter()
 
-// === Имя товара из параметра маршрута ===
-const productName = computed(() => {
-    return decodeURIComponent(route.params.productId || 'Срібна вода, 19л')
-})
+// === Название товара из роута
+const productName = computed(() => decodeURIComponent(route.params.productId || 'Срібна вода, 19л'))
 
-// === Код типа воды: 'silver' | 'deep' (иначе null) ===
+// === Код типа воды
 const waterType = computed(() => {
     const n = (productName.value || '')
         .toLowerCase()
@@ -21,26 +19,23 @@ const waterType = computed(() => {
         .replace(/[(),]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-
     if (n.includes('срібн')) return 'silver'
     if (n.includes('глибок')) return 'deep'
     return null
 })
 
-// --- form state
+// --- state
 const address = ref('')
-const quantity = ref('')
-const bottleOption = ref('own')        // own | buy
-const bottleQuality = ref('ideal')     // ideal | average | bad (для own)
-const timeOption = ref('now')          // now | custom
+const quantity = ref('')                     // select строкой → приводим ниже к числу
+const bottleOption = ref('own')              // 'own' | 'buy'
+const bottleQuality = ref('ideal')           // 'ideal' | 'average' | 'bad' (только для own)
+const timeOption = ref('now')                // 'now' | 'custom'
 const customTime = ref('')
 const paymentMethod = ref('cash')
+const deliveryOption = ref('home')           // 'home' | 'entrance' | 'coffee'
 
-// новая опция
-const deliveryOption = ref('home')     // home | entrance | coffee
-
-// --- карта / ручной выбор локации
-const manualMode = ref(false) // включаем 1 раз и без обратного выключения
+// --- карта/ручной выбор
+const manualMode = ref(false)
 const mapRef = ref(null)
 const map = ref(null)
 const marker = ref(null)
@@ -50,51 +45,65 @@ const lng = ref(null)
 // === Валидация адреса через Nominatim
 const validateAddress = async (addr) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`
-    const response = await fetch(url, {
-        headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' },
-    })
+    const response = await fetch(url, { headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' } })
     const data = await response.json()
     return data.length ? data[0] : null
 }
 
-// === Пер-бутыльная цена по правилам
-const perBottlePrice = (qty, type) => {
-    if (deliveryOption.value === 'coffee') {
-        // спец-тариф для кав'ярні (оставил как было)
-        return qty >= 5 ? 70 : 0
-    }
-    if (type === 'deep') {
-        return qty === 1 ? 250 : 180
-    }
-    if (type === 'silver') {
-        return qty === 1 ? 260 : 190
-    }
-    // дефолт на случай неизвестного типа
-    return qty === 1 ? 260 : 190
+// ==== ТАРИФЫ (по ТЗ)
+const UNIT_PRICES = {
+    deep:   { one: 250, many: 180 },
+    silver: { one: 260, many: 190 },
 }
+const BUY_SURCHARGE = 350      // + за покупку бутля
+const COFFEE_PRICE  = 70       // кав’ярня (від 5 бутлів)
 
-// === Итог
+// --- цена за 1 бутыль (только вода)
+const unitWaterPrice = computed(() => {
+    const qty = Number.parseInt(quantity.value, 10) || 0
+    const wt = waterType.value
+    if (!wt) return 0
+
+    // кав'ярня: фикс. цена, но только если qty >= 5
+    if (deliveryOption.value === 'coffee') return qty >= 5 ? COFFEE_PRICE : 0
+
+    const tier = qty >= 2 ? 'many' : 'one'
+    return UNIT_PRICES[wt]?.[tier] ?? 0
+})
+
+// --- наценка за покупку бутля (за 1 шт)
+const unitBottleSurcharge = computed(() => (bottleOption.value === 'buy' ? BUY_SURCHARGE : 0))
+
+// --- скидка -20% применяется только к части "вода"
+const discountFactor = computed(() => (deliveryOption.value === 'entrance' ? 0.8 : 1))
+
+// --- ИТОГО
 const totalAmount = computed(() => {
-    const qty = parseInt(quantity.value, 10)
-    if (isNaN(qty)) return 0
-    if (!waterType.value) return 0
+    const qty = Number.parseInt(quantity.value, 10) || 0
+    if (!qty || !waterType.value) return 0
 
-    // базовая сумма за воду
-    const pricePerBottle = perBottlePrice(qty, waterType.value)
-    if (pricePerBottle === 0 && deliveryOption.value === 'coffee') return 0 // защита для < 5 шт
-    let total = qty * pricePerBottle
+    // защита для кофе-режима
+    if (deliveryOption.value === 'coffee' && qty < 5) return 0
 
-    // скидка -20% для доставки "Під під’їзд"
-    if (deliveryOption.value === 'entrance') {
-        total = Math.round(total * 0.8)
+    const waterPart   = Math.round(unitWaterPrice.value * discountFactor.value) * qty
+    const bottlePart  = unitBottleSurcharge.value * qty
+    return waterPart + bottlePart
+})
+
+// --- мета для бэка (чтобы не пересчитал по старому)
+const pricingMeta = computed(() => {
+    const qty = Number.parseInt(quantity.value, 10) || 0
+    const wt  = waterType.value
+    const tier = qty >= 2 ? 'many' : 'one'
+    return {
+        water_type: wt,
+        tier,                                    // 'one' | 'many'
+        base_unit_water_price: UNIT_PRICES[wt]?.[tier] ?? 0,
+        discount_applied: deliveryOption.value === 'entrance' ? 0.2 : 0,
+        unit_bottle_surcharge: unitBottleSurcharge.value,
+        delivery_option: deliveryOption.value,
+        coffee_rule: deliveryOption.value === 'coffee' ? { min_qty: 5, price: COFFEE_PRICE } : null
     }
-
-    // Наценка за покупку бутлей: +350 грн за каждый
-    if (bottleOption.value === 'buy') {
-        total += qty * 350
-    }
-
-    return total
 })
 
 // --- уничтожение карты
@@ -106,13 +115,9 @@ const destroyMap = () => {
     }
     marker.value = null
 }
+onBeforeUnmount(destroyMap)
 
-// Чистим карту при размонтировании компонента
-onBeforeUnmount(() => {
-    destroyMap()
-})
-
-// --- включение ручного режима (только один раз, без обратного выключения)
+// --- включение ручного режима
 const activateManual = async () => {
     if (manualMode.value) return
     manualMode.value = true
@@ -120,7 +125,6 @@ const activateManual = async () => {
     if (!mapRef.value || map.value) return
 
     map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'Map data © OpenStreetMap contributors',
     }).addTo(map.value)
@@ -128,27 +132,23 @@ const activateManual = async () => {
     map.value.on('click', (e) => {
         lat.value = e.latlng.lat
         lng.value = e.latlng.lng
-
         if (marker.value) marker.value.setLatLng(e.latlng)
         else marker.value = L.marker(e.latlng).addTo(map.value)
     })
 }
 
-// Подстраховка на случай задержки рендера
+// подстраховка рендера карты
 watchEffect(async () => {
     if (manualMode.value && mapRef.value && !map.value) {
         await nextTick()
         if (!map.value) {
             map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
-
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: 'Map data © OpenStreetMap contributors',
             }).addTo(map.value)
-
             map.value.on('click', (e) => {
                 lat.value = e.latlng.lat
                 lng.value = e.latlng.lng
-
                 if (marker.value) marker.value.setLatLng(e.latlng)
                 else marker.value = L.marker(e.latlng).addTo(map.value)
             })
@@ -174,61 +174,56 @@ const createOrder = async () => {
             }
         }
 
-        // проверка для кав'ярні
-        if (deliveryOption.value === 'coffee' && quantity.value < 5) {
+        const qty = Number.parseInt(quantity.value, 10) || 0
+        if (!qty) { alert('❌ Оберіть кількість'); return }
+
+        if (deliveryOption.value === 'coffee' && qty < 5) {
             alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів')
             return
         }
 
-        // не отправляем заказ с неизвестным типом воды
         if (!waterType.value) {
             alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.')
             return
         }
 
-        const qty = Number(quantity.value)
         const token = localStorage.getItem('user_token')
 
         const payload = {
-            product_name: productName.value, // полное название (например, "Срібна вода, 19л")
-            water_type: waterType.value,     // 'silver' | 'deep'
+            product_name: productName.value,
+            water_type: waterType.value,                 // 'silver' | 'deep'
             quantity: qty,
-            bottle_option: bottleOption.value,                   // own | buy
-            bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null, // ideal | average | bad
-            purchase_bottle_count: bottleOption.value === 'buy' ? qty : 0,
+            bottle_option: bottleOption.value,           // 'own' | 'buy'
+            bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null, // 'ideal'|'average'|'bad'
             delivery_time_type: timeOption.value,
             custom_time: customTime.value || null,
             payment_method: paymentMethod.value,
-            total_price: totalAmount.value,
             delivery_option: deliveryOption.value,
+            // цены: и поштучная, и итог (чтобы бэк не считал по старому)
+            unit_water_price: unitWaterPrice.value,
+            unit_bottle_surcharge: unitBottleSurcharge.value,
+            total_price: Number(totalAmount.value) || 0,
+            pricing_meta: pricingMeta.value,             // для дебага на бэке
             lat: manualMode.value ? lat.value : Number(result?.lat),
             lng: manualMode.value ? lng.value : Number(result?.lon),
-            ...( !manualMode.value && address.value.trim()
-                    ? { address: address.value.trim() }
-                    : {}
-            ),
+            ...( !manualMode.value && address.value.trim() ? { address: address.value.trim() } : {} ),
         }
 
-        await axios.post('/api/orders', payload, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        await axios.post('/api/orders', payload, { headers: { Authorization: `Bearer ${token}` } })
 
         router.push({
             name: 'orders',
             query: {
                 showPopup: true,
                 product: productName.value,
-                quantity: quantity.value,
+                quantity: String(qty),
                 time: timeOption.value === 'custom' ? customTime.value : 'Найближчий час',
             },
         })
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 422) {
             const errs = error.response.data?.errors || {}
-            const msg =
-                Object.values(errs).flat().join('\n') ||
-                error.response.data?.message ||
-                'Validation error'
+            const msg = Object.values(errs).flat().join('\n') || error.response.data?.message || 'Validation error'
             alert('❌ ' + msg)
             return
         }
