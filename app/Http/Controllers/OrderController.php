@@ -162,4 +162,80 @@ class OrderController extends Controller
 
         return response()->json($orders);
     }
+    public function complete(Request $request, Order $order)
+    {
+        $data = $request->validate([
+            'rating' => ['nullable','integer','min:1','max:5'],
+        ]);
+        $rating = (int) ($data['rating'] ?? 5);
+
+        // Авторизация: заказ принадлежит текущему пользователю
+        $user = $request->user();
+        if ((int)$order->user_id !== (int)$user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Разрешённые статусы к завершению
+        if (!in_array($order->status, ['accepted','in_progress'], true)) {
+            return response()->json(['message' => 'Order is not deliverable'], 422);
+        }
+
+        $updatedDriver = null;
+
+        DB::transaction(function () use ($order, $rating, &$updatedDriver) {
+            // 1) Лочим заказ
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if (!in_array($locked->status, ['accepted','in_progress'], true)) {
+                abort(409, 'Order status changed');
+            }
+
+            // 2) Списание бутлей у водителя, если клиент их ПОКУПАЛ
+            if ($locked->driver_id && strtolower((string)$locked->bottle_option) === 'buy') {
+                $qty = max(0, (int)$locked->quantity);
+
+                // лочим запись водителя и атомарно уменьшаем количество
+                DB::table('drivers')
+                    ->where('id', $locked->driver_id)
+                    ->lockForUpdate()
+                    ->update([
+                        'bottles' => DB::raw('GREATEST(bottles - '.((int)$qty).', 0)')
+                    ]);
+
+                // вернём обновлённые данные водителя
+                $driverRow = DB::table('drivers')
+                    ->select('id','bottles','balance')
+                    ->where('id', $locked->driver_id)
+                    ->first();
+
+                if ($driverRow) {
+                    $updatedDriver = [
+                        'id'      => (int)$driverRow->id,
+                        'bottles' => (int)$driverRow->bottles,
+                        'balance' => (float)$driverRow->balance,
+                    ];
+                }
+            }
+
+            // 3) Завершаем заказ
+            $locked->status = 'completed';
+            $locked->rating = $rating;
+
+            // пишем completed_at, если колонка существует
+            if (Schema::hasColumn('orders', 'completed_at')) {
+                $locked->completed_at = now();
+            }
+
+            $locked->save();
+        });
+
+        // отправим событие для фронтов
+        event(new OrderStatusUpdated($order->fresh()));
+
+        return response()->json([
+            'message' => 'Order completed',
+            'order'   => $order->fresh(),
+            'driver'  => $updatedDriver, // null, если списание не применялось
+        ], 200);
+    }
 }
