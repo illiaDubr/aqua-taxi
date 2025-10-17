@@ -8,7 +8,8 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\DB;      // ← добавь
+use Illuminate\Support\Facades\Schema;
 class OrderController extends Controller
 {
     public function store(Request $request)
