@@ -9,7 +9,9 @@ const route = useRoute()
 const router = useRouter()
 
 // === Название товара из роута
-const productName = computed(() => decodeURIComponent(route.params.productId || 'Срібна вода, 19л'))
+const productName = computed(() =>
+    decodeURIComponent(route.params.productId || 'Срібна вода, 19л')
+)
 
 // === Код типа воды
 const waterType = computed(() => {
@@ -45,7 +47,7 @@ const lng = ref(null)
 // === Валидация адреса через Nominatim
 const validateAddress = async (addr) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`
-    const response = await fetch(url, { headers: { 'User-Agent': 'AquaTaxi (support@aquataxi.example)' } })
+    const response = await fetch(url, { headers: { 'User-Agent': 'AquaTaxi (web)' } })
     const data = await response.json()
     return data.length ? data[0] : null
 }
@@ -77,7 +79,7 @@ const unitBottleSurcharge = computed(() => (bottleOption.value === 'buy' ? BUY_S
 // --- скидка -20% применяется только к части "вода"
 const discountFactor = computed(() => (deliveryOption.value === 'entrance' ? 0.8 : 1))
 
-// --- ИТОГО
+// --- ИТОГО (как в UI)
 const totalAmount = computed(() => {
     const qty = Number.parseInt(quantity.value, 10) || 0
     if (!qty || !waterType.value) return 0
@@ -86,7 +88,7 @@ const totalAmount = computed(() => {
     if (deliveryOption.value === 'coffee' && qty < 5) return 0
 
     const waterPart  = Math.round(unitWaterPrice.value * discountFactor.value) * qty
-    const bottlePart = unitBottleSurcharge.value * qty
+    const bottlePart = unitBottleSurcharge.value * (bottleOption.value === 'buy' ? qty : 0)
     return waterPart + bottlePart
 })
 
@@ -175,7 +177,6 @@ const createOrder = async () => {
         }
 
         const qty = Number.parseInt(quantity.value, 10) || 0
-        const purchaseCount = bottleOption.value === 'buy' ? qty : 0
         if (!qty) { alert('❌ Оберіть кількість'); return }
         if (deliveryOption.value === 'coffee' && qty < 5) { alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів'); return }
         if (!waterType.value) { alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.'); return }
@@ -189,21 +190,40 @@ const createOrder = async () => {
             return
         }
 
+        // разложение суммы = как в UI
+        const waterUnit = unitWaterPrice.value
+        const bottleUnit = unitBottleSurcharge.value
+        const purchaseCount = bottleOption.value === 'buy' ? qty : 0
+        const waterAfterDiscount = Math.round(waterUnit * discountFactor.value) * qty
+        const bottleSubtotal = bottleUnit * purchaseCount
+        const totalUI = waterAfterDiscount + bottleSubtotal
+
         const payload = {
             product_name: productName.value,
             water_type: waterType.value,
             quantity: qty,
+
             bottle_option: bottleOption.value,
             bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null,
-            purchase_bottle_count: purchaseCount,
+            purchase_bottle_count: purchaseCount,           // ВАЖНО для бэка
+
             delivery_time_type: timeOption.value,
             custom_time: customTime.value || null,
             payment_method: paymentMethod.value,
             delivery_option: deliveryOption.value,
-            unit_water_price: unitWaterPrice.value,
-            unit_bottle_surcharge: unitBottleSurcharge.value,
-            total_price: Number(totalAmount.value) || 0,
+
+            // Цены — чтобы бэк не пересчитывал по-старому
+            unit_water_price: waterUnit,
+            unit_bottle_surcharge: bottleUnit,
+            water_subtotal_after_discount: waterAfterDiscount,
+            bottle_subtotal: bottleSubtotal,
+            discount_factor: discountFactor.value,
             pricing_meta: pricingMeta.value,
+
+            // Итого — ровно как в интерфейсе
+            total_price: Number(totalUI),
+
+            // Гео/адрес
             lat: manualMode.value ? lat.value : Number(result?.lat),
             lng: manualMode.value ? lng.value : Number(result?.lon),
             address: addressText,
