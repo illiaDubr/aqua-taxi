@@ -60,6 +60,7 @@ services:
             - .:/var/www:ro
             - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
             - ./docker/nginx/cors_map.conf:/etc/nginx/conf.d/cors_map.conf:ro
+            - /etc/nginx/ssl:/certs:ro
         networks: [aqua]
 
     reverb:
