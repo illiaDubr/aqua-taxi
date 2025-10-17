@@ -8,8 +8,9 @@ use App\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;      // ← добавь
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+
 class OrderController extends Controller
 {
     public function store(Request $request)
@@ -230,9 +231,7 @@ class OrderController extends Controller
             $locked->save();
         });
 
-        // отправим событие для фронтов
-        event(new OrderStatusUpdated($order->fresh()));
-
+        // отправим событие для фронто
         return response()->json([
             'message' => 'Order completed',
             'order'   => $order->fresh(),
