@@ -1,4 +1,5 @@
 # docker-compose.yml (production-friendly)
+
 services:
     mysql:
         image: mysql:8.0
@@ -37,7 +38,6 @@ services:
             mysql:
                 condition: service_healthy
         networks: [aqua]
-        # ВАЖНО: только migrate (без fresh). Если миграций нет — команда пройдёт без ошибок.
         command: >
             sh -lc "
               php artisan config:cache &&
@@ -45,6 +45,9 @@ services:
               php artisan migrate --force --no-interaction || true &&
               php-fpm -F
             "
+        volumes:
+            - storage_data:/var/www/storage     # общий storage между app и nginx
+            - public_build:/var/www/public      # общий public (для симлинка public/storage)
 
     nginx:
         image: nginx:alpine
@@ -57,9 +60,11 @@ services:
                 condition: service_started
         ports:
             - "80:80"
-            # - "443:443" # включишь позже для SSL
+            # - "443:443"  # включишь, когда добавишь SSL
         volumes:
             - .:/var/www:ro
+            - storage_data:/var/www/storage
+            - public_build:/var/www/public
             - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
             - ./docker/nginx/cors_map.conf:/etc/nginx/conf.d/cors_map.conf:ro
         networks: [aqua]
@@ -86,6 +91,8 @@ services:
 
 volumes:
     mysql-data:
+    storage_data:
+    public_build:
 
 networks:
     aqua:

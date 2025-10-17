@@ -5,12 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\Factory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class FactoryAuthController extends Controller
 {
+    /**
+     * Регистрация производителя + загрузка сертификата.
+     * Требует: email, phone, password, website, warehouse_address, water_types(JSON string), certificate(file)
+     */
     public function register(Request $request)
     {
         $request->validate([
@@ -54,9 +58,10 @@ class FactoryAuthController extends Controller
             return response()->json(['message' => 'Додайте хоча б один тип води'], 422);
         }
 
-        // ---- 2) Загрузка сертификата ----
+        // ---- 2) Загрузка сертификата на диск 'public' ----
+        // В БД храним путь (например: "certificates/xxx.pdf")
+        // Публичный URL для фронта строим через Storage::url(...)
         $certificatePath = $request->file('certificate')->store('certificates', 'public');
-        $certificateUrl  = str_replace('public/', 'storage/', $certificatePath);
 
         // ---- 3) Координаты ----
         $lat = null;
@@ -69,7 +74,7 @@ class FactoryAuthController extends Controller
             // Пробуем геокодировать через Nominatim
             try {
                 $geoResponse = Http::timeout(5)->withHeaders([
-                    'User-Agent' => 'AquaTaxi/1.0 (contact: support@aquataxi.example)', // уважение к Nominatim
+                    'User-Agent' => 'AquaTaxi/1.0 (contact: support@example.com)',
                 ])->get('https://nominatim.openstreetmap.org/search', [
                     'q'      => $request->warehouse_address,
                     'format' => 'json',
@@ -100,68 +105,98 @@ class FactoryAuthController extends Controller
 
         // ---- 4) Создание фабрики ----
         $factory = Factory::create([
-            'email'                => $request->email,
-            'phone'                => $request->phone,
-            'password'             => Hash::make($request->password),
-            'website'              => $request->website,
-            'warehouse_address'    => $request->warehouse_address,
-            'water_types'          => $clean, // МАССИВ (модель Factory должна иметь casts)
-            'certificate_path'     => $certificateUrl,
-            'certificate_status'   => 'pending',
+            'email'                 => $request->email,
+            'phone'                 => $request->phone,
+            'password'              => Hash::make($request->password),
+            'website'               => $request->website,
+            'warehouse_address'     => $request->warehouse_address,
+            'water_types'           => $clean,        // МАССИВ (в модели Factory должен быть casts: ['water_types' => 'array'])
+            'certificate_path'      => $certificatePath, // сохраняем ПУТЬ
+            'certificate_status'    => 'pending',
             'certificate_expiration'=> null,
-            'is_verified'          => false,
-            'verified_until'       => null,
-            'lat'                  => $lat,
-            'lng'                  => $lng,
+            'is_verified'           => false,
+            'verified_until'        => null,
+            'lat'                   => $lat,
+            'lng'                   => $lng,
         ]);
+
+        // Готовим расширенный ответ с абсолютным URL сертификата
+        $response = $this->factoryResource($factory);
 
         return response()->json([
             'message' => 'Реєстрація успішна. Сертифікат відправлений на модерацію.',
-            'factory' => $factory,
+            'factory' => $response,
         ], 201);
     }
 
+    /**
+     * Логин производителя (Sanctum token с ability "factory").
+     */
     public function login(Request $request)
     {
         $credentials = $request->only('email', 'password');
 
-        $factory = \App\Models\Factory::where('email', $credentials['email'])->first();
+        $factory = Factory::where('email', $credentials['email'])->first();
 
-        if (!$factory || !\Illuminate\Support\Facades\Hash::check($credentials['password'], $factory->password)) {
+        if (!$factory || !Hash::check($credentials['password'], $factory->password)) {
             return response()->json(['message' => 'Невірні дані'], 401);
         }
 
         // по желанию: сбрасываем все старые токены
         $factory->tokens()->delete();
 
-        // ВАЖНО: abilities для фабрики
+        // abilities для фабрики
         $token = $factory->createToken('factory', ['factory'])->plainTextToken;
 
         return response()->json([
             'token'   => $token,
-            'user'    => $factory,
-            'factory' => $factory,
+            'user'    => $this->factoryResource($factory),
+            'factory' => $this->factoryResource($factory),
         ]);
     }
 
+    /**
+     * Повторная загрузка/замена сертификата.
+     */
     public function uploadCertificate(Request $request)
     {
+        /** @var Factory $factory */
         $factory = auth()->user();
 
         $request->validate([
-            'certificate' => 'required|file|mimes:jpeg,png,pdf|max:10240',
+            'certificate' => 'required|file|mimes:jpeg,png,jpg,pdf|max:10240',
         ]);
 
         $path = $request->file('certificate')->store('certificates', 'public');
-        $url  = str_replace('public/', 'storage/', $path);
 
-        // используем одно поле certificate_path, как в register
+        // сохраняем ПУТЬ; URL строим динамически через Storage::url(...)
         $factory->update([
-            'certificate_path'      => $url,
-            'certificate_status'    => 'pending',
-            'certificate_expiration'=> null,
+            'certificate_path'       => $path,
+            'certificate_status'     => 'pending',
+            'certificate_expiration' => null,
         ]);
 
-        return response()->json(['message' => 'Сертифікат успішно завантажено та відправлено на перевірку.'], 200);
+        return response()->json([
+            'message' => 'Сертифікат успішно завантажено та відправлено на перевірку.',
+            'factory' => $this->factoryResource($factory->fresh()),
+        ], 200);
+    }
+
+    /**
+     * Приватный "ресурс" для фабрики: добавляет абсолютный certificate_url.
+     */
+    private function factoryResource(Factory $factory): array
+    {
+        $factory = $factory->toArray();
+
+        // Абсолютный URL к файлу сертификата (если путь есть)
+        $factory['certificate_url'] = null;
+        if (!empty($factory['certificate_path'])) {
+            // Storage::url('certificates/xxx.pdf') => "/storage/certificates/xxx.pdf"
+            // url(...) сделает абсолютный "http(s)://domain/storage/..."
+            $factory['certificate_url'] = url(Storage::url($factory['certificate_path']));
+        }
+
+        return $factory;
     }
 }
