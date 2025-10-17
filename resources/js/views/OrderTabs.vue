@@ -1,12 +1,10 @@
 <template>
     <div class="driver-map">
-        <!-- Свитчер -->
         <div class="order-switcher">
             <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
             <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
         </div>
 
-        <!-- Верхняя панель -->
         <div class="driver-map__top-panel">
             <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
                 <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
@@ -18,22 +16,15 @@
             </div>
         </div>
 
-        <!-- Фильтр по типу воды (коды -> названия) -->
         <div class="driver-map__filter-panel">
             <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
             <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
             <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
         </div>
 
-        <!-- Алерт -->
-        <div v-if="newOrderAlert" class="order-alert">
-            🚚 Нове замовлення додано на карту
-        </div>
-
-        <!-- Карта -->
+        <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
         <div ref="mapContainer" class="driver-map__container"></div>
 
-        <!-- Модалка пополнения -->
         <div v-if="showTopUpModal" class="modal">
             <div class="modal__overlay" @click="showTopUpModal = false"></div>
             <div class="modal__content">
@@ -52,6 +43,7 @@ import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
+/* ---------- state ---------- */
 const mapContainer = ref()
 const map = ref(null)
 const bottles = ref(0)
@@ -68,7 +60,7 @@ const selectedWaterType = ref(null) // 'silver' | 'deep' | null
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
-// === маппинги
+/* ---------- маппинги ---------- */
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
 const QUALITY_LABELS = { ideal: 'Ідеальний', average: 'Середній', bad: 'Поганий' }
 
@@ -83,6 +75,7 @@ const payLabel = (p) => (p === 'cash' ? 'Готівка' : 'Картка')
 const fmt = (n) => Number(n ?? 0).toFixed(2)
 const qualityLabel = (q) => QUALITY_LABELS[String(q ?? '').toLowerCase()] ?? '—'
 
+/* ---------- нормализация ---------- */
 const normalizeWaterCode = (val) => {
     if (val == null) return null
     const v = String(val).toLowerCase()
@@ -92,6 +85,25 @@ const normalizeWaterCode = (val) => {
 }
 const waterLabel = (val) => WATER_LABELS[normalizeWaterCode(val)] ?? '—'
 
+const normalizeBottleOption = (val) => {
+    const v = String(val ?? '').toLowerCase()
+    if (v === 'buy' || v.includes('куп')) return 'buy'
+    if (v === 'own' || v.includes('сво') || v.includes('влас')) return 'own'
+    return null
+}
+const pickBottleOption = (o) =>
+    normalizeBottleOption(o.bottle_option ?? o.bottleOption ?? o.bottles_option ?? o.bottlesOption ?? o.bottle)
+
+const pickBottleQuality = (o) => {
+    const v = String(o.bottle_quality ?? o.bottleQuality ?? o.quality ?? '').toLowerCase()
+    if (['ideal','average','bad'].includes(v)) return v
+    if (v.includes('ідеал') || v.includes('идеал')) return 'ideal'
+    if (v.includes('серед') || v.includes('сред')) return 'average'
+    if (v.includes('поган') || v.includes('плох')) return 'bad'
+    return null
+}
+
+/* ---------- вспомогательное ---------- */
 const getCustomer = (o) => {
     const user = o.user ?? o.customer ?? {}
     const name = o.user_name ?? o.customer_name ?? user.name ?? '—'
@@ -104,7 +116,7 @@ const setWaterFilter = (type) => { selectedWaterType.value = type; fetchOrders()
 const goToMap = () => router.push('/map')
 const switchTab = (tab) => { currentTab.value = tab; fetchOrders() }
 
-// профиль водителя
+/* ---------- профиль водителя ---------- */
 const fetchDriverData = async () => {
     try {
         const res = await axios.get('/api/driver/profile', { headers: authHeaders() })
@@ -116,7 +128,7 @@ const fetchDriverData = async () => {
     }
 }
 
-// пополнение
+/* ---------- платеж ---------- */
 const payWithFondy = async () => {
     try {
         const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, { headers: authHeaders() })
@@ -135,7 +147,7 @@ const payWithFondy = async () => {
     }
 }
 
-// заказы
+/* ---------- заказы ---------- */
 const fetchOrders = async () => {
     try {
         // очистить маркеры
@@ -146,7 +158,12 @@ const fetchOrders = async () => {
 
         const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
         const res = await axios.get(endpoint, { headers: authHeaders() })
-        let orders = (res.data ?? []).map(o => ({ ...o, water_type: normalizeWaterCode(o.water_type) }))
+        let orders = (res.data ?? []).map(o => ({
+            ...o,
+            water_type: normalizeWaterCode(o.water_type),
+            _bottle_option: pickBottleOption(o),
+            _bottle_quality: pickBottleQuality(o),
+        }))
 
         if (selectedWaterType.value) orders = orders.filter(o => o.water_type === selectedWaterType.value)
 
@@ -167,10 +184,12 @@ const fetchOrders = async () => {
             })
 
             const customer = getCustomer(order)
+            const bottleOptionNorm = order._bottle_option
+            const bottleQualityNorm = order._bottle_quality
 
             const qualityRow =
-                order.bottle_option === 'own' && order.bottle_quality
-                    ? `<b>Якість бутиля:</b> <span class="quality-pill">${qualityLabel(order.bottle_quality)}</span><br>`
+                bottleOptionNorm === 'own' && bottleQualityNorm
+                    ? `<b>Якість бутиля:</b> <span class="quality-pill">${qualityLabel(bottleQualityNorm)}</span><br>`
                     : ''
 
             const customerRows =
@@ -191,7 +210,7 @@ const fetchOrders = async () => {
             }<br>
           <b>Кількість:</b> ${order.quantity} бут.<br>
           <b>Тип води:</b> ${waterLabel(order.water_type)}<br>
-          <b>Бутелі:</b> ${bottleLabel(order.bottle_option)}<br>
+          <b>Бутелі:</b> ${bottleLabel(bottleOptionNorm)}<br>
           ${qualityRow}
           <b>Доставка:</b> ${deliveryLabel(order.delivery_option)}<br>
           <b>Оплата:</b> ${payLabel(order.payment_method)}<br>
@@ -213,6 +232,7 @@ const fetchOrders = async () => {
     }
 }
 
+/* ---------- init ---------- */
 onMounted(async () => {
     await fetchDriverData()
     await nextTick()
@@ -221,6 +241,7 @@ onMounted(async () => {
     await fetchOrders()
 })
 
+/* ---------- accept ---------- */
 window.acceptOrder = async function(orderId) {
     const confirmAccept = confirm('Підтвердити прийняття замовлення?')
     if (!confirmAccept) return
@@ -241,7 +262,6 @@ window.acceptOrder = async function(orderId) {
     }
 }
 </script>
-
 
 <style>
 .driver-map__filter-panel {
@@ -269,90 +289,35 @@ window.acceptOrder = async function(orderId) {
 }
 
 .order-switcher {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    padding: 12px;
-    background: #e9f1fc;
-    border-radius: 0 0 12px 12px;
-    font-weight: 600;
+    display: flex; justify-content: center; gap: 20px; padding: 12px;
+    background: #e9f1fc; border-radius: 0 0 12px 12px; font-weight: 600;
 }
 .order-switcher button {
-    background: none;
-    border: none;
-    padding: 8px 12px;
-    cursor: pointer;
-    color: #888;
-    border-bottom: 3px solid transparent;
-    font-size: 15px;
+    background: none; border: none; padding: 8px 12px; cursor: pointer; color: #888; border-bottom: 3px solid transparent; font-size: 15px;
 }
-.order-switcher button.active {
-    color: #000;
-    border-color: #0095FF;
-}
+.order-switcher button.active { color: #000; border-color: #0095FF; }
 
 .accept-button {
-    background-color: #0095FF;
-    color: white;
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
+    background-color: #0095FF; color: white; padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
 }
 .accept-button:hover { background-color: #43a047; }
 
 .driver-map { position: relative; width: 100%; height: 100vh; }
 .driver-map__top-panel {
-    position: absolute;
-    width: 100%;
-    padding: 24px 0px;
-    display: flex;
-    justify-content: space-between;
-    background-color: #0095FF;
-    border-radius: 0px 0px 10px 10px;
-    z-index: 1000;
+    position: absolute; width: 100%; padding: 24px 0px; display: flex; justify-content: space-between;
+    background-color: #0095FF; border-radius: 0px 0px 10px 10px; z-index: 1000;
 }
 .driver-map__block {
-    display: flex;
-    align-items: center;
-    background-color: #e8f1ff;
-    border-radius: 12px;
-    padding: 4px 10px;
-    font-weight: 600;
-    margin: 0 5px;
+    display: flex; align-items: center; background-color: #e8f1ff; border-radius: 12px; padding: 4px 10px; font-weight: 600; margin: 0 5px;
 }
-.driver-map__block button {
-    background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer;
-}
+.driver-map__block button { background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer; }
 .driver-map__container { height: 100%; width: 100%; }
 
 .order-alert {
-    position: absolute;
-    top: 90px; left: 50%;
-    transform: translateX(-50%);
-    background-color: #4caf50; color: white;
-    padding: 12px 20px; border-radius: 8px; font-weight: 600;
+    position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+    background-color: #4caf50; color: white; padding: 12px 20px; border-radius: 8px; font-weight: 600;
     z-index: 9999; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
-
-.order-list {
-    position: absolute; bottom: 20px; left: 20px;
-    background: white; padding: 10px; border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2); font-size: 14px; z-index: 9999;
-}
-
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center; z-index: 999; }
-.modal__overlay { position: absolute; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); }
-.modal__content {
-    position: relative; background: white; border-radius: 16px; padding: 24px;
-    width: 300px; display: flex; flex-direction: column; gap: 16px;
-}
-.modal__content input { padding: 12px; border-radius: 8px; border: 1px solid #ccc; }
-.modal__content button { background: #3498db; color: white; border: none; border-radius: 8px; padding: 12px; cursor: pointer; }
-
-/* Бейдж для отображения качества в попапе */
 .order-popup .quality-pill {
     display:inline-block; padding:2px 8px; border-radius:999px;
     background:#eef4ff; border:1px solid #d8e2ff; font-size:12px; font-weight:700;

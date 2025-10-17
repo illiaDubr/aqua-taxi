@@ -12,7 +12,6 @@ class DriverOrderController extends Controller
 {
     /**
      * СТАРЫЙ РОУТ: список "новых" заказов (оставляем для обратной совместимости).
-     * Рекомендуется использовать newOrders().
      */
     public function index(Request $request)
     {
@@ -21,9 +20,9 @@ class DriverOrderController extends Controller
 
     /**
      * Новые заказы для карты водителя.
-     * Поддерживает доп. фильтры:
-     *  - ?water=silver|deep (или 'Срібна'|'Глибокого очищення')
-     *  - ?with_coords=0|1 (по умолчанию только с координатами)
+     * Параметры:
+     *  - ?water=silver|deep|Срібна|Глибокого очищення
+     *  - ?with_coords=0|1 (по умолчанию 1)
      */
     public function newOrders(Request $request)
     {
@@ -48,7 +47,6 @@ class DriverOrderController extends Controller
 
     /**
      * Взять заказ в работу.
-     * Делается в транзакции с блокировкой строки, чтобы не было гонок.
      */
     public function accept(Request $request, Order $order)
     {
@@ -56,7 +54,6 @@ class DriverOrderController extends Controller
 
         try {
             DB::transaction(function () use ($order, $driver) {
-                // Заблокировать строку и перепроверить статус
                 $fresh = Order::where('id', $order->id)->lockForUpdate()->first();
 
                 if (!$fresh || $fresh->status !== 'new') {
@@ -68,7 +65,6 @@ class DriverOrderController extends Controller
                     'driver_id' => $driver->id,
                 ]);
 
-                // Событие для фронтов (клиент/водители)
                 event(new OrderStatusUpdated($fresh));
             });
 
@@ -89,23 +85,23 @@ class DriverOrderController extends Controller
      */
     private function buildNewOrdersQuery(Request $request)
     {
-        $query = Order::query()->where('status', 'new')->orderByDesc('created_at');
+        $query = Order::query()
+            ->where('status', 'new')
+            ->orderByDesc('created_at');
 
         // Только заказы с координатами (по умолчанию да)
-        $withCoords = (int)($request->boolean('with_coords', true));
+        $withCoords = $request->boolean('with_coords', true);
         if ($withCoords) {
             $query->whereNotNull('latitude')->whereNotNull('longitude');
         }
 
-        // Фильтр по типу воды (совместим и с 'silver|deep', и с 'Срібна|Глибокого очищення')
-        $water = $request->query('water');
-        if ($water) {
-            $map = [
-                'silver' => 'Срібна',
-                'deep'   => 'Глибокого очищення',
-            ];
-            $value = $map[$water] ?? $water; // если сразу пришло локализованное значение — используем его
-            $query->where('water_type', $value);
+        // Фильтр по типу воды
+        if ($water = $request->query('water')) {
+            $norm = $this->normalizeWater($water);
+            if ($norm !== null) {
+                // в БД храним коды: silver|deep
+                $query->where('water_type', $norm);
+            }
         }
 
         return $query;
@@ -118,6 +114,7 @@ class DriverOrderController extends Controller
     {
         return array_values(array_unique(array_merge([
             'id',
+            'product_name',
             'address',
             'quantity',
             'payment_method',
@@ -126,10 +123,24 @@ class DriverOrderController extends Controller
             'longitude',
             'water_type',
             'delivery_option',
+            'bottle_option',
+            'bottle_quality',
+            'purchase_bottle_count',
             'status',
             'driver_id',
             'created_at',
         ], $extra)));
+    }
+
+    /**
+     * Приводим входной water к silver/deep. Принимаем и локализованные названия.
+     */
+    private function normalizeWater(string $value): ?string
+    {
+        $v = mb_strtolower(trim($value));
+        if ($v === 'silver' || str_contains($v, 'срібн') || str_contains($v, 'серебр')) return 'silver';
+        if ($v === 'deep'   || str_contains($v, 'глибок') || str_contains($v, 'глубок')) return 'deep';
+        return null;
     }
 
     /**
@@ -138,16 +149,12 @@ class DriverOrderController extends Controller
      */
     private function driver(Request $request)
     {
-        // если группа роутов на auth:driver — этого достаточно:
-        $driver = $request->user();
-        // на всякий случай fallback:
-        if (!$driver) {
-            $driver = Auth::guard('driver')->user();
-        }
+        $driver = $request->user() ?: Auth::guard('driver')->user();
         abort_if(!$driver, 401, 'Необхідна авторизація водія');
         return $driver;
     }
-    public function profile(\Illuminate\Http\Request $request)
+
+    public function profile(Request $request)
     {
         /** @var \App\Models\Driver $driver */
         $driver = $request->user(); // auth:driver

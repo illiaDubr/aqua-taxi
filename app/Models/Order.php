@@ -14,10 +14,21 @@ class Order extends Model
     // protected $table = 'orders';
 
     protected $fillable = [
-        'user_id','driver_id','address','quantity','bottle_option',
-        'delivery_time_type','custom_time','payment_method','total_price',
-        'latitude','longitude','delivery_option','water_type','status','rating','purchase_bottle_count'
+        'user_id',
+        'address','latitude','longitude',
+
+        'product_name','water_type',
+
+        'quantity',
+        'bottle_option','bottle_quality','purchase_bottle_count',
+
+        'delivery_option','delivery_time_type','custom_time',
+        'payment_method',
+
+        'unit_water_price','unit_bottle_surcharge',
+        'total_price','status',
     ];
+
 
     protected $casts = [
         'quantity'     => 'integer',
