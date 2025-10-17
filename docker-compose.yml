@@ -1,4 +1,3 @@
-# docker-compose.yml (production-friendly)
 services:
     mysql:
         image: mysql:8.0
