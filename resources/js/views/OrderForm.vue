@@ -175,6 +175,7 @@ const createOrder = async () => {
         }
 
         const qty = Number.parseInt(quantity.value, 10) || 0
+        const purchaseCount = bottleOption.value === 'buy' ? qty : 0
         if (!qty) { alert('❌ Оберіть кількість'); return }
         if (deliveryOption.value === 'coffee' && qty < 5) { alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів'); return }
         if (!waterType.value) { alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.'); return }
@@ -194,6 +195,7 @@ const createOrder = async () => {
             quantity: qty,
             bottle_option: bottleOption.value,
             bottle_quality: bottleOption.value === 'own' ? bottleQuality.value : null,
+            purchase_bottle_count: purchaseCount,
             delivery_time_type: timeOption.value,
             custom_time: customTime.value || null,
             payment_method: paymentMethod.value,
