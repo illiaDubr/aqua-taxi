@@ -16,7 +16,7 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'address','latitude','longitude',
-
+        'driver_id',
         'product_name','water_type',
 
         'quantity',
