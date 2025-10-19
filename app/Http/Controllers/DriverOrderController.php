@@ -30,7 +30,7 @@ class DriverOrderController extends Controller
     }
 
     /**
-     * Активные заказы конкретного водителя (status=in_progress).
+     * Активные заказы конкретного водителя (accepted|in_progress).
      * Отдаем также пользователя (имя/телефон).
      */
     public function activeOrders(Request $request)
@@ -40,10 +40,19 @@ class DriverOrderController extends Controller
         return Order::query()
             ->with(['user:id,name,surname,phone'])
             ->where('driver_id', $driver->id)
-            ->where('status', 'in_progress')
+            ->whereIn('status', ['accepted','in_progress'])
+            // вернуть только те, у кого есть какие-то координаты (любой формат)
+            ->where(function ($q) {
+                $q->where(function ($q1) {
+                    $q1->whereNotNull('latitude')->whereNotNull('longitude');
+                })->orWhere(function ($q2) {
+                    $q2->whereNotNull('lat')->whereNotNull('lng');
+                });
+            })
             ->orderByDesc('created_at')
             ->get($this->orderFields(['user_id']));
     }
+
 
     /**
      * Взять заказ в работу.
@@ -60,6 +69,8 @@ class DriverOrderController extends Controller
                     abort(409, 'Цей товар вже прийнято іншим водієм');
                 }
 
+                // можно ставить accepted или сразу in_progress.
+                // оставляю как у тебя — сразу in_progress:
                 $fresh->update([
                     'status'    => 'in_progress',
                     'driver_id' => $driver->id,
@@ -70,7 +81,7 @@ class DriverOrderController extends Controller
 
             return response()->json(['message' => 'Замовлення прийнято'], 200);
         } catch (\Throwable $e) {
-            if ($e->getCode() === 409) {
+            if ((int)$e->getCode() === 409) {
                 return response()->json(['error' => 'Цей товар вже прийнято іншим водієм'], 409);
             }
             report($e);
@@ -92,7 +103,16 @@ class DriverOrderController extends Controller
         // Только заказы с координатами (по умолчанию да)
         $withCoords = $request->boolean('with_coords', true);
         if ($withCoords) {
-            $query->whereNotNull('latitude')->whereNotNull('longitude');
+            // 👇 учитываем оба формата координат: latitude/longitude ИЛИ lat/lng
+            $query->where(function ($q) {
+                $q->where(function ($q1) {
+                    $q1->whereNotNull('latitude')
+                        ->whereNotNull('longitude');
+                })->orWhere(function ($q2) {
+                    $q2->whereNotNull('lat')
+                        ->whereNotNull('lng');
+                });
+            });
         }
 
         // Фильтр по типу воды
@@ -101,6 +121,9 @@ class DriverOrderController extends Controller
             if ($norm !== null) {
                 // в БД храним коды: silver|deep
                 $query->where('water_type', $norm);
+                // если в новых записях water_type пустой, но ждетcя product_name —
+                // фильтрация по water_type просто никого не найдет; это ок —
+                // фронт также умеет распознавать тип из product_name.
             }
         }
 
@@ -109,6 +132,7 @@ class DriverOrderController extends Controller
 
     /**
      * Набор полей, которые реально нужны на карте/в попапе.
+     * Добавлены lat/lng (для нового формата).
      */
     private function orderFields(array $extra = [])
     {
@@ -121,6 +145,8 @@ class DriverOrderController extends Controller
             'total_price',
             'latitude',
             'longitude',
+            'lat',        // 👈 новый формат
+            'lng',        // 👈 новый формат
             'water_type',
             'delivery_option',
             'bottle_option',
@@ -145,7 +171,7 @@ class DriverOrderController extends Controller
 
     /**
      * Получить текущего водителя из guard'а.
-     * Роуты должны быть под middleware('auth:driver').
+     * Роуты должны быть под middleware('auth:driver') или sanctum с abilities:driver.
      */
     private function driver(Request $request)
     {

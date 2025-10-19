@@ -31,12 +31,12 @@
                         <p v-if="cert.warehouse_address"><strong>Адреса складу:</strong> {{ cert.warehouse_address }}</p>
                         <p v-if="cert.lat && cert.lng"><strong>Координати:</strong> {{ cert.lat }}, {{ cert.lng }}</p>
 
-                        <!-- Медиа превью внутри карточки -->
-                        <div v-if="displayPath(cert)" class="cert__media-wrap">
+                        <!-- Медиа превью -->
+                        <div v-if="cert.certificate_url" class="cert__media-wrap">
                             <!-- IMG -->
                             <img
-                                v-if="isImage(displayPath(cert)) && !cert._imgError"
-                                :src="publicUrl(displayPath(cert))"
+                                v-if="isImage(cert.certificate_url) && !cert._imgError"
+                                :src="cert.certificate_url"
                                 alt="Сертифікат"
                                 class="cert__media"
                                 @error="markImgError(cert)"
@@ -44,21 +44,21 @@
 
                             <!-- PDF -->
                             <object
-                                v-else-if="isPdf(displayPath(cert))"
-                                :data="publicUrl(displayPath(cert))"
+                                v-else-if="isPdf(cert.certificate_url)"
+                                :data="cert.certificate_url"
                                 type="application/pdf"
                                 class="cert__pdf"
                             >
                                 <div class="cert__fallback">
                                     Не вдалось показати PDF. Спробуйте завантажити файл:
-                                    <code>{{ publicUrl(displayPath(cert)) }}</code>
+                                    <code>{{ cert.certificate_url }}</code>
                                 </div>
                             </object>
 
                             <!-- Фолбек -->
                             <div v-else class="cert__fallback">
                                 Не вдалось показати зображення. Шлях:
-                                <code>{{ publicUrl(displayPath(cert)) }}</code>
+                                <code>{{ cert.certificate_url }}</code>
                             </div>
                         </div>
 
@@ -75,12 +75,8 @@
 
                             <div class="actions">
                                 <button class="cert__btn" @click="moderate(cert)">Зберегти</button>
-                                <button class="cert__btn cert__btn--success" @click="verify(cert)">
-                                    Верифікувати виробника
-                                </button>
-                                <button class="cert__btn cert__btn--danger" @click="deleteCert(cert)">
-                                    Видалити сертифікат
-                                </button>
+                                <button class="cert__btn cert__btn--success" @click="verify(cert)">Верифікувати виробника</button>
+                                <button class="cert__btn cert__btn--danger" @click="deleteCert(cert)">Видалити сертифікат</button>
                             </div>
                         </div>
                     </div>
@@ -100,11 +96,9 @@
                         <p>Адреса складу: {{ cert.warehouse_address }}</p>
 
                         <div class="actions" style="margin-top:10px;">
-                            <button class="cert__btn cert__btn--warning" @click="revokeVerify(cert)">
-                                Скасувати верифікацію
-                            </button>
+                            <button class="cert__btn cert__btn--warning" @click="revokeVerify(cert)">Скасувати верифікацію</button>
                             <button
-                                v-if="displayPath(cert)"
+                                v-if="cert.certificate_url"
                                 class="cert__btn cert__btn--danger"
                                 @click="deleteCert(cert)"
                             >
@@ -129,35 +123,9 @@ const activeTab = ref('certificates')
 const unverifiedCertificates = ref([])
 const verifiedCertificates = ref([])
 
-/** Путь к файлу из записи */
-const displayPath = (row) => row?.certificate_path || row?.certificate_file || null
-
-/** Нормализация путей: \ -> /, префиксы, двойные слеши */
-const normalizePath = (raw) => {
-    if (!raw) return ''
-    let s = String(raw).trim()
-    if (/^https?:\/\//i.test(s)) return s // абсолютный URL — вернуть как есть
-    s = s.replace(/\\/g, '/')
-        .replace(/^\/+/, '')
-        .replace(/^public\//, '')
-        .replace(/^storage\/app\/public\//, '')
-    if (!s.startsWith('storage/')) s = 'storage/' + s
-    s = s.replace(/\/{2,}/g, '/')
-    return s
-}
-
-/** Детекторы типов (на нормализованной строке) */
-const isImage = (p) => /(\.jpe?g|\.png|\.gif|\.webp|\.svg)$/i.test(String(p || '').replace(/\\/g,'/'))
-const isPdf   = (p) => /\.pdf$/i.test(String(p || '').replace(/\\/g,'/'))
-
-/** Собираем корректный публичный URL под nginx */
-const publicUrl = (raw) => {
-    if (!raw) return ''
-    if (/^https?:\/\//i.test(String(raw))) return String(raw)
-    const clean = normalizePath(raw)
-    const encoded = clean.split('/').map(seg => encodeURIComponent(decodeURIComponent(seg))).join('/')
-    return `${window.location.origin}/${encoded}`
-}
+/** Тип файла по расширению */
+const isImage = (p) => /(\.jpe?g|\.png|\.gif|\.webp|\.svg)(\?.*)?$/i.test(String(p || ''))
+const isPdf   = (p) => /\.pdf(\?.*)?$/i.test(String(p || ''))
 
 const formatDate = (date) => (date ? new Date(date).toLocaleDateString('uk-UA') : '—')
 const markImgError = (cert) => { cert._imgError = true }
@@ -217,9 +185,10 @@ async function deleteCert(cert) {
 async function loadUnverified() {
     try {
         const res = await axios.get('/api/admin/factories-with-certificates')
+        // Бэк теперь должен отдавать certificate_url
         const rows = (res.data || []).map(f => ({
             ...f,
-            certificate_path: f.certificate_path || f.certificate_file || null
+            certificate_url: f.certificate_url || null,
         }))
         unverifiedCertificates.value = rows.filter(
             f => (f.certificate_status === 'pending' || f.certificate_status === 'invalid')
@@ -232,7 +201,11 @@ async function loadUnverified() {
 async function loadVerified() {
     try {
         const res = await axios.get('/api/factories/verified')
-        verifiedCertificates.value = res.data || []
+        // тут также ожидаем certificate_url
+        verifiedCertificates.value = (res.data || []).map(f => ({
+            ...f,
+            certificate_url: f.certificate_url || null,
+        }))
     } catch (err) {
         console.error('❌ Помилка завантаження верифікованих', err)
     }
