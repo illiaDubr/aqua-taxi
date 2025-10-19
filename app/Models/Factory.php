@@ -22,24 +22,24 @@ class Factory extends Authenticatable
     protected $hidden = ['password','remember_token'];
 
     protected $casts = [
-        'water_types' => 'array',
-        'is_verified' => 'boolean',
-        'verified_until' => 'datetime',
-        'lat' => 'float',
-        'lng' => 'float',
+        'water_types'   => 'array',
+        'is_verified'   => 'boolean',
+        'verified_until'=> 'datetime',
+        'lat'           => 'float',
+        'lng'           => 'float',
     ];
 
-    // ✅ Добавляем virtual-атрибут, который появится в JSON
+    // 🔹 важно: чтобы поле появлялось в JSON
     protected $appends = ['certificate_url'];
 
-    // ✅ Генерация корректного публичного URL
+    // 🔹 аксессор
     public function getCertificateUrlAttribute(): ?string
     {
-        if (!$this->certificate_path) {
+        $path = $this->certificate_path;
+        if (!$path) {
             return null;
         }
-
-        // вернёт что-то вроде: https://example.com/storage/certificates/abc123.jpg
-        return Storage::disk('public')->url($this->certificate_path);
+        // вернёт /storage/.... (или https://.../storage/..., если в конфиге задан url)
+        return Storage::disk('public')->url($path);
     }
 }
