@@ -7,6 +7,11 @@
         </div>
 
         <div class="auth__card">
+            <!-- Глобальный баннер ошибок -->
+            <div v-if="formErr" class="alert alert--error">
+                <strong>Помилка:</strong> {{ formErr }}
+            </div>
+
             <div class="auth__tabs">
                 <span :class="{ active: activeTab === 'register' }" @click="switchTab('register')">Реєстрація</span>
                 <span :class="{ active: activeTab === 'login' }" @click="switchTab('login')">Вхід</span>
@@ -18,38 +23,50 @@
                     @submit.prevent="activeTab === 'register' ? handleRegister() : handleLogin()"
                     class="auth__form"
                     :key="activeTab + '-' + step"
+                    novalidate
                 >
                     <!-- ===================== РЕЄСТРАЦІЯ ===================== -->
                     <template v-if="activeTab === 'register'">
                         <!-- STEP 1 -->
                         <div v-if="step === 1" class="auth__form">
-                            <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" required />
-                            <input class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model.trim="phone" required />
+                            <div class="field">
+                                <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" />
+                                <small v-if="fieldErr.email" class="fld-err">{{ fieldErr.email }}</small>
+                            </div>
 
-                            <div class="auth__password-wrapper">
+                            <div class="field">
+                                <input class="auth__input" type="tel" placeholder="Ваш номер телефону*" v-model.trim="phone" />
+                                <small v-if="fieldErr.phone" class="fld-err">{{ fieldErr.phone }}</small>
+                            </div>
+
+                            <div class="field auth__password-wrapper">
                                 <input
                                     class="auth__input"
                                     :type="showPassword ? 'text' : 'password'"
                                     placeholder="Ваш пароль*"
                                     v-model.trim="password"
-                                    required
                                 />
                                 <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
+                                <small v-if="fieldErr.password" class="fld-err">{{ fieldErr.password }}</small>
                             </div>
 
-                            <input class="auth__input" type="text" placeholder="Ваш вебсайт*" v-model.trim="website" required />
+                            <div class="field">
+                                <input class="auth__input" type="text" placeholder="Ваш вебсайт*" v-model.trim="website" />
+                                <small v-if="fieldErr.website" class="fld-err">{{ fieldErr.website }}</small>
+                            </div>
 
                             <label class="auth__checkbox">
                                 <input type="checkbox" v-model="agree" />
                                 <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
                             </label>
+                            <small v-if="fieldErr.agree" class="fld-err">{{ fieldErr.agree }}</small>
 
                             <button type="button" class="auth__submit" @click="goToStep2">Наступний крок</button>
                         </div>
 
                         <!-- STEP 2 -->
                         <div v-else class="auth__form">
-                            <div class="upload-wrapper">
+                            <div class="field upload-wrapper">
                                 <input
                                     class="attacher"
                                     type="file"
@@ -57,11 +74,14 @@
                                     accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                                     @change="handleFile"
                                 />
-                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG, PNG або PDF (до 8 МБ)</p>
-                                <p v-if="fileError" class="file-err">{{ fileError }}</p>
+                                <p class="upload-desc">Завантажте фото сертифіката якості у форматі JPG, PNG або PDF (до 10 МБ)</p>
+                                <small v-if="fieldErr.certificate" class="fld-err">{{ fieldErr.certificate }}</small>
                             </div>
 
-                            <input class="auth__input" type="text" placeholder="Ваша адреса складу" v-model.trim="warehouse" required />
+                            <div class="field">
+                                <input class="auth__input" type="text" placeholder="Ваша адреса складу" v-model.trim="warehouse" />
+                                <small v-if="fieldErr.warehouse_address" class="fld-err">{{ fieldErr.warehouse_address }}</small>
+                            </div>
 
                             <!-- переключатель ручного выбора точки -->
                             <div class="manual-toggle">
@@ -81,8 +101,15 @@
                                 <div ref="mapRef" class="map-container"></div>
 
                                 <div class="coords">
-                                    <input class="auth__input" type="number" step="0.000001" placeholder="Широта" v-model.number="lat" />
-                                    <input class="auth__input" type="number" step="0.000001" placeholder="Довгота" v-model.number="lng" />
+                                    <div class="field-inline">
+                                        <input class="auth__input" type="number" step="0.000001" placeholder="Широта" v-model.number="lat" />
+                                        <small v-if="fieldErr.lat" class="fld-err">{{ fieldErr.lat }}</small>
+                                    </div>
+                                    <div class="field-inline">
+                                        <input class="auth__input" type="number" step="0.000001" placeholder="Довгота" v-model.number="lng" />
+                                        <small v-if="fieldErr.lng" class="fld-err">{{ fieldErr.lng }}</small>
+                                    </div>
+
                                     <button type="button" class="mini-btn" @click="useMyLocation">Моє місцезнаходження</button>
                                     <button type="button" class="mini-btn" @click="centerKyiv">Київ</button>
                                 </div>
@@ -135,6 +162,7 @@
                                 <div v-if="typesError" class="wt-errors" style="margin-top:6px;">
                                     <span class="wt-err">{{ typesError }}</span>
                                 </div>
+                                <small v-if="fieldErr.water_types" class="fld-err">{{ fieldErr.water_types }}</small>
                             </div>
                             <!-- ====== / Види води ====== -->
 
@@ -142,6 +170,7 @@
                                 <input type="checkbox" v-model="agree" />
                                 <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
                             </label>
+                            <small v-if="fieldErr.agree" class="fld-err">{{ fieldErr.agree }}</small>
 
                             <button type="submit" class="auth__submit" :disabled="submitting">
                                 <span v-if="!submitting">Завершити реєстрацію</span>
@@ -152,17 +181,22 @@
 
                     <!-- ===================== ВХІД ===================== -->
                     <template v-else>
-                        <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" required />
-                        <div class="auth__password-wrapper">
+                        <div class="field">
+                            <input class="auth__input" type="email" placeholder="Ваша пошта*" v-model.trim="email" />
+                            <small v-if="fieldErr.email" class="fld-err">{{ fieldErr.email }}</small>
+                        </div>
+
+                        <div class="field auth__password-wrapper">
                             <input
                                 class="auth__input"
                                 :type="showPassword ? 'text' : 'password'"
                                 placeholder="Пароль*"
                                 v-model.trim="password"
-                                required
                             />
                             <span class="auth__eye-icon" @click="showPassword = !showPassword">👁</span>
+                            <small v-if="fieldErr.password" class="fld-err">{{ fieldErr.password }}</small>
                         </div>
+
                         <button type="submit" class="auth__submit" :disabled="submitting">
                             <span v-if="!submitting">Увійти</span>
                             <span v-else>Входимо…</span>
@@ -194,8 +228,14 @@ const website = ref('')
 const warehouse = ref('')
 const agree = ref(false)
 const file = ref(null)
-const fileError = ref('')
 const showPassword = ref(false)
+
+const formErr = ref('')
+const fieldErr = ref({
+    email: '', phone: '', password: '', website: '',
+    warehouse_address: '', certificate: '', water_types: '',
+    lat: '', lng: '', agree: ''
+})
 
 const manualMode = ref(false)
 const geoError = ref(false)
@@ -282,14 +322,12 @@ watchEffect(async () => {
         })
     }
 
-    // убрать карту, если выключили ручной режим
     if (!(manualMode.value || geoError.value) && map.value) {
         map.value.remove()
         map.value = null
         marker.value = null
     }
 })
-
 function useMyLocation() {
     if (!map.value) return
     map.value.locate({ setView: true, maxZoom: 16 })
@@ -301,7 +339,6 @@ function useMyLocation() {
     })
 }
 function centerKyiv() { if (map.value) map.value.setView([50.4501, 30.5234], 13) }
-
 onBeforeUnmount(() => {
     if (map.value) { map.value.remove(); map.value = null; marker.value = null }
 })
@@ -317,16 +354,37 @@ const normWebsite = (v) => {
     return s
 }
 
+function resetErrors() {
+    formErr.value = ''
+    Object.keys(fieldErr.value).forEach(k => { fieldErr.value[k] = '' })
+}
+
+function mapValidationErrors(errors) {
+    // Laravel: errors = { field: [msg1, msg2], ... }
+    Object.entries(errors || {}).forEach(([k, arr]) => {
+        const key = (k === 'warehouse' ? 'warehouse_address' : k)
+        fieldErr.value[key] = Array.isArray(arr) ? arr[0] : String(arr)
+    })
+}
+
 /** ======= Сабмиты ======= */
 async function handleRegister() {
+    resetErrors()
+
     if (step.value === 1) { goToStep2(); return }
 
-    if (!warehouse.value || !file.value || !agree.value) {
-        alert('Будь ласка, заповніть усі поля та погодьтесь з умовами.')
+    // Клиентская валидация базово
+    if (!warehouse.value) fieldErr.value.warehouse_address = 'Вкажіть адресу складу'
+    if (!file.value) fieldErr.value.certificate = 'Додайте файл сертифіката'
+    if (!agree.value) fieldErr.value.agree = 'Необхідно погодитись з умовами'
+
+    if (Object.values(fieldErr.value).some(Boolean)) {
+        formErr.value = 'Перевірте виділені поля'
         return
     }
 
     if (!validateTypes()) {
+        formErr.value = 'Перевірте «Види води»'
         document.querySelector('.water-types')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         return
     }
@@ -344,37 +402,45 @@ async function handleRegister() {
         submitting.value = true
         if (manualMode.value) {
             if (lat.value == null || lng.value == null) {
-                alert('Встановіть точку на карті або вимкніть ручний режим.')
+                fieldErr.value.lat = 'Вкажіть координати'
+                fieldErr.value.lng = 'Вкажіть координати'
+                formErr.value = 'Встановіть точку на карті або вимкніть ручний режим'
                 submitting.value = false
                 return
             }
             formData.append('lat', String(lat.value))
             formData.append('lng', String(lng.value))
         }
-        await axios.post('/api/factory/register', formData)
-        alert('Реєстрація успішна!')
+
+        await axios.post('/api/factory/register', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+
+        alert('Реєстрація успішна! Сертифікат відправлено на модерацію.')
+        // reset
         activeTab.value = 'login'
-        // reset map state
         map.value?.remove(); map.value = null; marker.value = null
         lat.value = null; lng.value = null; geoError.value = false; manualMode.value = false
         step.value = 1
+        email.value = phone.value = password.value = website.value = warehouse.value = ''
+        agree.value = false; file.value = null
+        waterTypesList.value = [{ uid: cryptoRand(), preset: 'silver', name: 'Срібна', code: 'silver', price: 33.5, _err: null }]
     } catch (err) {
-        if (err?.response?.data?.error === 'geocoding_failed') {
-            geoError.value = true
-            manualMode.value = true
-        }
-        console.error(err)
-        alert('Помилка при реєстрації')
+        handleApiError(err, 'register')
     } finally {
         submitting.value = false
     }
 }
 
 async function handleLogin() {
-    if (!isEmail(email.value) || !isStrongPass(password.value)) {
-        alert('Перевірте пошту та пароль')
+    resetErrors()
+    if (!isEmail(email.value)) fieldErr.value.email = 'Невірна пошта'
+    if (!isStrongPass(password.value)) fieldErr.value.password = 'Мінімум 6 символів'
+    if (Object.values(fieldErr.value).some(Boolean)) {
+        formErr.value = 'Перевірте пошту і пароль'
         return
     }
+
     try {
         submitting.value = true
         const res = await axios.post('/api/factory/login', {
@@ -388,37 +454,125 @@ async function handleLogin() {
         alert('Успішний вхід!')
         router.push('/factory-page')
     } catch (err) {
-        console.error(err)
-        alert('Невірна пошта або пароль')
+        handleApiError(err, 'login')
     } finally {
         submitting.value = false
     }
 }
 
+function handleApiError(err, phase) {
+    // Axios error object normalization
+    const status = err?.response?.status
+    const data = err?.response?.data
+
+    // Сетевые ошибки (нет ответа)
+    if (!status) {
+        formErr.value = 'Немає з’єднання з сервером. Спробуйте ще раз.'
+        return
+    }
+
+    // 422: валидация или кастомные ошибки
+    if (status === 422) {
+        if (data?.error === 'geocoding_failed') {
+            // включаем ручной режим и показываем подсказку
+            geoError.value = true
+            manualMode.value = true
+            formErr.value = data?.message || 'Не вдалося визначити координати. Встановіть точку вручну.'
+            // Подсветим поля координат
+            fieldErr.value.lat = 'Вкажіть широту'
+            fieldErr.value.lng = 'Вкажіть довготу'
+            return
+        }
+        if (data?.errors) {
+            mapValidationErrors(data.errors)
+            // Частые поля: email/phone/password/website/warehouse_address/water_types/certificate
+            formErr.value = data?.message || 'Перевірте виділені поля форми'
+            return
+        }
+        formErr.value = data?.message || 'Невірні дані запиту'
+        return
+    }
+
+    // 401: неверные креды
+    if (status === 401) {
+        if (phase === 'login') {
+            fieldErr.value.email = '—'
+            fieldErr.value.password = 'Невірна пошта або пароль'
+            formErr.value = 'Невірна пошта або пароль'
+        } else {
+            formErr.value = data?.message || 'Недостатньо прав'
+        }
+        return
+    }
+
+    // 409: конфликт
+    if (status === 409) {
+        formErr.value = data?.message || 'Конфлікт запиту. Оновіть сторінку та спробуйте ще раз.'
+        return
+    }
+
+    // 413: файл слишком большой
+    if (status === 413) {
+        fieldErr.value.certificate = 'Файл завеликий. Максимум 10 МБ.'
+        formErr.value = 'Файл завеликий. Максимум 10 МБ.'
+        return
+    }
+
+    // 415/422 по MIME или маппим как неподдерживаемый формат
+    if (status === 415) {
+        fieldErr.value.certificate = 'Непідтримуваний формат файлу. Дозволено JPG, PNG, PDF.'
+        formErr.value = 'Непідтримуваний формат файлу.'
+        return
+    }
+
+    // Прочие 4xx
+    if (status >= 400 && status < 500) {
+        formErr.value = data?.message || `Помилка запиту (${status}).`
+        return
+    }
+
+    // 5xx
+    if (status >= 500) {
+        formErr.value = 'Помилка сервера. Спробуйте пізніше.'
+        return
+    }
+
+    // Фолбек
+    formErr.value = 'Сталася невідома помилка. Спробуйте ще раз.'
+}
+
 function goToStep2() {
-    if (!isEmail(email.value)) { alert('Невірна пошта'); return }
-    if (!normPhone(phone.value) || normPhone(phone.value).length < 10) { alert('Невірний телефон'); return }
-    if (!isStrongPass(password.value)) { alert('Пароль має містити щонайменше 6 символів'); return }
-    if (!website.value) { alert('Вкажіть вебсайт'); return }
-    if (!agree.value) { alert('Потрібно погодитись з умовами'); return }
+    resetErrors()
+    if (!isEmail(email.value)) fieldErr.value.email = 'Невірна пошта'
+    const phoneNorm = normPhone(phone.value)
+    if (!phoneNorm || phoneNorm.length < 10) fieldErr.value.phone = 'Невірний телефон'
+    if (!isStrongPass(password.value)) fieldErr.value.password = 'Мінімум 6 символів'
+    if (!website.value) fieldErr.value.website = 'Вкажіть вебсайт'
+    if (!agree.value) fieldErr.value.agree = 'Необхідно погодитись з умовами'
+
+    if (Object.values(fieldErr.value).some(Boolean)) {
+        formErr.value = 'Перевірте виділені поля'
+        return
+    }
+
     website.value = normWebsite(website.value)
     step.value = 2
 }
 
 function handleFile(e) {
-    fileError.value = ''
+    fieldErr.value.certificate = ''
     const f = e.target.files?.[0]
     if (!f) { file.value = null; return }
     const okTypes = ['image/jpeg', 'image/png', 'application/pdf']
     const extOk = /\.(jpg|jpeg|png|pdf)$/i.test(f.name)
     if (!okTypes.includes(f.type) && !extOk) {
-        fileError.value = 'Підтримуються лише JPG, PNG або PDF'
+        fieldErr.value.certificate = 'Підтримуються лише JPG, PNG або PDF'
         file.value = null
         return
     }
-    const maxBytes = 8 * 1024 * 1024
+    const maxBytes = 10 * 1024 * 1024 // 10MB
     if (f.size > maxBytes) {
-        fileError.value = 'Файл завеликий (до 8 МБ)'
+        fieldErr.value.certificate = 'Файл завеликий (до 10 МБ)'
         file.value = null
         return
     }
@@ -427,7 +581,8 @@ function handleFile(e) {
 
 function switchTab(tab) {
     activeTab.value = tab
-    // сброс состояния
+    formErr.value = ''
+    Object.keys(fieldErr.value).forEach(k => fieldErr.value[k] = '')
     if (tab === 'login') { step.value = 1 }
 }
 </script>
@@ -451,10 +606,17 @@ function switchTab(tab) {
 .mini-btn { padding: 8px 10px; border: none; border-radius: 8px; background:#e5f2ff; color:#1663c7; cursor: pointer; font-weight: 600; }
 .coords-view { color:#444; font-size: 13px; margin-top: 6px; }
 
+.field { display:flex; flex-direction: column; gap:6px; }
+.field-inline { display:flex; flex-direction: column; gap:4px; min-width:220px; }
+.fld-err { color:#b91c1c; font-size:12px; line-height:1.3; }
+
 /* file */
 .upload-wrapper { display:flex; flex-direction:column; gap:6px; }
 .upload-desc { font-size: 12px; color:#6b7280; }
-.file-err { color:#b91c1c; font-size:12px; }
+
+/* alert */
+.alert { padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-bottom: 8px; }
+.alert--error { background:#fee2e2; border:1px solid #fecaca; color:#7f1d1d; }
 
 /* auth */
 .auth__password-wrapper { position: relative; }
