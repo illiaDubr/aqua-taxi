@@ -46,7 +46,7 @@ services:
               php-fpm -F
             "
         volumes:
-            # 👇 ОБЩИЙ storage для Laravel (app пишет сюда)
+            - .:/var/www
             - ./storage:/var/www/storage
 
     nginx:
