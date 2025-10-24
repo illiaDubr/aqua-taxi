@@ -7,9 +7,9 @@ services:
         restart: always
         environment:
             MYSQL_DATABASE: aqua
-            MYSQL_USER: aqua
-            MYSQL_PASSWORD: aqua
-            MYSQL_ROOT_PASSWORD: root
+            MYSQL_USER: user
+            MYSQL_PASSWORD: change-me
+            MYSQL_ROOT_PASSWORD: change-me
             TZ: Europe/Kyiv
         ports:
             - "3306:3306"
