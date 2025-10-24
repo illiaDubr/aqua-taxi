@@ -1,4 +1,3 @@
-version: "3.8"
 
 services:
     mysql:
@@ -18,7 +17,7 @@ services:
         networks: [aqua]
         stop_grace_period: 60s
         healthcheck:
-            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+            test: [ "CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uuser -pchange-me --silent" ]
             interval: 5s
             timeout: 3s
             retries: 20
