@@ -151,8 +151,10 @@ let abortCtl = null
 
 function logoutFactory() {
   const token = getFactoryToken()
+
+  // Если токена нет — сразу редирект
   if (!token) {
-    alert('Ви вже вийшли з системи')
+    window.location.href = 'https://example.com/'
     return
   }
 
@@ -162,13 +164,17 @@ function logoutFactory() {
   .then(() => {
     localStorage.removeItem('factory_token')
     localStorage.removeItem('token')
-    router.push('/auth') // или другой маршрут авторизации
   })
   .catch(err => {
     console.error('❌ Помилка при виході', err)
     alert('Помилка при виході')
   })
+  .finally(() => {
+    // Редирект в любом случае
+    window.location.href = 'https://example.com/'
+  })
 }
+
 
 /** --- Auth helpers --- */
 function getFactoryToken () {

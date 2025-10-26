@@ -48,7 +48,16 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
+const icon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+})
 /* ---------- state ---------- */
 const mapContainer = ref(null)
 const map = ref(null)
@@ -63,6 +72,7 @@ const renderedOrderIds = ref([])
 const orderMarkers = ref({})
 const currentTab = ref('active')
 const selectedWaterType = ref(null)    // 'silver' | 'deep' | null
+
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
