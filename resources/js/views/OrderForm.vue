@@ -156,8 +156,7 @@ const activateManual = async () => {
         lat.value = e.latlng.lat
         lng.value = e.latlng.lng
         if (marker.value) marker.value.setLatLng(e.latlng)
-        else marker.value = L.marker(e.latlng).addTo(map.value)
-    })
+        else marker.value = L.marker(e.latlng, { icon }).addTo(map.value)
 }
 
 // подстраховка рендера карты
@@ -173,7 +172,7 @@ watchEffect(async () => {
                 lat.value = e.latlng.lat
                 lng.value = e.latlng.lng
                 if (marker.value) marker.value.setLatLng(e.latlng)
-                else marker.value = L.marker(e.latlng).addTo(map.value)
+                else marker.value = L.marker(e.latlng, { icon }).addTo(map.value)
             })
         }
     }
