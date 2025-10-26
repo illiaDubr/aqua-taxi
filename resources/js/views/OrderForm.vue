@@ -5,7 +5,15 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+const icon = L.icon({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+})
 const route = useRoute()
 const router = useRouter()
 
@@ -410,22 +418,57 @@ const createOrder = async () => {
 </template>
 
 <style scoped>
+.quality-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quality-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.quality-select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
 .quality-alert {
+  position: relative;
   background-color: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
   padding: 12px 16px;
   border-radius: 8px;
-  margin-top: 12px;
+  margin-top: 8px;
   font-size: 14px;
-  font-weight: 500;
   animation: fadeIn 0.3s ease;
+}
+
+.quality-alert-text {
+  display: block;
+  padding-right: 24px;
+}
+
+.quality-alert-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #721c24;
+  cursor: pointer;
 }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
-}
 .bottle-section .segmented {
     display: flex;
     gap: 6px;
