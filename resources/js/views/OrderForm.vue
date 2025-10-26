@@ -8,8 +8,8 @@ import 'leaflet/dist/leaflet.css'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 const icon = L.icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -260,7 +260,7 @@ const createOrder = async () => {
                 showPopup: true,
                 product: productName.value,
                 quantity: String(qty),
-                time: timeOption.value === 'custom' ? customTime.value : 'Найближчий час',
+                time: timeOption.value === 'custom' ? customTime.value : 'Протягом години',
             },
         })
     } catch (error) {
