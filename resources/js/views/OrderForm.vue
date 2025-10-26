@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watchEffect, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, watchEffect, nextTick, onBeforeUnmount } from 'vue'
+
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
@@ -39,12 +40,15 @@ const qualityWarning = ref('')
 const showQualityAlert = ref(false)
 watch([bottleOption, bottleQuality], ([option, quality]) => {
   if (option === 'own' && quality === 'bad') {
-    bottleOption.value = 'buy' // автоматическое переключение
-    qualityWarning.value = 'Ваші бутлі мають поганий стан. Ми автоматично переключили вас на покупку нових бутлів.'
-    showQualityAlert.value = true
-    setTimeout(() => showQualityAlert.value = false, 5000) // скрыть через 5 секунд
+    bottleOption.value = 'buy'
+    if (!showQualityAlert.value) {
+      qualityWarning.value = 'Ваші бутлі мають поганий стан. Ми автоматично переключили вас на покупку нових бутлів.'
+      showQualityAlert.value = true
+      setTimeout(() => showQualityAlert.value = false, 5000)
+    }
   }
 })
+
 // --- карта/ручной выбор
 const manualMode = ref(false)
 const mapRef = ref(null)
@@ -349,20 +353,22 @@ const createOrder = async () => {
 
                 <!-- качество только для своих -->
                 <transition name="fade-slide">
-                    <div v-if="bottleOption === 'own'" class="quality-row">
-                        <span class="quality-badge">Якість</span>
-                        <select v-model="bottleQuality" class="quality-select">
-                            <option value="ideal">Ідеальний</option>
-                            <option value="average">Середній</option>
-                            <option value="bad">Поганий</option>
-                        </select>
-                        <transition name="fade-slide">
-  <div v-if="showQualityAlert" class="quality-alert">
-    {{ qualityWarning }}
+  <div v-if="bottleOption === 'own'" class="quality-row">
+    <label class="quality-label">Оберіть якість ваших бутлів:</label>
+    <select v-model="bottleQuality" class="quality-select">
+      <option value="ideal">Ідеальний</option>
+      <option value="average">Середній</option>
+      <option value="bad">Поганий</option>
+    </select>
+
+    <transition name="fade-slide">
+      <div v-if="showQualityAlert" class="quality-alert">
+        <span class="quality-alert-text">{{ qualityWarning }}</span>
+        <button class="quality-alert-close" @click="showQualityAlert = false">×</button>
+      </div>
+    </transition>
   </div>
 </transition>
-                    </div>
-                </transition>
 
                 <!-- чип с подсказкой для покупки -->
                 <transition name="fade-slide">
@@ -458,7 +464,16 @@ const createOrder = async () => {
     gap: 10px;
     margin-top: 6px;
 }
-
+.close-alert {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #721c24;
+  cursor: pointer;
+}
 .quality-badge {
     display: inline-flex;
     align-items: center;
