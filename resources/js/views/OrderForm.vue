@@ -35,7 +35,16 @@ const timeOption = ref('now')          // 'now' | 'custom'
 const customTime = ref('')
 const paymentMethod = ref('cash')
 const deliveryOption = ref('home')     // 'home' | 'entrance' | 'coffee'
-
+const qualityWarning = ref('')
+const showQualityAlert = ref(false)
+watch([bottleOption, bottleQuality], ([option, quality]) => {
+  if (option === 'own' && quality === 'bad') {
+    bottleOption.value = 'buy' // автоматическое переключение
+    qualityWarning.value = 'Ваші бутлі мають поганий стан. Ми автоматично переключили вас на покупку нових бутлів.'
+    showQualityAlert.value = true
+    setTimeout(() => showQualityAlert.value = false, 5000) // скрыть через 5 секунд
+  }
+})
 // --- карта/ручной выбор
 const manualMode = ref(false)
 const mapRef = ref(null)
@@ -347,6 +356,11 @@ const createOrder = async () => {
                             <option value="average">Середній</option>
                             <option value="bad">Поганий</option>
                         </select>
+                        <transition name="fade-slide">
+  <div v-if="showQualityAlert" class="quality-alert">
+    {{ qualityWarning }}
+  </div>
+</transition>
                     </div>
                 </transition>
 
@@ -390,7 +404,22 @@ const createOrder = async () => {
 </template>
 
 <style scoped>
+.quality-alert {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .bottle-section .segmented {
     display: flex;
     gap: 6px;
