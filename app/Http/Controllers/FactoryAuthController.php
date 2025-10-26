@@ -155,6 +155,11 @@ class FactoryAuthController extends Controller
         ]);
     }
 
+    public function logout(Request $request)
+{
+    $request->user()->tokens()->delete();
+    return response()->json(['message' => 'Вихід виконано успішно']);
+}
     /**
      * Повторная загрузка/замена сертификата.
      */

@@ -78,9 +78,12 @@ Broadcast::routes(['middleware' => ['auth:sanctum']]);
 | FACTORY / ADMIN (публичные)
 |--------------------------------------------------------------------------
 */
+Route::prefix('admin')->middleware(['auth:sanctum','abilities:admin'])->post('/logout', [AdminAuthController::class, 'logout']);
+
 Route::prefix('factory')->group(function () {
     Route::post('/register', [FactoryAuthController::class, 'register']);
     Route::post('/login',    [FactoryAuthController::class, 'login']);
+    
 });
 
 Route::get('/factories/verified',    [FactoryController::class, 'verified']);
@@ -99,7 +102,7 @@ Route::prefix('admin')->middleware(['auth:sanctum','abilities:admin'])->group(fu
     Route::post('/factories/{id}/reject',               [FactoryController::class, 'reject']);
     Route::post('/factories/{id}/moderate-certificate', [FactoryModerationController::class, 'moderateCertificate']);
     Route::get('/factories-with-certificates',          [FactoryModerationController::class, 'factoriesWithCertificates']);
-
+    
     Route::post('/factories/{id}/unverify',             [FactoryModerationController::class, 'unverify']);
     Route::delete('/factories/{id}/certificate',        [FactoryModerationController::class, 'deleteCertificate']);
 });
@@ -111,6 +114,7 @@ Route::prefix('admin')->middleware(['auth:sanctum','abilities:admin'])->group(fu
 */
 Route::middleware(['auth:sanctum','abilities:factory'])->group(function () {
     Route::post('/factory/upload-certificate',          [FactoryAuthController::class, 'uploadCertificate']);
+    Route::post('/logout', [FactoryAuthController::class, 'logout']);
 
     Route::get('/factory-orders',                       [FactoryOrderController::class, 'forFactory']);
     Route::post('/factory-orders/{order}/accept',       [FactoryOrderController::class, 'acceptByFactory']);

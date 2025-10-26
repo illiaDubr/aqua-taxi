@@ -28,5 +28,11 @@ class AdminAuthController extends Controller
             'admin' => $admin
         ]);
     }
+    public function logout(Request $request)
+{
+    $request->user()->tokens()->delete();
+    return response()->json(['message' => 'Вихід виконано успішно']);
+}
+
 }
 

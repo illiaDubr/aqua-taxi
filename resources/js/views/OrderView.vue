@@ -2,6 +2,7 @@
     <div class="order">
         <div class="order__header">
             <img :src="city" alt="background" class="order__bg" />
+            <button class="order__logout" @click="logoutUser">Вийти</button>
         </div>
 
         <div class="order__tabs">
@@ -101,6 +102,28 @@ const confirmOrder = async (order) => {
     }
 }
 
+const logoutUser = async () => {
+  try {
+    const token = localStorage.getItem('user_token')
+    if (!token) {
+      alert('Ви вже вийшли з системи')
+      return
+    }
+
+    await axios.post('/api/user/logout', {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    localStorage.removeItem('user_token')
+    localStorage.removeItem('active_token')
+    router.push('/auth') // или другой маршрут авторизации
+  } catch (error) {
+    console.error('❌ Помилка при виході', error)
+    alert('Помилка при виході')
+  }
+}
+
+
 const formatDate = (str) => {
     if (!str) return ''
     const d = new Date(str)
@@ -130,6 +153,26 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.order__logout {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background-color: #ffffffdd;
+  color: #3498db;
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.2s ease;
+}
+.order__logout:hover {
+  background-color: #3498db;
+  color: white;
+}
+
 .order__driver {
     background: #f0f8ff;
     border: 1px solid #3498db;

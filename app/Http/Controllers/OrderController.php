@@ -193,31 +193,29 @@ class OrderController extends Controller
             }
 
             // 2) Списание бутлей у водителя, если клиент их ПОКУПАЛ
-            if ($locked->driver_id && strtolower((string)$locked->bottle_option) === 'buy') {
-                $qty = max(0, (int)$locked->quantity);
+           if ($locked->driver_id) {
+    $qty = max(0, (int)$locked->quantity);
 
-                // лочим запись водителя и атомарно уменьшаем количество
-                DB::table('drivers')
-                    ->where('id', $locked->driver_id)
-                    ->lockForUpdate()
-                    ->update([
-                        'bottles' => DB::raw('GREATEST(bottles - '.((int)$qty).', 0)')
-                    ]);
+    DB::table('drivers')
+        ->where('id', $locked->driver_id)
+        ->lockForUpdate()
+        ->update([
+            'bottles' => DB::raw('GREATEST(bottles - '.$qty.', 0)')
+        ]);
 
-                // вернём обновлённые данные водителя
-                $driverRow = DB::table('drivers')
-                    ->select('id','bottles','balance')
-                    ->where('id', $locked->driver_id)
-                    ->first();
+    $driverRow = DB::table('drivers')
+        ->select('id','bottles','balance')
+        ->where('id', $locked->driver_id)
+        ->first();
 
-                if ($driverRow) {
-                    $updatedDriver = [
-                        'id'      => (int)$driverRow->id,
-                        'bottles' => (int)$driverRow->bottles,
-                        'balance' => (float)$driverRow->balance,
-                    ];
-                }
-            }
+    if ($driverRow) {
+        $updatedDriver = [
+            'id'      => (int)$driverRow->id,
+            'bottles' => (int)$driverRow->bottles,
+            'balance' => (float)$driverRow->balance,
+        ];
+    }
+}
 
             // 3) Завершаем заказ
             $locked->status = 'completed';

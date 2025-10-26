@@ -2,15 +2,17 @@
     <div class="producer-orders">
         <!-- Верхняя панель -->
         <div class="producer-orders__topbar">
-            <div class="status-toggle" :class="{ offline: !isOnline }" @click="toggleStatus">
-                <span class="label">{{ isOnline ? 'Онлайн' : 'Оффлайн' }}</span>
-                <div class="toggle-circle"></div>
-            </div>
-            <div class="balance-box">
-                <span class="amount">{{ (balance ?? 0).toFixed(2) }}грн</span>
-                <button class="plus" @click="topUp">＋</button>
-            </div>
-        </div>
+  <div class="status-toggle" :class="{ offline: !isOnline }" @click="toggleStatus">
+    <span class="label">{{ isOnline ? 'Онлайн' : 'Оффлайн' }}</span>
+    <div class="toggle-circle"></div>
+  </div>
+  <div class="balance-box">
+    <span class="amount">{{ (balance ?? 0).toFixed(2) }}грн</span>
+    <button class="plus" @click="topUp">＋</button>
+  </div>
+  <button class="logout-btn" @click="logoutFactory">Вийти</button>
+</div>
+
 
         <div class="bg">
             <!-- Табы -->
@@ -146,6 +148,27 @@ const pollTimer = ref(null)
 const busy      = ref({})
 
 let abortCtl = null
+
+function logoutFactory() {
+  const token = getFactoryToken()
+  if (!token) {
+    alert('Ви вже вийшли з системи')
+    return
+  }
+
+  axios.post('/api/logout', {}, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(() => {
+    localStorage.removeItem('factory_token')
+    localStorage.removeItem('token')
+    router.push('/auth') // или другой маршрут авторизации
+  })
+  .catch(err => {
+    console.error('❌ Помилка при виході', err)
+    alert('Помилка при виході')
+  })
+}
 
 /** --- Auth helpers --- */
 function getFactoryToken () {
@@ -404,6 +427,23 @@ onBeforeUnmount(() => {
     cursor: pointer;
     transition: all 0.3s ease;
 }
+.logout-btn {
+  margin-left: auto;
+  background-color: #ffffffdd;
+  color: #3498db;
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.logout-btn:hover {
+  background-color: #3498db;
+  color: white;
+}
+
 .status-toggle.offline { background-color: #9e9e9e; }
 .status-toggle .label { font-size: 14px; color: white; }
 .status-toggle.offline .label { transform: translateX(10px) scale(0.9); transition: transform 0.3s ease; }

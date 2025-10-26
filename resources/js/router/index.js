@@ -2,9 +2,15 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 import AuthUser from '../views/AuthUser.vue';
+import AuthDriver from '../views/AuthDriver.vue';
+import AuthFactory from '../views/AuthFactory.vue';
 import OrderForm from '../views/OrderForm.vue';
 import OrderTabs from '../views/OrderTabs.vue';
 import MapView from '../views/MapView.vue';
+import ActiveOrders from '../views/ActiveOrders.vue';
+import FactoryView from '../views/FactoryView.vue';
+import OrderView from '../views/OrderView.vue';
+import WelcomeView from '../views/WelcomeView.vue';
 
 const routes = [
     // Публичные

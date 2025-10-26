@@ -8,15 +8,17 @@
 
         <!-- Верхняя панель -->
         <div class="driver-map__top-panel">
-            <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
-                <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
-                <button>＋</button>
-            </div>
-            <div class="driver-map__block">
-                <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
-                <button @click="showTopUpModal = true">＋</button>
-            </div>
-        </div>
+  <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
+    <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
+    <button>＋</button>
+  </div>
+  <div class="driver-map__block">
+    <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
+    <button @click="showTopUpModal = true">＋</button>
+  </div>
+  <button class="logout-btn" @click="logoutDriver">Вийти</button>
+</div>
+
 
         <!-- Фильтр типов воды -->
         <div class="driver-map__filter-panel">
@@ -64,6 +66,26 @@ const selectedWaterType = ref(null)    // 'silver' | 'deep' | null
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
+
+function logoutDriver() {
+  const token = localStorage.getItem('driver_token')
+  if (!token) {
+    alert('Ви вже вийшли з системи')
+    return
+  }
+
+  axios.post('/api/driver/logout', {}, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(() => {
+    localStorage.removeItem('driver_token')
+    router.push('/auth') // или другой маршрут авторизации
+  })
+  .catch(err => {
+    console.error('❌ Помилка при виході', err)
+    alert('Помилка при виході')
+  })
+}
 /* ---------- маппинги ---------- */
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
 const QUALITY_LABELS = { ideal: 'Ідеальний', average: 'Середній', bad: 'Поганий' }
@@ -315,7 +337,26 @@ window.acceptOrder = async function(orderId) {
 </script>
 
 <style>
-.driver-map { position: relative; width: 100%; height: 100vh; }
+.driver-map { position: fixed; width: 100%; height: 100vh; }
+
+.logout-btn {
+  margin-left: auto;
+  background-color: #ffffffdd;
+  color: #3498db;
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.logout-btn:hover {
+  background-color: #3498db;
+  color: white;
+}
+
+
 
 /* Табы */
 .order-switcher {
