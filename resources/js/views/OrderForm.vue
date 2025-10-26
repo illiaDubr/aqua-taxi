@@ -142,22 +142,26 @@ onBeforeUnmount(destroyMap)
 
 // --- включение ручного режима
 const activateManual = async () => {
-    if (manualMode.value) return
-    manualMode.value = true
-    await nextTick()
-    if (!mapRef.value || map.value) return
+  if (manualMode.value) return
+  manualMode.value = true
+  await nextTick()
+  if (!mapRef.value || map.value) return
 
-    map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'Map data © OpenStreetMap contributors',
-    }).addTo(map.value)
+  map.value = L.map(mapRef.value).setView([50.4501, 30.5234], 13)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data © OpenStreetMap contributors',
+  }).addTo(map.value)
 
-    map.value.on('click', (e) => {
-        lat.value = e.latlng.lat
-        lng.value = e.latlng.lng
-        if (marker.value) marker.value.setLatLng(e.latlng)
-        else marker.value = L.marker(e.latlng, { icon }).addTo(map.value)
-}
+  map.value.on('click', (e) => {
+    lat.value = e.latlng.lat
+    lng.value = e.latlng.lng
+    if (marker.value) {
+      marker.value.setLatLng(e.latlng)
+    } else {
+      marker.value = L.marker(e.latlng, { icon }).addTo(map.value)
+    }
+  })
+} // ← 
 
 // подстраховка рендера карты
 watchEffect(async () => {
