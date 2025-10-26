@@ -417,6 +417,18 @@ const createOrder = async () => {
 </template>
 
 <style scoped>
+.map-container {
+  height: 400px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  display: block !important;
+  opacity: 1 !important;
+}
 .quality-row {
   display: flex;
   flex-direction: column;
