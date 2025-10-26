@@ -130,7 +130,7 @@ const renderMarkers = () => {
         const lng = Number(f.lng ?? f.longitude)
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
 
-        const m = L.marker([lat, lng]).addTo(markersLayer).bindPopup(f.name ?? 'Виробник')
+        const m = L.marker([lat, lng], { icon }).addTo(markersLayer).bindPopup(f.name ?? 'Виробник')
         m.on('click', () => {
             selectedFactory.value = f
             showModal.value = true
