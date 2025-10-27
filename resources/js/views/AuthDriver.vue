@@ -37,10 +37,13 @@
             </span>
                     </div>
 
-                    <label v-if="activeTab === 'register'" class="auth__checkbox">
-                        <input type="checkbox" v-model="agree" />
-                        <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
-                    </label>
+                   <label v-if="activeTab === 'register'" class="auth__checkbox">
+  <input type="checkbox" v-model="agree" />
+  <span>
+    Реєструючись, ви погоджуєтесь з
+    <button type="button" class="auth__link" @click="showOfferModal = true">договором оферти</button>
+  </span>
+</label>
 
                     <button type="submit" class="auth__submit" :disabled="loading">
                         {{ loading ? 'Виконується…' : (activeTab === 'register' ? 'Наступний крок' : 'Увійти') }}
@@ -50,6 +53,8 @@
                 </form>
             </transition>
         </div>
+        <ModalOffer :visible="showOfferModal" @close="showOfferModal = false" />
+
     </div>
 </template>
 
@@ -58,6 +63,8 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import logo from '@/assets/logo2.png';
+import ModalOffer from '../views/ModalOffer.vue';
+const showOfferModal = ref(false);
 
 const router = useRouter();
 
@@ -128,6 +135,16 @@ async function submitForm() {
 </script>
 
 <style scoped>
+.auth__link {
+  background: none;
+  border: none;
+  color: #3498db;
+  text-decoration: underline;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
 .auth__password-wrapper { position: relative; }
 .auth__password-wrapper input { width: 100%; padding-left: 5px !important; padding-right: 0px !important; }
 .auth__eye-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; }

@@ -55,10 +55,14 @@
                                 <small v-if="fieldErr.website" class="fld-err">{{ fieldErr.website }}</small>
                             </div>
 
-                            <label class="auth__checkbox">
-                                <input type="checkbox" v-model="agree" />
-                                <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
-                            </label>
+                            <label v-if="activeTab === 'register'" class="auth__checkbox">
+  <input type="checkbox" v-model="agree" />
+  <span>
+    Реєструючись, ви погоджуєтесь з
+    <button type="button" class="auth__link" @click="showOfferModal = true">договором оферти</button>
+  </span>
+</label>
+
                             <small v-if="fieldErr.agree" class="fld-err">{{ fieldErr.agree }}</small>
 
                             <button type="button" class="auth__submit" @click="goToStep2">Наступний крок</button>
@@ -166,10 +170,14 @@
                             </div>
                             <!-- ====== / Види води ====== -->
 
-                            <label class="auth__checkbox">
-                                <input type="checkbox" v-model="agree" />
-                                <span>Реєструючись, ви погоджуєтесь з <a href="#">договором оферти</a></span>
-                            </label>
+                            <label v-if="activeTab === 'register'" class="auth__checkbox">
+  <input type="checkbox" v-model="agree" />
+  <span>
+    Реєструючись, ви погоджуєтесь з
+    <button type="button" class="auth__link" @click="showOfferModal = true">договором оферти</button>
+  </span>
+</label>
+
                             <small v-if="fieldErr.agree" class="fld-err">{{ fieldErr.agree }}</small>
 
                             <button type="submit" class="auth__submit" :disabled="submitting">
@@ -205,6 +213,8 @@
                 </form>
             </transition>
         </div>
+        <ModalOffer :visible="showOfferModal" @close="showOfferModal = false" />
+
     </div>
 </template>
 
@@ -215,6 +225,8 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import ModalOffer from '../views/ModalOffer.vue';
+const showOfferModal = ref(false);
 
 const router = useRouter()
 const activeTab = ref('register')
@@ -598,6 +610,16 @@ function switchTab(tab) {
     color: #92400e;
     margin-top: 20px;
 }
+.auth__link {
+  background: none;
+  border: none;
+  color: #3498db;
+  text-decoration: underline;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
 .map-container { height: 250px; margin-top: 10px; border-radius: 8px; overflow: hidden; }
 .manual-toggle { margin-top: 8px; }
 .geo-select { margin-top: 10px; }
