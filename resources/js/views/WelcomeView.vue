@@ -14,8 +14,8 @@
 
         </div>
         <div class="welcome__logos">
-      <img src="@/assets/maste.png" alt="MasterCard SecureCode" class="welcome__logo" />
-      <img src="@/assets/visa.png" alt="Visa Secure" class="welcome__logo" />
+      <img src="@/assets/maste1.png" alt="MasterCard SecureCode" class="welcome__logo" />
+      <img src="@/assets/visa1.png" alt="Visa Secure" class="welcome__logo" />
     </div>
 
     </div>
