@@ -14,8 +14,8 @@
 
         </div>
         <div class="welcome__logos">
-      <img src="@/assets/maste1.png" alt="MasterCard SecureCode" class="welcome__logo" />
-      <img src="@/assets/visa1.png" alt="Visa Secure" class="welcome__logo" />
+     <img :src="mastercardLogo" alt="MasterCard SecureCode" class="welcome__logo" />
+<img :src="visaLogo" alt="Visa Secure" class="welcome__logo" />
     </div>
 
     </div>
@@ -25,6 +25,8 @@
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import illustrarion from '@/assets/illustration.png'
+import mastercardLogo from '@/assets/maste1.png';
+import visaLogo from '@/assets/visa1.png';
 const router = useRouter();
 const auth = useAuthStore();
 
