@@ -13,6 +13,11 @@
             <button class="welcome__btn" @click="goToAuthFactory">Стати виробником</button>
 
         </div>
+        <div class="welcome__logos">
+      <img src="@/assets/maste.jpg" alt="MasterCard SecureCode" class="welcome__logo" />
+      <img src="@/assets/visa.jpg" alt="Visa Secure" class="welcome__logo" />
+    </div>
+
     </div>
 </template>
 
@@ -53,6 +58,23 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Montserrat', sans-serif;
+}
+.welcome__logos {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+.welcome__logo {
+  height: 40px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.welcome__logo:hover {
+  transform: scale(1.1);
 }
 
 .welcome {
