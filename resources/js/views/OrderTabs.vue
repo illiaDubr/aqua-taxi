@@ -36,7 +36,7 @@
             <div class="modal__content">
                 <h3>Поповнення балансу</h3>
                 <input type="number" v-model="topUpAmount" placeholder="Сума в грн" />
-                <button @click="payWithFondy">Поповнити</button>
+                <button @click="payWithIPay">Поповнити</button>
             </div>
         </div>
     </div>
@@ -171,22 +171,31 @@ const fetchDriverData = async () => {
 }
 
 /* ---------- платеж ---------- */
-const payWithFondy = async () => {
-    try {
-        const res = await axios.post('/api/driver/pay', { amount: parseFloat(topUpAmount.value) }, { headers: authHeaders() })
-        const { url, params } = res.data
-        const form = document.createElement('form')
-        form.method = 'POST'
-        form.action = url
-        Object.entries(params).forEach(([k, v]) => {
-            const input = document.createElement('input')
-            input.type = 'hidden'; input.name = k; input.value = v; form.appendChild(input)
-        })
-        document.body.appendChild(form); form.submit()
-    } catch (error) {
-        alert('❌ Помилка при генерації платежу')
-        console.error(error)
-    }
+const payWithIPay = async () => {
+  try {
+    const res = await axios.post('/api/driver/pay', {
+      amount: parseFloat(topUpAmount.value)
+    }, { headers: authHeaders() })
+
+    const { url, params } = res.data
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = url
+
+    Object.entries(params).forEach(([key, value]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = key
+      input.value = value
+      form.appendChild(input)
+    })
+
+    document.body.appendChild(form)
+    form.submit()
+  } catch (error) {
+    alert('❌ Помилка при генерації платежу')
+    console.error(error)
+  }
 }
 
 /* ---------- карта ---------- */
@@ -314,15 +323,22 @@ const fetchOrders = async () => {
 
 /* ---------- init ---------- */
 onMounted(async () => {
-    await fetchDriverData()
-    await nextTick()
-    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map.value)
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('ipay') === 'success') {
+    alert('✅ Баланс успішно поповнено')
+  }
 
-    await fetchOrders()
+  await fetchDriverData()
+  await nextTick()
+
+  map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data © OpenStreetMap contributors'
+  }).addTo(map.value)
+
+  await fetchOrders()
 })
+
 
 /* ---------- accept ---------- */
 window.acceptOrder = async function(orderId) {
