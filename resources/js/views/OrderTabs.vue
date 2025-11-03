@@ -340,6 +340,7 @@ onMounted(async () => {
 })
 
 
+
 /* ---------- accept ---------- */
 window.acceptOrder = async function(orderId) {
     const confirmAccept = confirm('Підтвердити прийняття замовлення?')
