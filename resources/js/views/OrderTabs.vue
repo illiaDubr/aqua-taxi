@@ -40,6 +40,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import BalanceTopUpModal from '../views/BalanceTopUpModal.vue';
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
@@ -163,7 +164,7 @@ const fetchDriverData = async () => {
 }
 
 /* ---------- платеж ---------- */
-import BalanceTopUpModal from '@/components/BalanceTopUpModal.vue';
+
 
 const showModal = ref(false);
 // const payWithIPay = async () => {
