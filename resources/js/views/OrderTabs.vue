@@ -360,6 +360,23 @@ window.acceptOrder = async function(orderId) {
 </script>
 
 <style>
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 300px;
+}
+
 .driver-map { position: fixed; width: 100%; height: 100vh; }
 
 .logout-btn {
