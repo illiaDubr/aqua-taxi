@@ -9,13 +9,21 @@ use App\Models\Driver;
 class DriverPaymentController extends Controller
 {
     public function initiatePayment(Request $request)
-    {
-        $amount = floatval($request->input('amount'));
-        $driver = auth()->user();
+{
+    \Log::info('📥 Incoming /api/driver/pay', [
+        'raw' => $request->getContent(),
+        'parsed' => $request->all(),
+        'amount' => $request->input('amount'),
+        'driver' => auth()->user(),
+        'headers' => $request->headers->all(),
+    ]);
 
-        if (!$driver || $amount <= 0) {
-            return response()->json(['error' => 'Invalid driver or amount'], 400);
-        }
+    $amount = floatval($request->input('amount'));
+    $driver = auth()->user();
+
+    if (!$driver || $amount <= 0) {
+        return response()->json(['error' => 'Invalid driver or amount'], 400);
+    }
 
         $merchantId = '5521';
         $merchantKey = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
