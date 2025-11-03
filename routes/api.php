@@ -9,7 +9,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\DriverAuthController;
 use App\Http\Controllers\DriverOrderController;
 use App\Http\Controllers\Driver\BalanceController;
-use App\Http\Controllers\Driver\FondyController;
+
 
 use App\Http\Controllers\FactoryAuthController;
 use App\Http\Controllers\AdminAuthController;
@@ -40,7 +40,6 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
     Route::get('profile', [DriverAuthController::class, 'profile']);
     Route::post('top-up', [BalanceController::class, 'topUp']);
     Route::get('balance', [BalanceController::class, 'getBalance']);
-    Route::post('pay',    [FondyController::class, 'initialize']);
 
     Route::get('orders/new',             [DriverOrderController::class, 'newOrders']);
     Route::get('orders/active',          [DriverOrderController::class, 'activeOrders']);
