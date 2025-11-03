@@ -10,7 +10,7 @@ use App\Http\Controllers\DriverAuthController;
 use App\Http\Controllers\DriverOrderController;
 use App\Http\Controllers\Driver\BalanceController;
 
-
+use App\Http\Controllers\DriverPaymentController;
 use App\Http\Controllers\FactoryAuthController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\Admin\FactoryController;
