@@ -13,6 +13,11 @@
             <button class="welcome__btn" @click="goToAuthFactory">Стати виробником</button>
 
         </div>
+        <div class="welcome__logos">
+     <img :src="mastercardLogo" alt="MasterCard SecureCode" class="welcome__logo" />
+<img :src="visaLogo" alt="Visa Secure" class="welcome__logo" />
+    </div>
+
     </div>
 </template>
 
@@ -20,6 +25,8 @@
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/auth';
 import illustrarion from '@/assets/illustration.png'
+import mastercardLogo from '@/assets/maste1.png';
+import visaLogo from '@/assets/visa1.png';
 const router = useRouter();
 const auth = useAuthStore();
 
@@ -53,6 +60,23 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Montserrat', sans-serif;
+}
+.welcome__logos {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+.welcome__logo {
+  height: 40px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.welcome__logo:hover {
+  transform: scale(1.1);
 }
 
 .welcome {
