@@ -26,9 +26,9 @@ Route::prefix('driver')->group(function () {
     Route::post('register', [DriverAuthController::class, 'register']);
     Route::post('login',    [DriverAuthController::class, 'login']);
 });
-Route::middleware('auth:sanctum')->group(function () {
+
     Route::post('/driver/pay', [DriverPaymentController::class, 'initiatePayment']);
-});
+
 Route::post('/driver/pay/callback', [DriverPaymentController::class, 'handleCallback']);
 
 /*
