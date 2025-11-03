@@ -164,7 +164,6 @@ const fetchDriverData = async () => {
 
 /* ---------- платеж ---------- */
 import BalanceTopUpModal from '@/components/BalanceTopUpModal.vue';
-import { ref } from 'vue';
 
 const showModal = ref(false);
 // const payWithIPay = async () => {
