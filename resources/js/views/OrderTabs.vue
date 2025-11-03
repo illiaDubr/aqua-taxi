@@ -1,45 +1,37 @@
 <template>
-    <div class="driver-map">
-        <!-- Табы -->
-        <div class="order-switcher">
-            <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
-            <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
-        </div>
-
-        <!-- Верхняя панель -->
-        <div class="driver-map__top-panel">
-  <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
-    <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
-    <button>＋</button>
-  </div>
-  <div class="driver-map__block">
-    <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
-    <button @click="showTopUpModal = true">＋</button>
-  </div>
-  <button class="logout-btn" @click="logoutDriver">Вийти</button>
-</div>
-
-
-        <!-- Фильтр типов воды -->
-        <div class="driver-map__filter-panel">
-            <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
-            <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
-            <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
-        </div>
-
-        <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
-        <div ref="mapContainer" class="driver-map__container"></div>
-
-        <!-- Пополнение -->
-        <div v-if="showTopUpModal" class="modal">
-            <div class="modal__overlay" @click="showTopUpModal = false"></div>
-            <div class="modal__content">
-                <h3>Поповнення балансу</h3>
-                <input type="number" v-model="topUpAmount" placeholder="Сума в грн" />
-                <button @click="payWithIPay">Поповнити</button>
-            </div>
-        </div>
+  <div class="driver-map">
+    <!-- Табы -->
+    <div class="order-switcher">
+      <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
+      <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
     </div>
+
+    <!-- Верхняя панель -->
+    <div class="driver-map__top-panel">
+      <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
+        <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
+        <button>＋</button>
+      </div>
+      <div class="driver-map__block">
+        <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
+        <button @click="showTopUpModal = true">＋</button>
+      </div>
+      <button class="logout-btn" @click="logoutDriver">Вийти</button>
+    </div>
+
+    <!-- Фильтр -->
+    <div class="driver-map__filter-panel">
+      <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
+      <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
+      <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
+    </div>
+
+    <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
+    <div ref="mapContainer" class="driver-map__container"></div>
+
+    <!-- Модалка -->
+    <BalanceTopUpModal :visible="showTopUpModal" @close="showTopUpModal = false" />
+  </div>
 </template>
 
 <script setup>
@@ -171,32 +163,36 @@ const fetchDriverData = async () => {
 }
 
 /* ---------- платеж ---------- */
-const payWithIPay = async () => {
-  try {
-    const res = await axios.post('/api/driver/pay', {
-      amount: parseFloat(topUpAmount.value)
-    }, { headers: authHeaders() })
+import BalanceTopUpModal from '@/components/BalanceTopUpModal.vue';
+import { ref } from 'vue';
 
-    const { url, params } = res.data
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = url
+const showModal = ref(false);
+// const payWithIPay = async () => {
+//   try {
+//     const res = await axios.post('/api/driver/pay', {
+//       amount: parseFloat(topUpAmount.value)
+//     }, { headers: authHeaders() })
 
-    Object.entries(params).forEach(([key, value]) => {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = key
-      input.value = value
-      form.appendChild(input)
-    })
+//     const { url, params } = res.data
+//     const form = document.createElement('form')
+//     form.method = 'POST'
+//     form.action = url
 
-    document.body.appendChild(form)
-    form.submit()
-  } catch (error) {
-    alert('❌ Помилка при генерації платежу')
-    console.error(error)
-  }
-}
+//     Object.entries(params).forEach(([key, value]) => {
+//       const input = document.createElement('input')
+//       input.type = 'hidden'
+//       input.name = key
+//       input.value = value
+//       form.appendChild(input)
+//     })
+
+//     document.body.appendChild(form)
+//     form.submit()
+//   } catch (error) {
+//     alert('❌ Помилка при генерації платежу')
+//     console.error(error)
+//   }
+// }
 
 /* ---------- карта ---------- */
 const clearMarkers = () => {

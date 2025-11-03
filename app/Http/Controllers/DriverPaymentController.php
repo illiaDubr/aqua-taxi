@@ -11,14 +11,17 @@ class DriverPaymentController extends Controller
     public function initiatePayment(Request $request)
     {
         $amount = floatval($request->input('amount'));
-        $driver = auth()->user(); // предполагается, что водитель аутентифицирован
+        $driver = auth()->user();
+
+        if (!$driver || $amount <= 0) {
+            return response()->json(['error' => 'Invalid driver or amount'], 400);
+        }
 
         $merchantId = '5521';
         $merchantKey = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
 
         $orderId = uniqid('ipay_');
         $callbackUrl = url('/map?ipay=success');
-
 
         // Сохраняем платёж
         DriverPayment::create([
@@ -28,6 +31,18 @@ class DriverPaymentController extends Controller
             'status' => 'pending',
         ]);
 
+        // Формируем подпись строго по документации
+        $signatureString = 
+            $merchantId .
+            $orderId .
+            number_format($amount, 2, '.', '') .
+            'UAH' .
+            'Поповнення балансу водія' .
+            $callbackUrl .
+            $callbackUrl;
+
+        $signature = hash('sha256', $signatureString . $merchantKey);
+
         $params = [
             'MERCHANT_ID' => $merchantId,
             'ORDER_ID' => $orderId,
@@ -36,13 +51,19 @@ class DriverPaymentController extends Controller
             'DESCRIPTION' => 'Поповнення балансу водія',
             'SUCCESS_URL' => $callbackUrl,
             'FAIL_URL' => $callbackUrl,
+            'SIGNATURE' => $signature,
         ];
 
-        $signature = hash('sha256', implode('', $params) . $merchantKey);
+        \Log::info('🔍 iPay init', [
+            'driver_id' => $driver->id,
+            'order_id' => $orderId,
+            'amount' => $amount,
+            'params' => $params,
+        ]);
 
         return response()->json([
             'url' => 'https://secure.ipay.ua/order/',
-            'params' => array_merge($params, ['SIGNATURE' => $signature]),
+            'params' => $params,
         ]);
     }
 
@@ -75,23 +96,18 @@ class DriverPaymentController extends Controller
             return response('Already processed or not found', 200);
         }
 
-        if ($data['STATUS'] === 'SUCCESS') {
-            $payment->status = 'success';
-            $payment->response_data = json_encode($data);
-            $payment->save();
+        $payment->status = $data['STATUS'] === 'SUCCESS' ? 'success' : 'failed';
+        $payment->response_data = json_encode($data);
+        $payment->save();
 
+        if ($payment->status === 'success') {
             $driver = Driver::find($payment->driver_id);
             if ($driver) {
                 $driver->balance += floatval($data['AMOUNT']);
                 $driver->save();
             }
-
             return response('OK', 200);
         }
-
-        $payment->status = 'failed';
-        $payment->response_data = json_encode($data);
-        $payment->save();
 
         return response('Payment failed', 400);
     }
