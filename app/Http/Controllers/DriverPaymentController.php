@@ -81,8 +81,9 @@ XML;
         'response_data' => $response->body(),
     ]);
 
-    return
+    return response()->json(['url' => $url]);
 }
+
     public function handleCallback(Request $request)
     {
         $merchantKey = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
