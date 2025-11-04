@@ -65,12 +65,6 @@ async function submitPayment() {
     return;
   }
 
-  const token = getToken();
-  if (!token) {
-    error.value = 'Треба увійти в систему';
-    // Можно дополнительно эмитить событие для родителя: $emit('unauth')
-    return;
-  }
 
   isLoading.value = true;
 
