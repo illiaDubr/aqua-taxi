@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('drivers', function (Blueprint $table) {
+        Schema::table('driver_payments', function (Blueprint $table) {
             $table->string('api_token', 80)->nullable()->unique()->after('remember_token');
         });
     }
