@@ -28,7 +28,7 @@
         </button>
       </div>
 
-      <p v-if="error" class="error">{{ error }}</p>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
     </div>
   </div>
 </template>
@@ -36,26 +36,17 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
-
-const props = defineProps({
-  visible: Boolean,
-});
+const props = defineProps({ visible: Boolean });
+const emit = defineEmits(['close', 'success', 'unauth']);
 
 const amount = ref(null);
 const isLoading = ref(false);
 const error = ref('');
 
 /**
- * Вспомогательная: возвращаем plain token из localStorage
+ * Модалка не делает локальную авторизационную проверку.
+ * Сервер возвращает 401/403 при отсутствии/некорректном токене.
  */
-function getToken() {
-  try {
-    return localStorage.getItem('token') || null;
-  } catch {
-    return null;
-  }
-}
-
 async function submitPayment() {
   error.value = '';
 
@@ -65,97 +56,72 @@ async function submitPayment() {
     return;
   }
 
-
   isLoading.value = true;
 
   try {
-    const res = await axios.post(
-      '/api/driver/pay',
-      { amount: value },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        timeout: 15000,
-      }
-    );
+    // Отправляем запрос — доверяем бэкенду авторизацию и валидацию
+    const res = await axios.post('/api/driver/pay', { amount: value }, { timeout: 15000 });
 
-    // Проверяем структуру ответа
-    if (res.status >= 200 && res.status < 300) {
-      const data = res.data || {};
-      // Если контроллер возвращает url/params (старый HTML-форма подход)
-      if (data.url && data.params) {
-        // Создаём и сабмитим форму к стороннему сервису (ipay)
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = data.url;
-        Object.entries(data.params).forEach(([k, v]) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = k;
-          input.value = String(v);
-          form.appendChild(input);
-        });
-        document.body.appendChild(form);
-        form.submit();
+    // Ожидаем структуру { url, params } или { url }
+    const data = res.data || {};
 
-        // Эмитим событие успеха с информацией (родитель может обновить баланс)
-        // Не закрываем модалку, т.к. пользователь уходит на оплату, но можно:
-        // $emit('success', { amount: value });
-        return;
-      }
+    if (data.url && data.params) {
+      // старый подход: POST-форма к iPay
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = data.url;
+      Object.entries(data.params).forEach(([k, v]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = k;
+        input.value = String(v);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
 
-      // Если API теперь возвращает url напрямую
-      if (data.url && !data.params) {
-        window.location.href = data.url;
-        return;
-      }
-
-      // Если контроллер вернул простую подтверждающую структуру
-      // Эмитим success, закрываем модалку и передаём сумму
-      // Родитель может слушать и обновлять баланс
-      // Пример: <BalanceTopUpModal @success="onTopUpSuccess" />
-      // where onTopUpSuccess = (payload) => { fetchProfile() }
-      const payload = { amount: value, raw: data };
-      // emit manually via global event — in script setup use `const emit = defineEmits([...])`
-      emitSuccess(payload);
-      amount.value = null;
-      $emitClose();
-    } else {
-      error.value = 'Помилка поповнення: ' + (res.statusText || res.status);
+      // опционально эмитим success — родитель может обновить баланс
+      emit('success', { amount: value });
+      // не закрываем модалку принудительно, т.к. пользователь перенаправлен
+      return;
     }
+
+    if (data.url && !data.params) {
+      // редирект на url
+      window.location.href = data.url;
+      emit('success', { amount: value });
+      return;
+    }
+
+    // Если сервер вернул простую структуру — эмитим успех и закрываем модалку
+    emit('success', { amount: value, raw: data });
+    amount.value = null;
+    emit('close');
   } catch (e) {
-    // axios error handling
+    // Обработка axios ошибок
     if (e.response) {
-      // Сервер ответил (4xx,5xx)
-      const text = e.response.data ? JSON.stringify(e.response.data) : e.response.statusText;
-      error.value = 'Помилка поповнення: ' + text;
+      // Сервер ответил статусом
+      const status = e.response.status;
+      const body = e.response.data;
+      if (status === 401 || status === 403) {
+        error.value = 'Потрібна авторизація. Будь ласка, увійдіть ще раз.';
+        // уведомляем родителя, чтобы он показал логин
+        emit('unauth');
+      } else if (body && typeof body === 'object') {
+        // читаем человеко-дружелюбное сообщение если есть
+        error.value = body.error || body.message || JSON.stringify(body);
+      } else {
+        error.value = String(body || e.response.statusText || 'Помилка сервера');
+      }
     } else if (e.request) {
-      // Запрос ушёл, но ответа нет
       error.value = 'Сервер не відповідає. Спробуйте пізніше.';
     } else {
-      // Что-то при настройке запроса
       error.value = 'Помилка: ' + e.message;
     }
-    // Логируем в консоль для отладки
     console.error('TopUp error:', e);
   } finally {
     isLoading.value = false;
   }
-}
-
-/**
- * Небольшие обёртки, т.к. script setup: используем defineEmits
- */
-const emit = defineEmits(['close', 'success', 'unauth']);
-
-function emitSuccess(payload) {
-  emit('success', payload);
-}
-
-function $emitClose() {
-  emit('close');
 }
 </script>
 
