@@ -48,8 +48,7 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
     Route::post('logout', [DriverAuthController::class, 'logout']);
 });
 
-/* Платёжный callback — публичный */
-Route::post('/fondy/callback', [FondyController::class, 'callback'])->name('fondy.callback');
+
 
 /*
 |--------------------------------------------------------------------------
