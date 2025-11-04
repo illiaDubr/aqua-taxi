@@ -12,6 +12,7 @@ class DriverPayment extends Model
         'amount',
         'status',
         'response_data',
+         'api_token',
     ];
 
     protected $casts = [

@@ -18,11 +18,13 @@ class Driver extends Authenticatable
         'name',
         'surname',
         'balance',
-        'bottles'
+        'bottles',
+         'api_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+         'api_token',
     ];
 }
