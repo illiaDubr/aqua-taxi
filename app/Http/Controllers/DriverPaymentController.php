@@ -5,76 +5,84 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\DriverPayment;
 use App\Models\Driver;
+use Illuminate\Support\Facades\Http;
 
 class DriverPaymentController extends Controller
 {
     public function initiatePayment(Request $request)
 {
-    \Log::info('📥 Incoming /api/driver/pay', [
-        'raw' => $request->getContent(),
-        'parsed' => $request->all(),
-        'amount' => $request->input('amount'),
-        'driver' => auth()->user(),
-        'headers' => $request->headers->all(),
+    $request->validate([
+        'amount' => 'required|numeric|min:1',
     ]);
 
-    $amount = floatval($request->input('amount'));
     $driver = auth()->user();
-
-    if (!$driver || $amount <= 0) {
-        return response()->json(['error' => 'Invalid driver or amount'], 400);
+    if (!$driver) {
+        return response()->json(['error' => 'Unauthorized'], 401);
     }
 
-        $merchantId = '5521';
-        $merchantKey = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
+    $amount = intval($request->input('amount') * 100); // в копійках
+    $merchantId = '2023';
+    $salt = bin2hex(random_bytes(16));
+    $callbackUrl = url('/map?ipay=success');
 
-        $orderId = uniqid('ipay_');
-        $callbackUrl = url('/map?ipay=success');
+    $signatureString = $merchantId . $salt . $amount . 'UAH' . 'Поповнення балансу водія';
+    $sign = hash('sha512', $signatureString . 'секретний_ключ'); // замени на реальний ключ
 
-        // Сохраняем платёж
-        DriverPayment::create([
-            'driver_id' => $driver->id,
-            'order_id' => $orderId,
-            'amount' => $amount,
-            'status' => 'pending',
-        ]);
+    $xml = <<<XML
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<payment>
+    <auth>
+        <mch_id>{$merchantId}</mch_id>
+        <salt>{$salt}</salt>
+        <sign>{$sign}</sign>
+    </auth>
+    <urls>
+        <good>{$callbackUrl}</good>
+        <bad>{$callbackUrl}</bad>
+        <auto_redirect_good>1</auto_redirect_good>
+        <auto_redirect_bad>1</auto_redirect_bad>
+    </urls>
+    <transactions>
+        <transaction>
+            <amount>{$amount}</amount>
+            <currency>UAH</currency>
+            <desc>Поповнення балансу водія</desc>
+            <info>{"driver_id":{$driver->id}}</info>
+            <smch_id>4301</smch_id>
+        </transaction>
+    </transactions>
+    <lifetime>0.1</lifetime>
+    <lang>ua</lang>
+</payment>
+XML;
 
-        // Формируем подпись строго по документации
-        $signatureString = 
-            $merchantId .
-            $orderId .
-            number_format($amount, 2, '.', '') .
-            'UAH' .
-            'Поповнення балансу водія' .
-            $callbackUrl .
-            $callbackUrl;
+    $response = Http::withHeaders([
+        'Content-Type' => 'application/xml',
+    ])->post('https://checkout.ipay.ua/api/checkout', $xml);
 
-        $signature = hash('sha256', $signatureString . $merchantKey);
-
-        $params = [
-            'MERCHANT_ID' => $merchantId,
-            'ORDER_ID' => $orderId,
-            'AMOUNT' => number_format($amount, 2, '.', ''),
-            'CURRENCY' => 'UAH',
-            'DESCRIPTION' => 'Поповнення балансу водія',
-            'SUCCESS_URL' => $callbackUrl,
-            'FAIL_URL' => $callbackUrl,
-            'SIGNATURE' => $signature,
-        ];
-
-        \Log::info('🔍 iPay init', [
-            'driver_id' => $driver->id,
-            'order_id' => $orderId,
-            'amount' => $amount,
-            'params' => $params,
-        ]);
-
-        return response()->json([
-            'url' => 'https://secure.ipay.ua/order/',
-            'params' => $params,
-        ]);
+    if (!$response->ok()) {
+        \Log::error('❌ iPay error', ['body' => $response->body()]);
+        return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
     }
 
+    $body = simplexml_load_string($response->body());
+    $url = (string) $body->url ?? null;
+
+    if (!$url) {
+        return response()->json(['error' => 'No payment URL returned'], 400);
+    }
+
+    // Сохраняем платёж
+    DriverPayment::create([
+        'driver_id' => $driver->id,
+        'order_id' => uniqid('ipay_'),
+        'amount' => $request->input('amount'),
+        'status' => 'pending',
+        'response_data' => $response->body(),
+    ]);
+
+    return
+}
     public function handleCallback(Request $request)
     {
         $merchantKey = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
