@@ -35,17 +35,25 @@ return [
     |
     */
 
-    'guards' => [
-        'web' => [
-            'driver' => 'session',
-            'provider' => 'users',
-        ],
-
-        'admin' => [
-            'driver' => 'sanctum',
-            'provider' => 'admins',
-        ],
+   'guards' => [
+    'web' => [
+        'driver' => 'session',
+        'provider' => 'users',
     ],
+
+    'api' => [
+        'driver' => 'token',
+        'provider' => 'users',
+        'hash' => false,
+    ],
+
+    // 👇 ДОБАВЬ ЭТО
+    'driver' => [
+        'driver' => 'token', // или 'jwt', если используешь tymon/jwt-auth
+        'provider' => 'drivers',
+        'hash' => false,
+    ],
+],
 
     /*
     |--------------------------------------------------------------------------
