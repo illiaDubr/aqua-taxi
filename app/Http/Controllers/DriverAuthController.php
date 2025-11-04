@@ -36,28 +36,42 @@ class DriverAuthController extends Controller
     }
 
     public function login(Request $request)
-    {
-        $data = $request->validate([
-            'email'    => ['required','email'],
-            'password' => ['required','string'],
-        ]);
+{
+    $validated = $request->validate([
+        'email' => 'required|email|exists:drivers,email',
+        'password' => 'required|string',
+    ]);
 
-        /** @var Driver|null $driver */
-        $driver = Driver::where('email', $data['email'])->first();
+    /** @var \App\Models\Driver|null $driver */
+    $driver = Driver::where('email', $validated['email'])->first();
 
-        if (!$driver || !Hash::check($data['password'], $driver->password)) {
-            return response()->json(['message' => 'Невірні дані'], 401);
-        }
+    if (!$driver) {
+        // На всякий случай: логируем и возвращаем 401
+        Log::warning('Driver login failed: not found', ['email' => $validated['email']]);
+        return response()->json(['message' => 'Невірні дані'], 401);
+    }
 
-        // ВАЖНО: ability = driver
-        $token = $driver->createToken('driver_token', ['driver'])->plainTextToken;
-
-        return response()->json([
-            'token'  => $token,
-            'driver' => $driver,
+    if (!Hash::check($validated['password'], $driver->password)) {
+        Log::warning('Driver login failed: bad password', ['driver_id' => $driver->id]);
+        throw ValidationException::withMessages([
+            'password' => ['Невірний пароль'],
         ]);
     }
 
+    // Убедимся, что модель поддерживает токены (HasApiTokens)
+    if (!method_exists($driver, 'createToken')) {
+        Log::error('Driver model missing createToken method - check HasApiTokens trait');
+        return response()->json(['message' => 'Server error'], 500);
+    }
+
+    // Создаём токен и возвращаем
+    $token = $driver->createToken('driver-token', ['driver'])->plainTextToken;
+
+    return response()->json([
+        'driver' => $driver,
+        'token' => $token,
+    ], 200);
+}
     public function profile(Request $request)
     {
         $user = $request->user();
