@@ -47,14 +47,12 @@ return [
         'hash' => false,
     ],
 
-    // 👇 ДОБАВЬ ЭТО
     'driver' => [
-        'driver' => 'token', // или 'jwt', если используешь tymon/jwt-auth
+        'driver' => 'token', // или sanctum, если используешь его
         'provider' => 'drivers',
         'hash' => false,
     ],
 ],
-
     /*
     |--------------------------------------------------------------------------
     | User Providers
@@ -73,21 +71,21 @@ return [
     */
 
     'providers' => [
-        'users' => [
-            'driver' => 'drivers',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
-        ],
+    'users' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\User::class,
+    ],
 
-        'admins' => [
-            'driver' => 'drivers',
-            'model' => App\Models\Admin::class,
-        ],
-        'drivers' => [
-        'driver' => '
-        drivers',
+    'admins' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Admin::class,
+    ],
+
+    'drivers' => [
+        'driver' => 'eloquent',
         'model' => App\Models\Driver::class,
     ],
-    ],
+],
 
     /*
     |--------------------------------------------------------------------------
