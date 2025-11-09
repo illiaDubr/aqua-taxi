@@ -83,7 +83,8 @@ return [
             'model' => App\Models\Admin::class,
         ],
         'drivers' => [
-        'driver' => 'eloquent',
+        'driver' => '
+        eloquent',
         'model' => App\Models\Driver::class,
     ],
     ],

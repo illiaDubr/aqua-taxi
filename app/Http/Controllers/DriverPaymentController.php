@@ -51,7 +51,7 @@ class DriverPaymentController extends Controller
         }
 
         // соль и подпись согласно документации
-        $salt = sha1((string) microtime(true));
+        $salt = sha1(microtime(true));
         $sign = hash_hmac('sha512', $salt, $signKey);
 
         $callbackGood = url('/map?ipay=success');
@@ -94,6 +94,7 @@ XML;
 
             $response = Http::asForm()->withHeaders([
                 'Accept' => 'application/xml',
+                'Content-Type' => 'application/x-www-form-urlencoded',
             ])->post($endpoint, [
                 'data' => $xml,
             ]);
