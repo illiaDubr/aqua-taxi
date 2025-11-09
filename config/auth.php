@@ -74,17 +74,17 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            'driver' => 'drivers',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 
         'admins' => [
-            'driver' => 'eloquent',
+            'driver' => 'drivers',
             'model' => App\Models\Admin::class,
         ],
         'drivers' => [
         'driver' => '
-        eloquent',
+        drivers',
         'model' => App\Models\Driver::class,
     ],
     ],
