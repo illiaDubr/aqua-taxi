@@ -37,17 +37,19 @@ public function initiatePayment(Request $request)
 
     $merchantId = $this->getMerchantId();
     $signKey = $this->getSignKey();
+    $systemKey = config('ipay.system_key');
     $endpoint = $this->getEndpoint();
 
     Log::debug('iPay config loaded', [
         'merchant_id' => $merchantId,
         'sign_key' => $signKey,
+        'system_key' => $systemKey,
         'endpoint' => $endpoint,
         'sandbox' => config('ipay.use_sandbox'),
     ]);
 
-    if (!$merchantId || !$signKey) {
-        Log::error('iPay: missing config (merchant or key)');
+    if (!$merchantId || !$signKey || !$systemKey) {
+        Log::error('iPay: missing config (merchant, sign key, or system key)');
         return response()->json(['error' => 'Payment gateway not configured'], 500);
     }
 
@@ -135,7 +137,7 @@ XML;
             'respStatus' => $respStatus,
         ]);
 
-        $expectedRespSign = $respSalt && $signKey ? hash_hmac('sha512', $respSalt, $signKey) : null;
+        $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
 
         if ($expectedRespSign && $respSign !== $expectedRespSign) {
             Log::warning('iPay: response signature mismatch', [
@@ -170,6 +172,7 @@ XML;
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
+
 
 
     /**
