@@ -25,7 +25,7 @@ return [
     |
     */
 
-    'endpoint' => env('IPAY_ENDPOINT', 'https://checkout.ipay.ua/api302'),
+    'endpoint' => env('IPAY_ENDPOINT', 'https://sandbox-checkout.ipay.ua/api302'),
     'sandbox_endpoint' => env('IPAY_SANDBOX_ENDPOINT', 'https://sandbox-checkout.ipay.ua/api302'),
     'use_sandbox' => env('IPAY_USE_SANDBOX', false),
 
