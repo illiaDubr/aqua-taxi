@@ -34,13 +34,14 @@ private function driver(Request $request)
     return $driver;
 }
 
+
 public function initiatePayment(Request $request)
 {
     $request->validate([
         'amount' => 'required|numeric|min:0.01',
     ]);
 
-    $driver = $this->driver($request); // 👈 авторизация водителя
+    $driver = $this->driver($request); 
 
     $amountGrn = (float) $request->input('amount');
     $amount = (int) round($amountGrn * 100);
