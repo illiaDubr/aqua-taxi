@@ -32,12 +32,6 @@ public function initiatePayment(Request $request)
         'amount' => 'required|numeric|min:0.01',
     ]);
 
-    $driver = auth()->user();
-    if (!$driver) {
-        Log::warning('iPay: unauthorized access attempt');
-        return response()->json(['error' => 'Unauthorized'], 401);
-    }
-
     $amountGrn = (float) $request->input('amount');
     $amount = (int) round($amountGrn * 100);
 
@@ -62,7 +56,7 @@ public function initiatePayment(Request $request)
 
     $callbackGood = url('/map?ipay=success');
     $callbackBad  = url('/map?ipay=fail');
-    $infoJson = json_encode(['driver_id' => $driver->id]);
+    $infoJson = json_encode(['driver_id' => 'anonymous']);
 
     $xml = <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -153,7 +147,7 @@ XML;
         }
 
         $payment = DriverPayment::create([
-            'driver_id' => $driver->id,
+            'driver_id' => null,
             'order_id'  => $respPid ?: uniqid('ipay_'),
             'amount'    => $amountGrn,
             'amount_cents' => $amount,
