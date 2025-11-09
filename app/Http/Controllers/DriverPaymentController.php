@@ -7,6 +7,7 @@ use App\Models\DriverPayment;
 use App\Models\Driver;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class DriverPaymentController extends Controller
 {
