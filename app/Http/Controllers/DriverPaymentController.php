@@ -11,23 +11,21 @@ use Illuminate\Support\Facades\Log;
 class DriverPaymentController extends Controller
 {
     protected function getEndpoint(): string
-    {
-        $useSandbox = filter_var(env('IPAY_USE_SANDBOX', false), FILTER_VALIDATE_BOOLEAN);
-        return $useSandbox
-            ? env('IPAY_SANDBOX_ENDPOINT', 'https://sandbox-checkout.ipay.ua/api302')
-            : env('IPAY_ENDPOINT', 'https://checkout.ipay.ua/api302');
-    }
+{
+    return config('ipay.use_sandbox')
+        ? config('ipay.sandbox_endpoint')
+        : config('ipay.endpoint');
+}
 
-    protected function getMerchantId(): string
-    {
-        return env('IPAY_MERCHANT_ID');
-    }
+protected function getMerchantId(): string
+{
+    return config('ipay.merchant_id');
+}
 
-    protected function getSignKey(): string
-    {
-        return env('IPAY_SIGN_KEY');
-    }
-
+protected function getSignKey(): string
+{
+    return config('ipay.sign_key');
+}
     public function initiatePayment(Request $request)
 {
     $request->validate([
