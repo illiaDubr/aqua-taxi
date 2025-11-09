@@ -26,11 +26,20 @@ protected function getSignKey(): string
 {
     return config('ipay.sign_key');
 }
+private function driver(Request $request)
+{
+    $driver = $request->user() ?: Auth::guard('driver')->user();
+    abort_if(!$driver, 401, 'Необхідна авторизація водія');
+    return $driver;
+}
+
 public function initiatePayment(Request $request)
 {
     $request->validate([
         'amount' => 'required|numeric|min:0.01',
     ]);
+
+    $driver = $this->driver($request); // 👈 авторизация водителя
 
     $amountGrn = (float) $request->input('amount');
     $amount = (int) round($amountGrn * 100);
@@ -46,6 +55,7 @@ public function initiatePayment(Request $request)
         'system_key' => $systemKey,
         'endpoint' => $endpoint,
         'sandbox' => config('ipay.use_sandbox'),
+        'driver_id' => $driver->id,
     ]);
 
     if (!$merchantId || !$signKey || !$systemKey) {
@@ -58,7 +68,7 @@ public function initiatePayment(Request $request)
 
     $callbackGood = url('/map?ipay=success');
     $callbackBad  = url('/map?ipay=fail');
-    $infoJson = json_encode(['driver_id' => 'anonymous']);
+    $infoJson = json_encode(['driver_id' => $driver->id]);
 
     $xml = <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -149,7 +159,7 @@ XML;
         }
 
         $payment = DriverPayment::create([
-            'driver_id' => null,
+            'driver_id' => $driver->id, // 👈 теперь не null
             'order_id'  => $respPid ?: uniqid('ipay_'),
             'amount'    => $amountGrn,
             'amount_cents' => $amount,
@@ -172,7 +182,6 @@ XML;
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
-
 
 
     /**
