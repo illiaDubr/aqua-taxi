@@ -15,14 +15,9 @@
       />
 
       <div class="modal-actions">
-        <button
-          @click="submitPayment"
-          class="btn-primary"
-          :disabled="isLoading"
-        >
+        <button @click="submitPayment" class="btn-primary" :disabled="isLoading">
           {{ isLoading ? 'Обробка...' : 'Поповнити' }}
         </button>
-
         <button @click="$emit('close')" class="btn-secondary" :disabled="isLoading">
           Назад
         </button>
@@ -36,6 +31,7 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+
 const props = defineProps({ visible: Boolean });
 const emit = defineEmits(['close', 'success', 'unauth']);
 
@@ -43,13 +39,8 @@ const amount = ref(null);
 const isLoading = ref(false);
 const error = ref('');
 
-/**
- * Модалка не делает локальную авторизационную проверку.
- * Сервер возвращает 401/403 при отсутствии/некорректном токене.
- */
 async function submitPayment() {
   error.value = '';
-
   const value = Number(amount.value);
   if (!value || isNaN(value) || value <= 0) {
     error.value = 'Введіть коректну суму для поповнення';
@@ -59,64 +50,36 @@ async function submitPayment() {
   isLoading.value = true;
 
   try {
-    // Отправляем запрос — доверяем бэкенду авторизацию и валидацию
     const res = await axios.post('/api/driver/pay', { amount: value }, { timeout: 15000 });
+    const { url, payment_id } = res.data || {};
 
-    // Ожидаем структуру { url, params } или { url }
-    const data = res.data || {};
+    if (url && payment_id) {
+      // Запускаем polling через 15 секунд
+      setTimeout(() => {
+        axios.post(`/api/driver/pay/poll/${payment_id}`).catch(err => {
+          console.warn('polling error', err);
+        });
+      }, 15000);
 
-    if (data.url && data.params) {
-      // старый подход: POST-форма к iPay
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = data.url;
-      Object.entries(data.params).forEach(([k, v]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = k;
-        input.value = String(v);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-
-      // опционально эмитим success — родитель может обновить баланс
-      emit('success', { amount: value });
-      // не закрываем модалку принудительно, т.к. пользователь перенаправлен
-      return;
-    }
-
-    if (data.url && !data.params) {
-      // редирект на url
-      window.location.href = data.url;
+      // Редиректим пользователя на оплату
+      window.location.href = url;
       emit('success', { amount: value });
       return;
     }
 
-    // Если сервер вернул простую структуру — эмитим успех и закрываем модалку
-    emit('success', { amount: value, raw: data });
-    amount.value = null;
-    emit('close');
+    error.value = 'Не вдалося отримати посилання на оплату';
   } catch (e) {
-    // Обработка axios ошибок
     if (e.response) {
-      // Сервер ответил статусом
       const status = e.response.status;
       const body = e.response.data;
       if (status === 401 || status === 403) {
         error.value = 'Потрібна авторизація. Будь ласка, увійдіть ще раз.';
-        // уведомляем родителя, чтобы он показал логин
         emit('unauth');
-      } else if (body && typeof body === 'object') {
-        // читаем человеко-дружелюбное сообщение если есть
-        error.value = body.error || body.message || JSON.stringify(body);
       } else {
-        error.value = String(body || e.response.statusText || 'Помилка сервера');
+        error.value = body?.error || body?.message || 'Помилка сервера';
       }
-    } else if (e.request) {
-      error.value = 'Сервер не відповідає. Спробуйте пізніше.';
     } else {
-      error.value = 'Помилка: ' + e.message;
+      error.value = 'Сервер не відповідає. Спробуйте пізніше.';
     }
     console.error('TopUp error:', e);
   } finally {

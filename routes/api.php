@@ -30,7 +30,7 @@ Route::prefix('driver')->group(function () {
 Route::middleware('auth:driver')->post('/driver/pay', [DriverPaymentController::class, 'initiatePayment']);
 Route::get('/driver/pay/status/{paymentId}', [DriverPaymentController::class, 'checkStatus']);
 Route::post('/driver/pay/callback', [DriverPaymentController::class, 'handleCallback']);
-
+Route::post('/driver/pay/poll/{payment}', [DriverPaymentController::class, 'pollUntilSuccess']);
 /*
 |--------------------------------------------------------------------------
 | DRIVER (приватные) — нужен токен с ability: driver

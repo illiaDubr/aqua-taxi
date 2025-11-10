@@ -291,7 +291,7 @@ XML;
             'status'        => $respStatus ?: 'created',
             'response_data' => $response->body(),
         ]);
-$this->pollUntilSuccess($payment);
+
         Log::info('iPay payment created', [
             'payment_id' => $payment->id,
             'driver_id'  => $driver->id,
