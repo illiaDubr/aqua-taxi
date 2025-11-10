@@ -79,55 +79,56 @@ class DriverPaymentController extends Controller
     }
 
     public function initiatePayment(Request $request)
-    {
-        // Логируем заголовки в начале — часто Authorization режут прокси/nginx
-        Log::debug('initiatePayment request headers', [
-            'authorization' => $request->header('Authorization'),
-            'all_headers' => $request->headers->all(),
-        ]);
+{
+    Log::debug('initiatePayment request headers', [
+        'authorization' => $request->header('Authorization'),
+        'all_headers' => $request->headers->all(),
+    ]);
 
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-        ]);
+    $validated = $request->validate([
+        'amount' => 'required|numeric|min:0.01',
+    ]);
 
-        // Получаем водителя — метод driver() вернёт либо модель, либо JSON-ответ (401).
-        $driverOrResponse = $this->driver($request);
-        if ($driverOrResponse instanceof \Illuminate\Http\JsonResponse) {
-            // Если driver() вернул JSON (401) — просто отдадим его дальше
-            return $driverOrResponse;
-        }
-        $driver = $driverOrResponse;
+    $driverOrResponse = $this->driver($request);
+    if ($driverOrResponse instanceof \Illuminate\Http\JsonResponse) {
+        return $driverOrResponse;
+    }
+    $driver = $driverOrResponse;
 
-        $amountGrn = (float) $request->input('amount');
-        $amount = (int) round($amountGrn * 100);
+    $amountGrn = (float) $request->input('amount');
+    $amount = (int) round($amountGrn * 100);
 
-        $merchantId = $this->getMerchantId();
-        $signKey = $this->getSignKey();
-        $systemKey = config('ipay.system_key');
-        $endpoint = $this->getEndpoint();
+    $merchantId = $this->getMerchantId();
+    $signKey    = $this->getSignKey();
+    $systemKey  = config('ipay.system_key');
+    $endpoint   = $this->getEndpoint();
 
-        Log::debug('iPay config loaded', [
-            'merchant_id' => $merchantId ? 'present' : null,
-            'sign_key' => $signKey ? 'present' : null,
-            'system_key' => $systemKey ? 'present' : null,
-            'endpoint' => $endpoint,
-            'sandbox' => config('ipay.use_sandbox'),
-            'driver_id' => $driver->id ?? null,
-        ]);
+    Log::debug('iPay config loaded', [
+        'merchant_id' => $merchantId ? 'present' : null,
+        'sign_key'    => $signKey ? 'present' : null,
+        'system_key'  => $systemKey ? 'present' : null,
+        'endpoint'    => $endpoint,
+        'sandbox'     => config('ipay.use_sandbox'),
+        'driver_id'   => $driver->id ?? null,
+    ]);
 
-        if (!$merchantId || !$signKey || !$systemKey) {
-            Log::error('iPay: missing config (merchant, sign key, or system key)');
-            return response()->json(['error' => 'Payment gateway not configured'], 500);
-        }
+    if (!$merchantId || !$signKey || !$systemKey) {
+        Log::error('iPay: missing config (merchant, sign key, or system key)');
+        return response()->json(['error' => 'Payment gateway not configured'], 500);
+    }
 
-        $salt = sha1(microtime(true));
-        $sign = hash_hmac('sha512', $salt, $signKey);
+    $salt = sha1(microtime(true));
+    $sign = hash_hmac('sha512', $salt, $signKey);
 
-        $callbackGood = url('/ordersDrive?ipay=success');
-        $callbackBad  = url('/ordersDrive?ipay=fail');
-        $infoJson = json_encode(['driver_id' => $driver->id]);
+    // URLы для редиректа клиента
+    $callbackGood = url('/ordersDrive?ipay=success');
+    $callbackBad  = url('/ordersDrive?ipay=fail');
+    // URL для серверного callback от iPay
+    $callbackSrv  = url('/driver/pay/callback');
 
-        $xml = <<<XML
+    $infoJson = json_encode(['driver_id' => $driver->id]);
+
+    $xml = <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <payment>
     <auth>
@@ -138,6 +139,7 @@ class DriverPaymentController extends Controller
     <urls>
         <good>{$callbackGood}</good>
         <bad>{$callbackBad}</bad>
+        <callback>{$callbackSrv}</callback>
         <auto_redirect_good>1</auto_redirect_good>
         <auto_redirect_bad>1</auto_redirect_bad>
     </urls>
@@ -155,91 +157,91 @@ class DriverPaymentController extends Controller
 </payment>
 XML;
 
-        Log::debug('iPay XML payload constructed', [
-            'salt' => $salt,
-            'sign' => $sign,
-            // не логируем полный xml в проде, но в debug полезно
-            'xml_snippet' => substr($xml, 0, 300),
+    Log::debug('iPay XML payload constructed', [
+        'salt' => $salt,
+        'sign' => $sign,
+        'xml_snippet' => substr($xml, 0, 300),
+    ]);
+
+    try {
+        $response = Http::asForm()->withHeaders([
+            'Accept' => 'application/xml',
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ])->post($endpoint, [
+            'data' => $xml,
         ]);
 
-        try {
-            $response = Http::asForm()->withHeaders([
-                'Accept' => 'application/xml',
-                'Content-Type' => 'application/x-www-form-urlencoded',
-            ])->post($endpoint, [
-                'data' => $xml,
-            ]);
+        Log::debug('iPay HTTP response received', [
+            'status' => $response->status(),
+            'body_snippet' => substr($response->body(), 0, 500),
+        ]);
 
-            Log::debug('iPay HTTP response received', [
+        if (!$response->successful()) {
+            Log::error('iPay request failed', [
+                'url' => $endpoint,
                 'status' => $response->status(),
-                'body_snippet' => substr($response->body(), 0, 500),
+                'body' => $response->body()
             ]);
-
-            if (!$response->successful()) {
-                Log::error('iPay request failed', [
-                    'url' => $endpoint,
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-                return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
-            }
-
-            libxml_use_internal_errors(true);
-            $bodyXml = simplexml_load_string($response->body());
-            if (!$bodyXml) {
-                Log::error('iPay: invalid XML response', ['raw' => $response->body()]);
-                return response()->json(['error' => 'Invalid response from payment gateway'], 500);
-            }
-
-            $respSalt = (string) ($bodyXml->salt ?? $bodyXml->auth->salt ?? '');
-            $respSign = (string) ($bodyXml->sign ?? '');
-            $respPid  = (string) ($bodyXml->pid ?? '');
-            $respUrl  = (string) ($bodyXml->url ?? '');
-            $respStatus = (string) ($bodyXml->status ?? '');
-
-            Log::debug('iPay parsed response', [
-                'respSalt' => $respSalt,
-                'respSign' => $respSign,
-                'respPid' => $respPid,
-                'respUrl' => $respUrl,
-                'respStatus' => $respStatus,
-            ]);
-
-            $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
-
-            if ($expectedRespSign && $respSign !== $expectedRespSign) {
-                Log::warning('iPay: response signature mismatch', [
-                    'expected' => $expectedRespSign,
-                    'received' => $respSign,
-                    'body' => $response->body(),
-                ]);
-                return response()->json(['error' => 'Invalid response signature'], 400);
-            }
-
-            $payment = DriverPayment::create([
-                'driver_id' => $driver->id,
-                'order_id'  => $respPid ?: uniqid('ipay_'),
-                'amount'    => $amountGrn,
-                'amount_cents' => $amount,
-                'status'    => $respStatus ?: 'created',
-                'response_data' => $response->body(),
-            ]);
-
-            Log::info('iPay payment created', [
-                'payment_id' => $payment->id,
-                'url' => $respUrl,
-            ]);
-
-            if (!$respUrl) {
-                return response()->json(['error' => 'No payment URL returned', 'response' => $response->body()], 400);
-            }
-
-            return response()->json(['url' => $respUrl, 'payment_id' => $payment->id]);
-        } catch (\Exception $e) {
-            Log::error('iPay exception', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return response()->json(['error' => 'Internal error'], 500);
+            return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
         }
+
+        libxml_use_internal_errors(true);
+        $bodyXml = simplexml_load_string($response->body());
+        if (!$bodyXml) {
+            Log::error('iPay: invalid XML response', ['raw' => $response->body()]);
+            return response()->json(['error' => 'Invalid response from payment gateway'], 500);
+        }
+
+        $respSalt   = (string) ($bodyXml->salt ?? $bodyXml->auth->salt ?? '');
+        $respSign   = (string) ($bodyXml->sign ?? '');
+        $respPid    = (string) ($bodyXml->pid ?? '');
+        $respUrl    = (string) ($bodyXml->url ?? '');
+        $respStatus = (string) ($bodyXml->status ?? '');
+
+        Log::debug('iPay parsed response', [
+            'respSalt'   => $respSalt,
+            'respSign'   => $respSign,
+            'respPid'    => $respPid,
+            'respUrl'    => $respUrl,
+            'respStatus' => $respStatus,
+        ]);
+
+        $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
+
+        if ($expectedRespSign && $respSign !== $expectedRespSign) {
+            Log::warning('iPay: response signature mismatch', [
+                'expected' => $expectedRespSign,
+                'received' => $respSign,
+                'body' => $response->body(),
+            ]);
+            return response()->json(['error' => 'Invalid response signature'], 400);
+        }
+
+        $payment = DriverPayment::create([
+            'driver_id'     => $driver->id,
+            'order_id'      => $respPid ?: uniqid('ipay_'),
+            'amount'        => $amountGrn,
+            'amount_cents'  => $amount,
+            'status'        => $respStatus ?: 'created',
+            'response_data' => $response->body(),
+        ]);
+
+        Log::info('iPay payment created', [
+            'payment_id' => $payment->id,
+            'url'        => $respUrl,
+        ]);
+
+        if (!$respUrl) {
+            return response()->json(['error' => 'No payment URL returned', 'response' => $response->body()], 400);
+        }
+
+        return response()->json(['url' => $respUrl, 'payment_id' => $payment->id]);
+    } catch (\Exception $e) {
+        Log::error('iPay exception', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        return response()->json(['error' => 'Internal error'], 500);
     }
+}
+
 
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
 
