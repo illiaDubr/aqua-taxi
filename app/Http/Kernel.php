@@ -25,4 +25,7 @@ class Kernel extends HttpKernel
         // ...
         'admin' => \App\Http\Middleware\AdminMiddleware::class,
     ];
+    protected $commands = [
+    \App\Console\Commands\IpayStatusCommand::class,
+];
 }
