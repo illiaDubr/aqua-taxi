@@ -123,8 +123,8 @@ class DriverPaymentController extends Controller
         $salt = sha1(microtime(true));
         $sign = hash_hmac('sha512', $salt, $signKey);
 
-        $callbackGood = url('/map?ipay=success');
-        $callbackBad  = url('/map?ipay=fail');
+        $callbackGood = url('/ordersDrive?ipay=success');
+        $callbackBad  = url('/ordersDrive?ipay=fail');
         $infoJson = json_encode(['driver_id' => $driver->id]);
 
         $xml = <<<XML
@@ -248,7 +248,7 @@ XML;
 public function handleCallback(Request $request)
 {
     $raw = $request->getContent();
-    $systemKey = config('ipay.system_key'); // важно: system_key, а не sign_key
+    $systemKey = config('ipay.system_key'); 
     Log::info('iPay callback received', ['content_snippet' => substr($raw, 0, 1000), 'content_length' => strlen($raw)]);
 
     // Если это XML
