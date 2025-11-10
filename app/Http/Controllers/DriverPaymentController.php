@@ -163,9 +163,7 @@ XML;
         $response = Http::asForm()->withHeaders([
             'Accept' => 'application/xml',
             'Content-Type' => 'application/x-www-form-urlencoded',
-        ])->post($endpoint, [
-            'data' => $xml,
-        ]);
+        ])->post($endpoint, ['data' => $xml]);
 
         Log::info('iPay XML sent', ['endpoint' => $endpoint]);
 
@@ -235,8 +233,50 @@ XML;
             'url'        => $respUrl,
         ]);
 
-        if (!$respUrl) {
-            return response()->json(['error' => 'No payment URL returned', 'response' => $response->body()], 400);
+        // 🔄 Проверка статуса через action=status
+        $statusSalt = sha1(microtime(true));
+        $statusSign = hash_hmac('sha512', $statusSalt, $systemKey);
+
+        $statusXml = <<<XML
+<payment>
+    <auth>
+        <mch_id>{$merchantId}</mch_id>
+        <salt>{$statusSalt}</salt>
+        <sign>{$statusSign}</sign>
+    </auth>
+    <action>status</action>
+    <pid>{$payment->order_id}</pid>
+</payment>
+XML;
+
+        $statusResponse = Http::asForm()->withHeaders([
+            'Accept' => 'application/xml',
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ])->post($endpoint, ['data' => $statusXml]);
+
+        if ($statusResponse->successful()) {
+            $statusXmlBody = simplexml_load_string($statusResponse->body());
+            $statusCode = (string) ($statusXmlBody->status ?? '');
+
+            Log::info('iPay status check after creation', [
+                'payment_id' => $payment->id,
+                'status' => $statusCode,
+            ]);
+
+            if ($statusCode === '5' && $payment->status !== 'success') {
+                $driver = Driver::find($payment->driver_id);
+                if ($driver) {
+                    $driver->balance += $payment->amount;
+                    $driver->save();
+                    $payment->status = 'success';
+                    $payment->credited = true;
+                    $payment->save();
+                    Log::info('Driver balance credited via status check', [
+                        'driver_id' => $driver->id,
+                        'amount' => $payment->amount,
+                    ]);
+                }
+            }
         }
 
         return response()->json(['url' => $respUrl, 'payment_id' => $payment->id]);
@@ -247,11 +287,65 @@ XML;
 }
 
 
-
-
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
 
  
+
+    public function checkStatus($paymentId)
+{
+    $payment = DriverPayment::find($paymentId);
+    if (! $payment) {
+        return response()->json(['error' => 'Payment not found'], 404);
+    }
+
+    $merchantId = config('ipay.merchant_id');
+    $systemKey  = config('ipay.system_key');
+    $salt       = sha1(microtime(true));
+    $sign       = hash_hmac('sha512', $salt, $systemKey);
+
+    $xml = <<<XML
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<payment>
+    <auth>
+        <mch_id>{$merchantId}</mch_id>
+        <salt>{$salt}</salt>
+        <sign>{$sign}</sign>
+    </auth>
+    <action>status</action>
+    <pid>{$payment->order_id}</pid>
+</payment>
+XML;
+
+    $endpoint = config('ipay.sandbox_endpoint'); // или боевой endpoint
+    $response = Http::asForm()->withHeaders([
+        'Accept' => 'application/xml',
+        'Content-Type' => 'application/x-www-form-urlencoded',
+    ])->post($endpoint, ['data' => $xml]);
+
+    if (! $response->successful()) {
+        Log::error('iPay status request failed', ['status' => $response->status(), 'body' => $response->body()]);
+        return response()->json(['error' => 'iPay error'], 500);
+    }
+
+    $bodyXml = simplexml_load_string($response->body());
+    $status = (string) ($bodyXml->status ?? '');
+
+    Log::info('iPay status response', ['payment_id' => $payment->id, 'status' => $status]);
+
+    if ($status === '5' && $payment->status !== 'success') {
+        $driver = Driver::find($payment->driver_id);
+        if ($driver) {
+            $driver->balance += $payment->amount;
+            $driver->save();
+            $payment->status = 'success';
+            $payment->credited = true;
+            $payment->save();
+            Log::info('iPay status: credited driver balance', ['driver_id' => $driver->id, 'amount' => $payment->amount]);
+        }
+    }
+
+    return response()->json(['status' => $status]);
+}
 
 public function handleCallback(Request $request)
 {
