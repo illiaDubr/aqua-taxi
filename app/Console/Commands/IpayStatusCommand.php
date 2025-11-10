@@ -19,9 +19,15 @@ class IpayStatusCommand extends Command
             return;
         }
 
-        $merchantId = config('ipay.merchant_id', '5521');
-        $systemKey  = config('ipay.system_key', 'e5817ba6ce82a941e2be9623aabcd9e37e78f19a');
-        $endpoint   = config('ipay.sandbox_endpoint', 'https://sandbox-checkout.ipay.ua/api302');
+        $merchantId = config('ipay.merchant_id');
+$systemKey  = config('ipay.system_key');
+$endpoint   = config('ipay.sandbox_endpoint');
+
+if (! $merchantId || ! $systemKey || ! $endpoint) {
+    $this->error('Missing iPay config: merchant_id, system_key, or endpoint');
+    return;
+}
+
 
         $salt = sha1(microtime(true));
         $sign = hash_hmac('sha512', $salt, $systemKey);
@@ -71,5 +77,7 @@ XML;
         $this->line("Card: {$card}");
         $this->line("Amount: {$amount}");
         $this->line("Desc: {$desc}");
+        $this->line("PID: {$payment->order_id}");
+$this->line("Payment ID: {$payment->id}");
     }
 }

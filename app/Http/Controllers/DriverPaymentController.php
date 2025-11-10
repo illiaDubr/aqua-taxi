@@ -333,7 +333,6 @@ XML;
         ]);
 
         // 🔄 Проверка статуса через action=status
-        $statusSalt = sha1(microtime(true));
         $statusSign = hash_hmac('sha512', $statusSalt, $systemKey);
 
         $statusXml = <<<XML
