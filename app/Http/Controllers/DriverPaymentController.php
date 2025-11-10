@@ -122,7 +122,7 @@ class DriverPaymentController extends Controller
 
     $callbackGood = url('/ordersDrive?ipay=success');
     $callbackBad  = url('/ordersDrive?ipay=fail');
-    $callbackSrv  = url('/api/driver/pay/callback'); // важно: /api/...
+    $callbackSrv  = url('/api/driver/pay/callback');
 
     Log::info('iPay callback URL set', ['callback' => $callbackSrv]);
 
@@ -156,12 +156,6 @@ class DriverPaymentController extends Controller
     <lang>ua</lang>
 </payment>
 XML;
-
-    Log::debug('iPay XML payload constructed', [
-        'salt' => $salt,
-        'sign' => $sign,
-        'xml_snippet' => substr($xml, 0, 300),
-    ]);
 
     Log::debug('iPay full XML payload', ['xml' => $xml]);
 
@@ -251,6 +245,7 @@ XML;
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
+
 
 
 
