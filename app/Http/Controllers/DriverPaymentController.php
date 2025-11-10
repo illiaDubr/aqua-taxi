@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Support\Facades\DB;
 
 class DriverPaymentController extends Controller
 {
@@ -242,7 +243,7 @@ XML;
 
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
 
-   use Illuminate\Support\Facades\DB;
+ 
 
 public function handleCallback(Request $request)
 {
