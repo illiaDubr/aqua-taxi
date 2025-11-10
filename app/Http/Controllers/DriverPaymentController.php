@@ -120,11 +120,11 @@ class DriverPaymentController extends Controller
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    // URLы для редиректа клиента
     $callbackGood = url('/ordersDrive?ipay=success');
     $callbackBad  = url('/ordersDrive?ipay=fail');
-    // URL для серверного callback от iPay
-    $callbackSrv  = url('/api/driver/pay/callback');
+    $callbackSrv  = url('/api/driver/pay/callback'); // важно: /api/...
+
+    Log::info('iPay callback URL set', ['callback' => $callbackSrv]);
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
@@ -163,6 +163,8 @@ XML;
         'xml_snippet' => substr($xml, 0, 300),
     ]);
 
+    Log::debug('iPay full XML payload', ['xml' => $xml]);
+
     try {
         $response = Http::asForm()->withHeaders([
             'Accept' => 'application/xml',
@@ -170,6 +172,8 @@ XML;
         ])->post($endpoint, [
             'data' => $xml,
         ]);
+
+        Log::info('iPay XML sent', ['endpoint' => $endpoint]);
 
         Log::debug('iPay HTTP response received', [
             'status' => $response->status(),
@@ -206,6 +210,10 @@ XML;
             'respStatus' => $respStatus,
         ]);
 
+        if (!$respPid) {
+            Log::warning('iPay response missing pid', ['body' => $response->body()]);
+        }
+
         $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
 
         if ($expectedRespSign && $respSign !== $expectedRespSign) {
@@ -228,6 +236,8 @@ XML;
 
         Log::info('iPay payment created', [
             'payment_id' => $payment->id,
+            'driver_id'  => $driver->id,
+            'amount'     => $amountGrn,
             'url'        => $respUrl,
         ]);
 
@@ -241,6 +251,7 @@ XML;
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
+
 
 
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
