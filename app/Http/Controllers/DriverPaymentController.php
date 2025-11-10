@@ -124,7 +124,7 @@ class DriverPaymentController extends Controller
     $callbackGood = url('/ordersDrive?ipay=success');
     $callbackBad  = url('/ordersDrive?ipay=fail');
     // URL для серверного callback от iPay
-    $callbackSrv  = url('/driver/pay/callback');
+    $callbackSrv  = url('/api/driver/pay/callback');
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
