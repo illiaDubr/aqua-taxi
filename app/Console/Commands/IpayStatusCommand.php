@@ -20,7 +20,7 @@ class IpayStatusCommand extends Command
         }
 
         $merchantId = config('ipay.merchant_id');
-$systemKey  = config('ipay.system_key');
+$systemKey = env('IPAY_SYSTEM_KEY');
 $endpoint   = config('ipay.sandbox_endpoint');
 
 if (! $merchantId || ! $systemKey || ! $endpoint) {
