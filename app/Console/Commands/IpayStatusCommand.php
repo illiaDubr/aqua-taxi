@@ -38,21 +38,27 @@ class IpayStatusCommand extends Command
 </payment>
 XML;
 
+        $xmlClean = preg_replace('/\s+/', ' ', trim($xml));
+
         $response = Http::asForm()->withHeaders([
             'Accept' => 'application/xml',
             'Content-Type' => 'application/x-www-form-urlencoded',
-        ])->post($endpoint, ['data' => $xml]);
+        ])->post($endpoint, ['data' => $xmlClean]);
 
-        if (! $response->successful()) {
-            $this->error('Request failed: ' . $response->status());
-            $this->line($response->body());
+        $this->line("Status code: " . $response->status());
+        $this->line("Content-Type: " . $response->header('Content-Type'));
+        $this->line("Raw response:\n" . $response->body());
+
+        $raw = $response->body();
+        if (! str_starts_with(trim($raw), '<')) {
+            $this->error('Response is not XML');
             return;
         }
 
-        $bodyXml = simplexml_load_string($response->body());
+        libxml_use_internal_errors(true);
+        $bodyXml = simplexml_load_string($raw);
         if (! $bodyXml) {
             $this->error('Invalid XML response');
-            $this->line($response->body());
             return;
         }
 
