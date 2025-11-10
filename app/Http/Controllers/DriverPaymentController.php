@@ -79,11 +79,22 @@ class DriverPaymentController extends Controller
     }
 
 
-private function pollUntilSuccess(DriverPayment $payment)
+public function pollUntilSuccess(DriverPayment $payment)
 {
     $merchantId = config('ipay.merchant_id');
     $systemKey  = config('ipay.system_key');
     $endpoint   = config('ipay.sandbox_endpoint'); // или боевой
+
+    if (! $merchantId || ! $systemKey || ! $endpoint) {
+        Log::error('iPay polling: missing config', [
+            'merchant_id' => $merchantId,
+            'system_key'  => $systemKey,
+            'endpoint'    => $endpoint,
+        ]);
+        return;
+    }
+
+    sleep(2); // дать iPay время зарегистрировать платёж
 
     for ($i = 0; $i < 6; $i++) {
         $salt = sha1(microtime(true));
@@ -107,31 +118,52 @@ XML;
         ])->post($endpoint, ['data' => $xml]);
 
         if (! $response->successful()) {
-            Log::warning('iPay polling failed', ['payment_id' => $payment->id, 'status' => $response->status()]);
+            Log::warning('iPay polling failed', [
+                'payment_id' => $payment->id,
+                'status'     => $response->status(),
+                'body'       => $response->body(),
+            ]);
             sleep(5);
             continue;
         }
 
+        Log::debug('iPay polling raw XML', [
+            'payment_id' => $payment->id,
+            'attempt'    => $i + 1,
+            'body'       => $response->body(),
+        ]);
+
         $bodyXml = simplexml_load_string($response->body());
+        if (! $bodyXml) {
+            Log::warning('iPay polling: invalid XML', [
+                'payment_id' => $payment->id,
+                'raw'        => $response->body(),
+            ]);
+            sleep(5);
+            continue;
+        }
+
         $status = (string) ($bodyXml->status ?? '');
 
         Log::info('iPay polling attempt', [
             'payment_id' => $payment->id,
-            'attempt' => $i + 1,
-            'status' => $status,
+            'attempt'    => $i + 1,
+            'status'     => $status,
         ]);
 
-        if ($status === '5' && $payment->status !== 'success') {
+        if ($status === '5' && $payment->status !== 'success' && ! $payment->credited) {
             $driver = Driver::find($payment->driver_id);
             if ($driver) {
                 $driver->balance += $payment->amount;
                 $driver->save();
+
                 $payment->status = 'success';
                 $payment->credited = true;
                 $payment->save();
+
                 Log::info('Driver balance credited via polling', [
                     'driver_id' => $driver->id,
-                    'amount' => $payment->amount,
+                    'amount'    => $payment->amount,
                 ]);
             }
             return;
@@ -142,6 +174,7 @@ XML;
 
     Log::info('iPay polling ended without success', ['payment_id' => $payment->id]);
 }
+
 
 
     public function initiatePayment(Request $request)
