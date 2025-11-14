@@ -55,6 +55,17 @@
             </div>
         </div>
 
+        <!-- Модалка — уведомление после принятия заказа -->
+        <div v-if="showPostAcceptModal" class="modal-backdrop" @click.self="closePostAcceptModal">
+            <div class="modal">
+                <h3>ℹ️ Після виконання замовлення</h3>
+                <p v-html="postAcceptMessage"></p>
+                <div class="modal-actions">
+                    <button @click="closePostAcceptModal">Понятно</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -80,10 +91,14 @@ const orderMarkers = ref({})
 const currentTab = ref('active')
 const selectedWaterType = ref(null)    // 'silver' | 'deep' | null
 
-// новые модалки состояния
+// модалки состояния
 const showRefillModal = ref(false)
 const refillMessage = ref('')
 const showLowBalanceModal = ref(false)
+
+// модалка после принятия
+const showPostAcceptModal = ref(false)
+const postAcceptMessage = ref('')
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
@@ -178,7 +193,7 @@ const fetchDriverData = async () => {
     }
 }
 
-/* ---------- карта / загрузка заказов (небольшие правки для onclick) ---------- */
+/* ---------- карта / загрузка заказов ---------- */
 const clearMarkers = () => {
     Object.values(orderMarkers.value).forEach(marker => { try { map.value?.removeLayer(marker) } catch(_){} })
     orderMarkers.value = {}
@@ -253,7 +268,6 @@ const fetchOrders = async () => {
                     }<br>`
                     : ''
 
-            // NOTE: заменили onclick на tryAcceptOrder
             const popupHtml = `
         <div class="order-popup">
           <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
@@ -347,9 +361,17 @@ onMounted(async () => {
 
             // выполняем запрос принятия
             await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
-            alert('✅ Замовлення прийнято')
-            map.value?.closePopup()
+            // После успешного принятия показываем модалку с информацией о списании 10%
+            const fee = Number(0.1 * orderSum)
+            if (orderSum > 0) {
+                postAcceptMessage.value = `Після виконання цього замовлення з Вашого балансу буде списано <b>${fee.toFixed(2)} грн</b> (10% від суми замовлення ${fmt(orderSum)} грн).`
+            } else {
+                postAcceptMessage.value = `Після виконання цього замовлення з Вашого балансу буде списано <b>10% від суми замовлення</b> (сума замовлення = ${fmt(orderSum)} грн).`
+            }
+            showPostAcceptModal.value = true
 
+            // закрываем popup и обновляем данные
+            map.value?.closePopup()
             const marker = orderMarkers.value[orderId]
             if (marker) { try { map.value?.removeLayer(marker) } catch(_){}; delete orderMarkers.value[orderId] }
 
@@ -368,6 +390,11 @@ const openTopUp = () => {
     showLowBalanceModal.value = false
     showTopUpModal.value = true
 }
+
+const closePostAcceptModal = () => {
+    showPostAcceptModal.value = false
+    postAcceptMessage.value = ''
+}
 </script>
 
 <style scoped>
@@ -385,14 +412,15 @@ const openTopUp = () => {
     background: #fff;
     padding: 18px;
     border-radius: 8px;
-    width: 320px;
-    max-width: 90%;
+    width: 360px;
+    max-width: 92%;
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 .modal h3{ margin:0 0 8px 0; }
-.modal p{ margin:0 0 12px 0; }
+.modal p{ margin:0 0 12px 0; line-height:1.4; }
 .modal-actions{ display:flex; gap:8px; justify-content:flex-end; }
-.modal-actions button{ padding:6px 10px; border-radius:6px; cursor:pointer; }
+.modal-actions button{ padding:8px 12px; border-radius:6px; cursor:pointer; border:none; background:#0095FF; color:white; font-weight:600; }
+.modal-actions button:hover { opacity:0.9; }
 .accept-button { padding:6px 8px; cursor:pointer; }
 .modal-overlay {
   position: fixed;
@@ -411,7 +439,7 @@ const openTopUp = () => {
   width: 300px;
 }
 
-.driver-map { position: fixed; width: 100%; height: 100vh; }
+.driver-map { position: fixed; width: 100%; height: 100%; }
 
 .logout-btn {
   margin-left: auto;
