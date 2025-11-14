@@ -1,37 +1,61 @@
 <template>
-  <div class="driver-map">
-    <!-- Табы -->
-    <div class="order-switcher">
-      <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
-      <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
+    <div class="driver-map">
+        <!-- Табы -->
+        <div class="order-switcher">
+            <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
+            <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
+        </div>
+
+        <!-- Верхняя панель -->
+        <div class="driver-map__top-panel">
+            <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
+                <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
+                <button>＋</button>
+            </div>
+            <div class="driver-map__block">
+                <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
+                <button @click="showTopUpModal = true">＋</button>
+            </div>
+            <button class="logout-btn" @click="logoutDriver">Вийти</button>
+        </div>
+
+        <!-- Фильтр -->
+        <div class="driver-map__filter-panel">
+            <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
+            <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
+            <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
+        </div>
+
+        <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
+        <div ref="mapContainer" class="driver-map__container"></div>
+
+        <!-- Модалки -->
+        <BalanceTopUpModal :visible="showTopUpModal" @close="showTopUpModal = false" />
+
+        <!-- Модалка — недостаточно бутлей -->
+        <div v-if="showRefillModal" class="modal-backdrop" @click.self="showRefillModal = false">
+            <div class="modal">
+                <h3>🚰 Потрібно набрати воду</h3>
+                <p>{{ refillMessage }}</p>
+                <div class="modal-actions">
+                    <button @click="showRefillModal = false">Закрити</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модалка — низький баланс -->
+        <div v-if="showLowBalanceModal" class="modal-backdrop" @click.self="showLowBalanceModal = false">
+            <div class="modal">
+                <h3>💳 Низький баланс</h3>
+                <p>Ваш баланс менше 10% від суми цього замовлення. Будь ласка, поповніть баланс, щоб приймати замовлення.</p>
+                <div class="modal-actions">
+                    <button @click="openTopUp">Поповнити</button>
+                    <button @click="showLowBalanceModal = false">Пізніше</button>
+                </div>
+            </div>
+        </div>
+
     </div>
-
-    <!-- Верхняя панель -->
-    <div class="driver-map__top-panel">
-      <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
-        <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
-        <button>＋</button>
-      </div>
-      <div class="driver-map__block">
-        <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
-        <button @click="showTopUpModal = true">＋</button>
-      </div>
-      <button class="logout-btn" @click="logoutDriver">Вийти</button>
-    </div>
-
-    <!-- Фильтр -->
-    <div class="driver-map__filter-panel">
-      <button :class="{ active: selectedWaterType === null }" @click="setWaterFilter(null)">Усі типи</button>
-      <button :class="{ active: selectedWaterType === 'silver' }" @click="setWaterFilter('silver')">Показати Срібну</button>
-      <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
-    </div>
-
-    <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
-    <div ref="mapContainer" class="driver-map__container"></div>
-
-    <!-- Модалка -->
-    <BalanceTopUpModal :visible="showTopUpModal" @close="showTopUpModal = false" />
-  </div>
 </template>
 
 <script setup>
@@ -41,17 +65,7 @@ import axios from 'axios'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import BalanceTopUpModal from '../views/BalanceTopUpModal.vue';
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
-const icon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-})
-/* ---------- state ---------- */
 const mapContainer = ref(null)
 const map = ref(null)
 const bottles = ref(0)
@@ -66,30 +80,34 @@ const orderMarkers = ref({})
 const currentTab = ref('active')
 const selectedWaterType = ref(null)    // 'silver' | 'deep' | null
 
+// новые модалки состояния
+const showRefillModal = ref(false)
+const refillMessage = ref('')
+const showLowBalanceModal = ref(false)
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
-
 function logoutDriver() {
-  const token = localStorage.getItem('driver_token')
-  if (!token) {
-    alert('Ви вже вийшли з системи')
-    return
-  }
+    const token = localStorage.getItem('driver_token')
+    if (!token) {
+        alert('Ви вже вийшли з системи')
+        return
+    }
 
-  axios.post('/api/driver/logout', {}, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(() => {
-    localStorage.removeItem('driver_token')
-    router.push('/auth') // или другой маршрут авторизации
-  })
-  .catch(err => {
-    console.error('❌ Помилка при виході', err)
-    alert('Помилка при виході')
-  })
+    axios.post('/api/driver/logout', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    })
+        .then(() => {
+            localStorage.removeItem('driver_token')
+            router.push('/auth')
+        })
+        .catch(err => {
+            console.error('❌ Помилка при виході', err)
+            alert('Помилка при виході')
+        })
 }
-/* ---------- маппинги ---------- */
+
+/* ---------- маппинги / вспомогательные (без изменений) ---------- */
 const WATER_LABELS = { silver: 'Срібна', deep: 'Глибокого очищення' }
 const QUALITY_LABELS = { ideal: 'Ідеальний', average: 'Середній', bad: 'Поганий' }
 
@@ -104,8 +122,6 @@ const payLabel = (p) => (p === 'cash' ? 'Готівка' : 'Картка')
 const fmt = (n) => Number(n ?? 0).toFixed(2)
 const qualityLabel = (q) => QUALITY_LABELS[String(q ?? '').toLowerCase()] ?? '—'
 
-/* ---------- нормализация ---------- */
-// Поддержка water_type ИЛИ product_name
 const normalizeWaterCode = (val, productName = '') => {
     if (!val && productName) {
         const name = productName.toLowerCase()
@@ -138,7 +154,6 @@ const pickBottleQuality = (o) => {
     return null
 }
 
-/* ---------- вспомогательное ---------- */
 const getCustomer = (o) => {
     const user = o.user ?? o.customer ?? {}
     const name = o.user_name ?? o.customer_name ?? user.name ?? '—'
@@ -163,45 +178,13 @@ const fetchDriverData = async () => {
     }
 }
 
-/* ---------- платеж ---------- */
-
-
-const showModal = ref(false);
-// const payWithIPay = async () => {
-//   try {
-//     const res = await axios.post('/api/driver/pay', {
-//       amount: parseFloat(topUpAmount.value)
-//     }, { headers: authHeaders() })
-
-//     const { url, params } = res.data
-//     const form = document.createElement('form')
-//     form.method = 'POST'
-//     form.action = url
-
-//     Object.entries(params).forEach(([key, value]) => {
-//       const input = document.createElement('input')
-//       input.type = 'hidden'
-//       input.name = key
-//       input.value = value
-//       form.appendChild(input)
-//     })
-
-//     document.body.appendChild(form)
-//     form.submit()
-//   } catch (error) {
-//     alert('❌ Помилка при генерації платежу')
-//     console.error(error)
-//   }
-// }
-
-/* ---------- карта ---------- */
+/* ---------- карта / загрузка заказов (небольшие правки для onclick) ---------- */
 const clearMarkers = () => {
     Object.values(orderMarkers.value).forEach(marker => { try { map.value?.removeLayer(marker) } catch(_){} })
     orderMarkers.value = {}
     renderedOrderIds.value = []
 }
 
-/* ---------- загрузка заказов ---------- */
 const fetchOrders = async () => {
     try {
         clearMarkers()
@@ -209,8 +192,6 @@ const fetchOrders = async () => {
 
         const endpoint = currentTab.value === 'active' ? '/api/driver/orders/active' : '/api/driver/orders/new'
         const res = await axios.get(endpoint, { headers: authHeaders() })
-
-        console.debug('[orders raw]', res.data)
 
         let orders = (res.data ?? []).map(o => {
             const statusRaw = (o.status ?? '').toString().trim().toLowerCase()
@@ -220,7 +201,6 @@ const fetchOrders = async () => {
             return {
                 ...o,
                 status: statusRaw,
-                // если water_type пустой — извлекаем из product_name
                 water_type: normalizeWaterCode(o.water_type ?? o.waterType, o.product_name ?? o.productName),
                 _bottle_option: pickBottleOption(o),
                 _bottle_quality: pickBottleQuality(o),
@@ -230,23 +210,16 @@ const fetchOrders = async () => {
             }
         })
 
-        // страховка по статусам
         if (currentTab.value === 'active') {
             orders = orders.filter(o => ['accepted', 'in_progress'].includes(o.status))
         } else {
             orders = orders.filter(o => o.status === 'new' && (o._driver_id == null))
         }
 
-        // фильтр по типу воды
         if (selectedWaterType.value) {
             orders = orders.filter(o => o.water_type === selectedWaterType.value)
         }
 
-        console.debug('[orders normalized]',
-            orders.map(o => ({ id: o.id, status: o.status, _lat: o._lat, _lng: o._lng, _driver_id: o._driver_id }))
-        )
-
-        // рендерим
         orders.forEach(order => {
             const lat = order._lat
             const lng = order._lng
@@ -280,6 +253,7 @@ const fetchOrders = async () => {
                     }<br>`
                     : ''
 
+            // NOTE: заменили onclick на tryAcceptOrder
             const popupHtml = `
         <div class="order-popup">
           <b>${currentTab.value === 'active' ? '🚚 Активне замовлення' : '🚰 Нове замовлення'}</b><br>
@@ -296,7 +270,7 @@ const fetchOrders = async () => {
           <b>Оплата:</b> ${payLabel(order.payment_method ?? order.paymentMethod)}<br>
           <b>Сума:</b> ${fmt(order.total_price ?? order.totalPrice)} грн<br>
           ${customerRows}
-          ${ currentTab.value === 'new' ? `<br><button onclick="window.acceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>` : '' }
+          ${ currentTab.value === 'new' ? `<br><button onclick="window.tryAcceptOrder(${order.id})" class="accept-button">✅ Прийняти</button>` : '' }
         </div>
       `
 
@@ -307,7 +281,6 @@ const fetchOrders = async () => {
             setTimeout(() => { try { map.value?.removeLayer(pulse) } catch(_){} }, 3000)
         })
 
-        // автофокус
         if (orders.length) {
             const o = orders[0]
             map.value?.setView([o._lat, o._lng], 14)
@@ -319,47 +292,108 @@ const fetchOrders = async () => {
 
 /* ---------- init ---------- */
 onMounted(async () => {
-  const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('ipay') === 'success') {
-    alert('✅ Баланс успішно поповнено')
-  }
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('ipay') === 'success') {
+        alert('✅ Баланс успішно поповнено')
+    }
 
-  await fetchDriverData()
-  await nextTick()
+    await fetchDriverData()
+    await nextTick()
 
-  map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Map data © OpenStreetMap contributors'
-  }).addTo(map.value)
+    map.value = L.map(mapContainer.value, { zoomControl: false }).setView([50.4501, 30.5234], 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map.value)
 
-  await fetchOrders()
+    await fetchOrders()
+
+    // экспортируем в window функцию tryAcceptOrder, чтобы кнопка в popup могла её вызвать
+    window.tryAcceptOrder = async function(orderId) {
+        try {
+            // найдем заказ в локальном состоянии (если нет — подгрузим с бэка)
+            let order = ordersState.value.find(o => String(o.id) === String(orderId))
+            if (!order) {
+                const res = await axios.get(`/api/orders/${orderId}`, { headers: authHeaders() }).catch(()=>null)
+                order = res?.data ?? null
+            }
+            if (!order) {
+                alert('❌ Неможливо знайти дані замовлення')
+                return
+            }
+
+            // рассчеты: требуемое кол-во бутлей
+            const requiredBottles = Number(order.quantity ?? order.qty ?? order.count ?? 0)
+            const driverBottles = Number(bottles.value ?? 0)
+
+            // проверка бутлей у водія
+            if (driverBottles < requiredBottles) {
+                refillMessage.value = `У вас ${driverBottles} бут., а потрібно ${requiredBottles}. Спочатку наберіть води або поверніться після поповнення запасу.`
+                showRefillModal.value = true
+                return
+            }
+
+            // проверка баланса: если меньше 10% от суммы заказа — блокируем
+            const orderSum = Number(order.total_price ?? order.totalPrice ?? order.price ?? 0)
+            const minRequiredBalance = 0.1 * orderSum
+            // Если сумма заказа = 0 (например при оплате готівкою) — считаем что проверка баланса не применяется
+            if (orderSum > 0 && Number(balance.value ?? 0) < minRequiredBalance) {
+                showLowBalanceModal.value = true
+                return
+            }
+
+            // все проверки пройдены — подтверждаем действие у водителя
+            const confirmAccept = confirm('Підтвердити прийняття замовлення?')
+            if (!confirmAccept) return
+
+            // выполняем запрос принятия
+            await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
+            alert('✅ Замовлення прийнято')
+            map.value?.closePopup()
+
+            const marker = orderMarkers.value[orderId]
+            if (marker) { try { map.value?.removeLayer(marker) } catch(_){}; delete orderMarkers.value[orderId] }
+
+            await fetchDriverData()
+            currentTab.value = 'active'
+            await fetchOrders()
+        } catch (error) {
+            if (error?.response?.status === 409) alert('❌ Це замовлення вже прийнято іншим водієм')
+            else { alert('❌ Помилка при прийнятті замовлення'); console.error(error) }
+        }
+    }
 })
 
-
-
-/* ---------- accept ---------- */
-window.acceptOrder = async function(orderId) {
-    const confirmAccept = confirm('Підтвердити прийняття замовлення?')
-    if (!confirmAccept) return
-    try {
-        await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
-        alert('✅ Замовлення прийнято')
-        map.value?.closePopup()
-
-        const marker = orderMarkers.value[orderId]
-        if (marker) { try { map.value?.removeLayer(marker) } catch(_){}; delete orderMarkers.value[orderId] }
-
-        await fetchDriverData()
-        currentTab.value = 'active'
-        await fetchOrders()
-    } catch (error) {
-        if (error?.response?.status === 409) alert('❌ Це замовлення вже прийнято іншим водієм')
-        else { alert('❌ Помилка при прийнятті замовлення'); console.error(error) }
-    }
+// открыть модалку пополнения
+const openTopUp = () => {
+    showLowBalanceModal.value = false
+    showTopUpModal.value = true
 }
 </script>
 
-<style>
+<style scoped>
+/* Простейшие стили модалок (подложка, окно) — при необходимости адаптируйте под ваш дизайн */
+.modal-backdrop{
+    position: fixed;
+    left:0;right:0;top:0;bottom:0;
+    background: rgba(0,0,0,0.5);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index: 9999;
+}
+.modal{
+    background: #fff;
+    padding: 18px;
+    border-radius: 8px;
+    width: 320px;
+    max-width: 90%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.modal h3{ margin:0 0 8px 0; }
+.modal p{ margin:0 0 12px 0; }
+.modal-actions{ display:flex; gap:8px; justify-content:flex-end; }
+.modal-actions button{ padding:6px 10px; border-radius:6px; cursor:pointer; }
+.accept-button { padding:6px 8px; cursor:pointer; }
 .modal-overlay {
   position: fixed;
   top: 0; left: 0;
@@ -395,8 +429,6 @@ window.acceptOrder = async function(orderId) {
   background-color: #3498db;
   color: white;
 }
-
-
 
 /* Табы */
 .order-switcher {
