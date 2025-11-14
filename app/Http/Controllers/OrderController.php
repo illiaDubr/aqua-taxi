@@ -165,75 +165,99 @@ class OrderController extends Controller
         return response()->json($orders);
     }
     public function complete(Request $request, Order $order)
-    {
-        $data = $request->validate([
-            'rating' => ['nullable','integer','min:1','max:5'],
-        ]);
-        $rating = (int) ($data['rating'] ?? 5);
+{
+    $data = $request->validate([
+        'rating' => ['nullable','integer','min:1','max:5'],
+    ]);
+    $rating = (int) ($data['rating'] ?? 5);
 
-        // Авторизация: заказ принадлежит текущему пользователю
-        $user = $request->user();
-        if ((int)$order->user_id !== (int)$user->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        // Разрешённые статусы к завершению
-        if (!in_array($order->status, ['accepted','in_progress'], true)) {
-            return response()->json(['message' => 'Order is not deliverable'], 422);
-        }
-
-        $updatedDriver = null;
-
-        DB::transaction(function () use ($order, $rating, &$updatedDriver) {
-            // 1) Лочим заказ
-            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
-
-            if (!in_array($locked->status, ['accepted','in_progress'], true)) {
-                abort(409, 'Order status changed');
-            }
-
-            // 2) Списание бутлей у водителя, если клиент их ПОКУПАЛ
-           if ($locked->driver_id) {
-    $qty = max(0, (int)$locked->quantity);
-
-    DB::table('drivers')
-        ->where('id', $locked->driver_id)
-        ->lockForUpdate()
-        ->update([
-            'bottles' => DB::raw('GREATEST(bottles - '.$qty.', 0)')
-        ]);
-
-    $driverRow = DB::table('drivers')
-        ->select('id','bottles','balance')
-        ->where('id', $locked->driver_id)
-        ->first();
-
-    if ($driverRow) {
-        $updatedDriver = [
-            'id'      => (int)$driverRow->id,
-            'bottles' => (int)$driverRow->bottles,
-            'balance' => (float)$driverRow->balance,
-        ];
+    // Авторизация: заказ принадлежит текущему пользователю
+    $user = $request->user();
+    if ((int)$order->user_id !== (int)$user->id) {
+        return response()->json(['message' => 'Forbidden'], 403);
     }
+
+    // Разрешённые статусы к завершению
+    if (!in_array($order->status, ['accepted','in_progress'], true)) {
+        return response()->json(['message' => 'Order is not deliverable'], 422);
+    }
+
+    $updatedDriver = null;
+
+    DB::transaction(function () use ($order, $rating, &$updatedDriver) {
+        // 1) Лочим заказ
+        $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+        if (!in_array($locked->status, ['accepted','in_progress'], true)) {
+            abort(409, 'Order status changed');
+        }
+
+        // 2) Если у заказа есть назначенный водитель — лочим строку водителя и обновляем bottles и balance
+        if ($locked->driver_id) {
+            // Лочим запись водителя
+            $driverRow = DB::table('drivers')
+                ->where('id', $locked->driver_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($driverRow) {
+                // Считаем количество бутлей, которые нужно списать у водителя.
+                // Используем purchase_bottle_count если задан, иначе если bottle_option == 'buy' — считаем quantity, иначе 0
+                $purchaseCount = 0;
+                if (isset($locked->purchase_bottle_count) && $locked->purchase_bottle_count !== null) {
+                    $purchaseCount = (int)$locked->purchase_bottle_count;
+                } elseif (($locked->bottle_option ?? '') === 'buy') {
+                    $purchaseCount = (int)$locked->quantity;
+                } else {
+                    $purchaseCount = 0;
+                }
+
+                // Новое количество бутлей (не ниже 0)
+                $newBottles = max(0, (int)$driverRow->bottles - $purchaseCount);
+
+                // Комиссия 10% от total_price
+                $orderSum = (float) ($locked->total_price ?? 0);
+                $commission = round($orderSum * 0.10, 2);
+
+                // Новый баланс (не ниже 0)
+                $newBalance = max(0, round((float)$driverRow->balance - $commission, 2));
+
+                // Применяем обновления
+                DB::table('drivers')
+                    ->where('id', $driverRow->id)
+                    ->update([
+                        'bottles' => $newBottles,
+                        'balance' => $newBalance,
+                    ]);
+
+                // Вернём данные об обновлённом водителе в ответ
+                $updatedDriver = [
+                    'id'      => (int)$driverRow->id,
+                    'bottles' => $newBottles,
+                    'balance' => (float)$newBalance,
+                    'commission_deducted' => (float)$commission,
+                ];
+            }
+        }
+
+        // 3) Завершаем заказ
+        $locked->status = 'completed';
+        $locked->rating = $rating;
+
+        if (Schema::hasColumn('orders', 'completed_at')) {
+            $locked->completed_at = now();
+        }
+
+        $locked->save();
+    });
+
+    // отправим событие для фронто (если нужно — можно расшарить событие здесь)
+
+    return response()->json([
+        'message' => 'Order completed',
+        'order'   => $order->fresh(),
+        'driver'  => $updatedDriver, // null, если списание не применялось
+    ], 200);
 }
 
-            // 3) Завершаем заказ
-            $locked->status = 'completed';
-            $locked->rating = $rating;
-
-            // пишем completed_at, если колонка существует
-            if (Schema::hasColumn('orders', 'completed_at')) {
-                $locked->completed_at = now();
-            }
-
-            $locked->save();
-        });
-
-        // отправим событие для фронто
-        return response()->json([
-            'message' => 'Order completed',
-            'order'   => $order->fresh(),
-            'driver'  => $updatedDriver, // null, если списание не применялось
-        ], 200);
-    }
 }
