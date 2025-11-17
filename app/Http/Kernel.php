@@ -3,6 +3,7 @@
 namespace App\Http;
 
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use App\Console\Commands\RevokeExpiredFactoryVerifications;
 
 class Kernel extends HttpKernel
 {
@@ -28,4 +29,13 @@ class Kernel extends HttpKernel
     protected $commands = [
     \App\Console\Commands\IpayStatusCommand::class,
 ];
+protected function schedule(Schedule $schedule)
+{
+    // запускать каждую минуту/каждые 5 минут — выбери по нагрузке
+    $schedule->command('factories:revoke-expired')->everyMinute()->withoutOverlapping()->runInBackground();
+
+    // либо реже:
+    // $schedule->command('factories:revoke-expired')->everyFiveMinutes()->withoutOverlapping()->runInBackground();
 }
+}
+

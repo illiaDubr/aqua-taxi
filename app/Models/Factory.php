@@ -42,4 +42,13 @@ class Factory extends Authenticatable
         // вернёт /storage/.... (или https://.../storage/..., если в конфиге задан url)
         return Storage::disk('public')->url($path);
     }
+
+    public function scopeCurrentlyVerified($query)
+{
+    return $query->where('is_verified', true)
+                 ->where(function ($q) {
+                     $q->whereNull('verified_until')
+                       ->orWhereDate('verified_until', '>=', now()->toDateString());
+                 });
+}
 }
