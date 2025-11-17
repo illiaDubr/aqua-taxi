@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Broadcast; 
+use Illuminate\Support\Facades\Event;
 
 class OrderController extends Controller
 {
@@ -258,6 +260,74 @@ class OrderController extends Controller
         'order'   => $order->fresh(),
         'driver'  => $updatedDriver, // null, если списание не применялось
     ], 200);
+}
+ public function cancel(Request $request, Order $order)
+    {
+        $user = $request->user();
+
+        // Проверка: только создатель заказа может отменить (или админ)
+        if ($order->user_id !== $user->id && !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $data = $request->validate([
+            'reason' => ['nullable','string','max:2000'],
+        ]);
+
+        if ($order->isCancelled()) {
+            return response()->json(['message' => 'Order already cancelled'], 409);
+        }
+
+        DB::transaction(function () use ($order, $user, $data) {
+            $order->status = 'cancelled';
+            $order->cancelled_at = now();
+            $order->cancelled_by = 'user';
+            $order->cancelled_by_id = $user->id;
+            $order->cancel_reason = $data['reason'] ?? null;
+            $order->save();
+
+            // можно добавить событие: event(new OrderCancelled($order));
+            // или уведомление водителю/пользователю
+        });
+
+        return response()->json([
+            'message' => 'Order cancelled',
+            'order' => $order->fresh(),
+        ], 200);
+    }
+
+
+    
+public function driverCancel(Request $request, Order $order)
+{
+    $data = $request->validate(['reason' => ['nullable','string','max:1000']]);
+    $reason = trim($data['reason'] ?? '');
+
+    $driver = $request->user(); // предполагаем, что у водителя своя аутентификация (driver guard) или driver_token
+
+    // проверяем право — что этот водитель назначен на заказ
+    if ((int)$order->driver_id !== (int)$driver->id) {
+        return response()->json(['message' => 'Forbidden'], 403);
+    }
+
+    if (in_array($order->status, ['completed','cancelled'], true)) {
+        return response()->json(['message' => 'Order cannot be cancelled'], 422);
+    }
+
+    DB::transaction(function () use ($order, $driver, $reason) {
+        $order->status = 'cancelled';
+        $order->cancelled_at = now();
+        $order->cancelled_by = 'driver';
+        $order->cancelled_by_id = $driver->id;
+        $order->cancel_reason = $reason;
+        $order->save();
+
+        // можно вернуть бутли водителю или откатить другие ресурсы
+    });
+
+    event(new \App\Events\OrderStatusUpdated($order->fresh()));
+
+    return response()->json(['message' => 'Order cancelled', 'order' => $order->fresh()], 200);
 }
 
 }

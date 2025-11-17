@@ -40,11 +40,11 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
     Route::get('profile', [DriverAuthController::class, 'profile']);
     Route::post('top-up', [BalanceController::class, 'topUp']);
     Route::get('balance', [BalanceController::class, 'getBalance']);
-
+    Route::post('/driver/orders/{order}/cancel', [OrderController::class, 'driverCancel']);
     Route::get('orders/new',             [DriverOrderController::class, 'newOrders']);
     Route::get('orders/active',          [DriverOrderController::class, 'activeOrders']);
     Route::post('orders/{order}/accept', [DriverOrderController::class, 'accept']);
-
+    Route::get('/driver/orders/cancelled', [DriverOrderController::class, 'cancelled']);
     Route::post('logout', [DriverAuthController::class, 'logout']);
 });
 
@@ -70,7 +70,13 @@ Route::middleware(['auth:sanctum','abilities:user'])->group(function () {
     Route::post('/orders',                  [OrderController::class, 'store']);
     Route::get('/orders/active',            [OrderController::class, 'activeOrders']);
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete']);
+    Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel']);
+   
 });
+
+
+
+
 
 /* Broadcasting (по токену) */
 Broadcast::routes(['middleware' => ['auth:sanctum']]);

@@ -27,6 +27,8 @@ class Order extends Model
 
         'unit_water_price','unit_bottle_surcharge',
         'total_price','status',
+
+        'cancelled_at', 'cancelled_by', 'cancelled_by_id', 'cancel_reason',
     ];
 
 
@@ -37,7 +39,8 @@ class Order extends Model
         'latitude'     => 'float',
         'longitude'    => 'float',
     ];
-
+    
+    
     // дефолтный статус
     protected $attributes = [
         'status' => 'new',
@@ -79,7 +82,10 @@ class Order extends Model
     }
 
     /* ---------- СВЯЗИ ---------- */
-
+    public function isCancelled(): bool
+    {
+        return $this->status === 'cancelled' || !is_null($this->cancelled_at);
+    }
     public function user()
     {
         return $this->belongsTo(User::class);

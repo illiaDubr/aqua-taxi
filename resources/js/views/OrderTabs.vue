@@ -26,7 +26,28 @@
             <button :class="{ active: selectedWaterType === 'deep' }" @click="setWaterFilter('deep')">Показати Глибокого очищення</button>
         </div>
 
+        <!-- Алерт о новом заказе -->
         <div v-if="newOrderAlert" class="order-alert">🚚 Нове замовлення додано на карту</div>
+
+        <!-- Уведомления об отменах -->
+        <div v-if="cancelledNotifications.length" class="cancel-notifications">
+          <div v-for="n in cancelledNotifications" :key="n.id" class="cancel-item" :class="{ seen: n.seen }">
+            <div class="cancel-item__head">
+              <strong>⚠️ Замовлення скасоване</strong>
+              <small>{{ formatDate(n.cancelled_at) }}</small>
+            </div>
+            <div class="cancel-item__body">
+              <div><strong>Адреса:</strong> {{ n.address ?? '—' }}</div>
+              <div><strong>Кількість:</strong> {{ n.quantity ?? '—' }}</div>
+              <div v-if="n.cancel_reason"><em>Причина: {{ n.cancel_reason }}</em></div>
+              <div><strong>Скасовано:</strong> {{ humanCancelledBy(n.cancelled_by) }}</div>
+            </div>
+            <div class="cancel-item__actions">
+              <button @click="markNotificationSeen(n)">ОК</button>
+            </div>
+          </div>
+        </div>
+
         <div ref="mapContainer" class="driver-map__container"></div>
 
         <!-- Модалки -->
@@ -70,7 +91,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+/*
+  Обновлённый driver-map.vue
+  - Polling отменённых заказов: GET /api/driver/orders/cancelled?since=ISO
+  - Показ уведомлений, удаление маркеров и удаление заказов из локального состояния.
+  - Не использует broadcasting / websockets (fallback polling-only).
+*/
+
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import L from 'leaflet'
@@ -102,24 +130,21 @@ const postAcceptMessage = ref('')
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driver_token')}` })
 
-function logoutDriver() {
-    const token = localStorage.getItem('driver_token')
-    if (!token) {
-        alert('Ви вже вийшли з системи')
-        return
-    }
+// --- polling cancelled state ---
+const cancelledNotifications = ref([])   // список уведомлений об отменах
+const lastCheckedCancelledAt = ref(new Date().toISOString()) // ISO string для since
+let cancelledPollTimer = null
+const driverId = ref(null)
 
-    axios.post('/api/driver/logout', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-    })
-        .then(() => {
-            localStorage.removeItem('driver_token')
-            router.push('/auth')
-        })
-        .catch(err => {
-            console.error('❌ Помилка при виході', err)
-            alert('Помилка при виході')
-        })
+// helpers
+const humanCancelledBy = (who) => {
+  if (!who) return '—'
+  switch (who) {
+    case 'user': return 'Користувач'
+    case 'driver': return 'Водій'
+    case 'system': return 'Система'
+    default: return who
+  }
 }
 
 /* ---------- маппинги / вспомогательные (без изменений) ---------- */
@@ -188,9 +213,89 @@ const fetchDriverData = async () => {
         const d = res.data?.driver ?? res.data ?? {}
         bottles.value = Number(d.bottles ?? 0)
         balance.value = Number(d.balance ?? 0)
+        driverId.value = d.id ?? d.driver_id ?? null
     } catch (e) {
         console.error('❌ Помилка отримання даних водія', e)
     }
+}
+
+/* ---------- polling cancelled orders ---------- */
+const fetchCancelledOrders = async () => {
+    // запрашиваем отмены, назначенные текущему водителю, начиная с lastCheckedCancelledAt
+    try {
+        // если driverId ещё нет — пропускаем
+        if (!driverId.value) return
+        const res = await axios.get('/api/driver/orders/cancelled', {
+            headers: authHeaders(),
+            params: { since: lastCheckedCancelledAt.value }
+        })
+        const data = res.data ?? []
+        if (!Array.isArray(data) || data.length === 0) return
+
+        // сортируем по времени (новые первыми)
+        data.sort((a,b) => new Date(b.cancelled_at) - new Date(a.cancelled_at))
+
+        data.forEach(item => {
+            handleOrderCancelled(item)
+        })
+
+        // обновим lastCheckedCancelledAt до времени самого нового пришедшего
+        const latest = data[0]?.cancelled_at ?? new Date().toISOString()
+        lastCheckedCancelledAt.value = latest
+    } catch (e) {
+        console.error('❌ Помилка отримання скасованих замовлень', e)
+    }
+}
+
+const startCancelledPolling = (intervalMs = 60_000) => {
+    // запускаем немедленно, а затем по таймеру
+    fetchCancelledOrders()
+    if (cancelledPollTimer) clearInterval(cancelledPollTimer)
+    cancelledPollTimer = setInterval(fetchCancelledOrders, intervalMs)
+}
+
+const stopCancelledPolling = () => {
+    if (cancelledPollTimer) {
+        clearInterval(cancelledPollTimer)
+        cancelledPollTimer = null
+    }
+}
+
+function handleOrderCancelled(payload) {
+    // payload: { id, cancelled_at, cancelled_by, cancel_reason, address, quantity, ... }
+    const id = payload.id
+    // удаляем маркер с карты
+    const marker = orderMarkers.value[id]
+    if (marker) {
+        try { map.value?.removeLayer(marker) } catch(_) {}
+        delete orderMarkers.value[id]
+    }
+    // удаляем заказ из локального состояния (если был)
+    ordersState.value = ordersState.value.filter(o => String(o.id) !== String(id))
+
+    // добавляем уведомление в начало списка
+    cancelledNotifications.value.unshift({
+        id,
+        cancelled_at: payload.cancelled_at,
+        cancelled_by: payload.cancelled_by,
+        cancel_reason: payload.cancel_reason,
+        address: payload.address ?? payload.addr ?? '',
+        quantity: payload.quantity ?? payload.qty ?? '',
+        seen: false
+    })
+
+    // краткий баннер + звук/flash
+    newOrderAlert.value = true
+    setTimeout(()=> { newOrderAlert.value = false }, 5000)
+}
+
+const markNotificationSeen = (n) => {
+    n.seen = true
+    // удаляем уведомление через секунду (плавно)
+    setTimeout(() => {
+        const idx = cancelledNotifications.value.findIndex(x => x.id === n.id)
+        if (idx !== -1) cancelledNotifications.value.splice(idx, 1)
+    }, 1000)
 }
 
 /* ---------- карта / загрузка заказов ---------- */
@@ -321,6 +426,9 @@ onMounted(async () => {
 
     await fetchOrders()
 
+    // запускаем polling отмен (интервал 60s)
+    startCancelledPolling(60_000)
+
     // экспортируем в window функцию tryAcceptOrder, чтобы кнопка в popup могла её вызвать
     window.tryAcceptOrder = async function(orderId) {
         try {
@@ -383,6 +491,12 @@ onMounted(async () => {
             else { alert('❌ Помилка при прийнятті замовлення'); console.error(error) }
         }
     }
+}) // end onMounted
+
+onBeforeUnmount(() => {
+    // очищаем polling и window.tryAcceptOrder
+    stopCancelledPolling()
+    try { delete window.tryAcceptOrder } catch(_) {}
 })
 
 // открыть модалку пополнения
@@ -468,7 +582,6 @@ const closePostAcceptModal = () => {
 }
 .order-switcher button.active { color: #000; border-color: #0095FF; }
 
-/* Топ-панель */
 .driver-map__top-panel {
     position: absolute; width: 100%; padding: 24px 0px; display: flex; justify-content: space-between;
     background-color: #0095FF; border-radius: 0px 0px 10px 10px; z-index: 1000;
@@ -478,10 +591,8 @@ const closePostAcceptModal = () => {
 }
 .driver-map__block button { background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer; }
 
-/* Карта */
 .driver-map__container { height: 100%; width: 100%; }
 
-/* Фильтры */
 .driver-map__filter-panel {
     position: absolute;
     bottom: 5px;
@@ -522,7 +633,32 @@ const closePostAcceptModal = () => {
     background:#eef4ff; border:1px solid #d8e2ff; font-size:12px; font-weight:700;
 }
 
-/* Модалка */
+/* Уведомления об отменах */
+.cancel-notifications {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92%;
+  max-width: 760px;
+  z-index: 12000;
+}
+.cancel-item {
+  background: #fff8f8;
+  border: 1px solid #ffbebe;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transition: transform .18s ease, opacity .18s ease;
+}
+.cancel-item.seen { opacity: 0.6; transform: translateY(-6px); }
+.cancel-item__head { display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.cancel-item__body { font-size:14px; color:#6b1f1f; margin-top:6px; }
+.cancel-item__actions { display:flex; justify-content:flex-end; margin-top:8px; }
+.cancel-item__actions button { background:#0095FF; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+
+/* Модалка общий overlay */
 .modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; }
 .modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
 .modal__content { position: relative; background: #fff; padding: 16px; border-radius: 10px; min-width: 320px; }

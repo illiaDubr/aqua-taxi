@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Events\OrderStatusUpdated;
 use App\Models\Order;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DriverOrderController extends Controller
 {
@@ -192,5 +194,27 @@ class DriverOrderController extends Controller
             'bottles'  => (int)($driver->bottles ?? 0),
             'balance'  => (float)($driver->balance ?? 0),
         ]);
+    }
+    public function cancelled(Request $request)
+    {
+        $driver = $request->user();
+        $since = $request->query('since');
+
+        try {
+            $sinceDt = $since ? Carbon::parse($since) : Carbon::now()->subMinutes(5);
+        } catch (\Exception $e) {
+            $sinceDt = Carbon::now()->subMinutes(5);
+        }
+
+        $orders = Order::query()
+            ->where('driver_id', $driver->id)
+            ->whereNotNull('cancelled_at')
+            ->where('cancelled_at', '>=', $sinceDt)
+            ->orderBy('cancelled_at', 'desc')
+            ->get([
+                'id','address','quantity','cancelled_at','cancelled_by','cancel_reason','status','total_price','latitude','longitude'
+            ]);
+
+        return response()->json($orders);
     }
 }
