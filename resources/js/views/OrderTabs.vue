@@ -244,66 +244,85 @@ const fetchCancelledOrders = async () => {
             headers: authHeaders(),
             params: { since: lastCheckedCancelledAt.value }
         })
-        const data = res.data ?? []
-        if (!Array.isArray(data) || data.length === 0) return
-console.log('🔄 Запит на скасовані замовлення', lastCheckedCancelledAt.value)
 
-        // упорядочим по времени: новые первыми
-        data.sort((a,b) => new Date(b.cancelled_at) - new Date(a.cancelled_at))
+        const data = Array.isArray(res.data) ? res.data : []
 
-        data.forEach((item) => {
-            handleOrderCancelled(item)
+        if (data.length === 0) {
+            lastCheckedCancelledAt.value = new Date().toISOString()
+            return
+        }
+
+        console.log('🔄 Скасовані замовлення:', data)
+
+        // безопасная сортировка
+        data.sort((a, b) => {
+            const aTime = new Date(a?.cancelled_at ?? 0).getTime()
+            const bTime = new Date(b?.cancelled_at ?? 0).getTime()
+            return bTime - aTime
         })
 
-        // обновим lastChecked до времени последнего элемента
-        const latest = data[0]?.cancelled_at ?? new Date().toISOString()
-        lastCheckedCancelledAt.value = latest
+        for (const item of data) {
+            try {
+                safeHandleOrderCancelled(item)
+            } catch (err) {
+                console.error('❌ Помилка обробки замовлення', err, item)
+            }
+        }
+
+        // обновим lastChecked
+        const latest = data[0]?.cancelled_at
+        lastCheckedCancelledAt.value = latest ?? new Date().toISOString()
     } catch (e) {
-        console.error('❌ Помилка отримання скасованих замовлень', e)
+        console.error('❌ Помилка запиту скасованих замовлень', e)
     }
 }
 
-const startCancelledPolling = (intervalMs = 60_000) => {
-    // сразу один запрос, затем интервал
-    fetchCancelledOrders()
-    if (cancelledPollTimer) clearInterval(cancelledPollTimer)
-    cancelledPollTimer = setInterval(fetchCancelledOrders, intervalMs)
-}
+function safeHandleOrderCancelled(payload) {
+    if (!payload || typeof payload !== 'object') return
 
-const stopCancelledPolling = () => {
-    if (cancelledPollTimer) {
-        clearInterval(cancelledPollTimer)
-        cancelledPollTimer = null
-    }
-}
+    const {
+        id,
+        cancelled_at,
+        cancelled_by,
+        cancel_reason,
+        address,
+        quantity
+    } = payload
 
-function handleOrderCancelled(payload) {
-    // payload: { id, cancelled_at, cancelled_by, cancel_reason, address, quantity }
-    const id = payload.id
-    // удаляем маркер с карты и popup
-    const marker = orderMarkers.value[id]
-    if (marker) {
-        try { map.value?.removeLayer(marker) } catch(_) {}
+    if (!id) return
+
+    // удаляем маркер
+    const marker = orderMarkers.value?.[id]
+    if (marker && map.value?.removeLayer) {
+        try {
+            map.value.removeLayer(marker)
+        } catch (_) {}
         delete orderMarkers.value[id]
     }
-    // удаляем заказ из локального состояния (если был)
-    ordersState.value = ordersState.value.filter(o => String(o.id) !== String(id))
 
-    // добавляем уведомление в начало списка
-    cancelledNotifications.value.unshift({
+    // удаляем из состояния
+    if (Array.isArray(ordersState.value)) {
+        ordersState.value = ordersState.value.filter(o => String(o.id) !== String(id))
+    }
+
+    // добавляем уведомление
+    cancelledNotifications.value?.unshift?.({
         id,
-        cancelled_at: payload.cancelled_at,
-        cancelled_by: payload.cancelled_by,
-        cancel_reason: payload.cancel_reason,
-        address: payload.address,
-        quantity: payload.quantity,
+        cancelled_at,
+        cancelled_by,
+        cancel_reason,
+        address,
+        quantity,
         seen: false
     })
 
-    // краткий баннер + звук/flash
+    // баннер + звук
     newOrderAlert.value = true
-    setTimeout(()=> { newOrderAlert.value = false }, 5000)
+    setTimeout(() => {
+        newOrderAlert.value = false
+    }, 5000)
 }
+
 
 const markNotificationSeen = (n) => {
     n.seen = true
