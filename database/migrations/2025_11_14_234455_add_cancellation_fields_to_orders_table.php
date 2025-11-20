@@ -18,15 +18,16 @@ return new class extends Migration
     }
 
     public function down(): void
-    {
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropIndex(['cancelled_at']);
-            $table->dropColumn([
-                'cancelled_at',
-                'cancelled_by',
-                'cancelled_by_id',
-                'cancel_reason',
-            ]);
-        });
-    }
+{
+    Schema::table('orders', function (Blueprint $table) {
+        $table->dropIndex('orders_cancelled_at_index');
+        $table->dropColumn([
+            'cancelled_at',
+            'cancelled_by',
+            'cancelled_by_id',
+            'cancel_reason',
+        ]);
+    });
+}
+
 };
