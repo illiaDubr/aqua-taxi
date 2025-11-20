@@ -205,7 +205,25 @@ const tel = (p) => (p ? String(p).replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
 const setWaterFilter = async (type) => { selectedWaterType.value = type; await fetchOrders() }
 const goToMap = () => router.push('/map')
 const switchTab = async (tab) => { currentTab.value = tab; await fetchOrders() }
+const logoutDriver = async () => {
+    try {
+        await axios.post('/api/driver/logout', {}, {
+            headers: authHeaders()
+        })
 
+        // удаляем токен
+        localStorage.removeItem('driver_token')
+        localStorage.removeItem('driver_data')
+
+        // стоп пуллинга отмен
+        stopCancelledPolling()
+
+        // редирект на логин водителя
+        router.push('/auth-driver')
+    } catch (error) {
+        console.error('❌ Помилка виходу:', error)
+    }
+}
 /* ---------- профиль водителя ---------- */
 const fetchDriverData = async () => {
     try {

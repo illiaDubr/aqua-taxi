@@ -332,7 +332,11 @@ XML;
             'url'        => $respUrl,
         ]);
 
-        // 🔄 Проверка статуса через action=status
+        // ===============================
+        //  FIX: добавлено определение $statusSalt
+        // ===============================
+        $statusSalt = sha1(microtime(true));
+
         $statusSign = hash_hmac('sha512', $statusSalt, $systemKey);
 
         $statusXml = <<<XML
