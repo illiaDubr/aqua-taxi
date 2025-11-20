@@ -239,10 +239,7 @@ const fetchDriverData = async () => {
 
 /* ---------- polling cancelled orders ---------- */
 const fetchCancelledOrders = async () => {
-    // запрашиваем отмены, назначенные текущему водителю, начиная с lastCheckedCancelledAt
     try {
-        // если driverId ещё нет — пропускаем
-        if (!driverId.value) return
         const res = await axios.get('/api/driver/orders/cancelled', {
             headers: authHeaders(),
             params: { since: lastCheckedCancelledAt.value }
@@ -250,14 +247,14 @@ const fetchCancelledOrders = async () => {
         const data = res.data ?? []
         if (!Array.isArray(data) || data.length === 0) return
 
-        // сортируем по времени (новые первыми)
+        // упорядочим по времени: новые первыми
         data.sort((a,b) => new Date(b.cancelled_at) - new Date(a.cancelled_at))
 
-        data.forEach(item => {
+        data.forEach((item) => {
             handleOrderCancelled(item)
         })
 
-        // обновим lastCheckedCancelledAt до времени самого нового пришедшего
+        // обновим lastChecked до времени последнего элемента
         const latest = data[0]?.cancelled_at ?? new Date().toISOString()
         lastCheckedCancelledAt.value = latest
     } catch (e) {
@@ -266,7 +263,7 @@ const fetchCancelledOrders = async () => {
 }
 
 const startCancelledPolling = (intervalMs = 60_000) => {
-    // запускаем немедленно, а затем по таймеру
+    // сразу один запрос, затем интервал
     fetchCancelledOrders()
     if (cancelledPollTimer) clearInterval(cancelledPollTimer)
     cancelledPollTimer = setInterval(fetchCancelledOrders, intervalMs)
@@ -280,9 +277,9 @@ const stopCancelledPolling = () => {
 }
 
 function handleOrderCancelled(payload) {
-    // payload: { id, cancelled_at, cancelled_by, cancel_reason, address, quantity, ... }
+    // payload: { id, cancelled_at, cancelled_by, cancel_reason, address, quantity }
     const id = payload.id
-    // удаляем маркер с карты
+    // удаляем маркер с карты и popup
     const marker = orderMarkers.value[id]
     if (marker) {
         try { map.value?.removeLayer(marker) } catch(_) {}
@@ -297,8 +294,8 @@ function handleOrderCancelled(payload) {
         cancelled_at: payload.cancelled_at,
         cancelled_by: payload.cancelled_by,
         cancel_reason: payload.cancel_reason,
-        address: payload.address ?? payload.addr ?? '',
-        quantity: payload.quantity ?? payload.qty ?? '',
+        address: payload.address,
+        quantity: payload.quantity,
         seen: false
     })
 
