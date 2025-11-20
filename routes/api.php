@@ -40,11 +40,11 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
     Route::get('profile', [DriverAuthController::class, 'profile']);
     Route::post('top-up', [BalanceController::class, 'topUp']);
     Route::get('balance', [BalanceController::class, 'getBalance']);
-    Route::post('/driver/orders/{order}/cancel', [OrderController::class, 'driverCancel']);
+    Route::post('/orders/{order}/cancel', [OrderController::class, 'driverCancel']);
     Route::get('orders/new',             [DriverOrderController::class, 'newOrders']);
     Route::get('orders/active',          [DriverOrderController::class, 'activeOrders']);
     Route::post('orders/{order}/accept', [DriverOrderController::class, 'accept']);
-    Route::get('/driver/orders/cancelled', [DriverOrderController::class, 'cancelled']);
+    Route::get('/orders/cancelled', [DriverOrderController::class, 'cancelled']);
     Route::post('logout', [DriverAuthController::class, 'logout']);
 });
 
