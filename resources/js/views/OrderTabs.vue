@@ -246,6 +246,7 @@ const fetchCancelledOrders = async () => {
         })
         const data = res.data ?? []
         if (!Array.isArray(data) || data.length === 0) return
+console.log('🔄 Запит на скасовані замовлення', lastCheckedCancelledAt.value)
 
         // упорядочим по времени: новые первыми
         data.sort((a,b) => new Date(b.cancelled_at) - new Date(a.cancelled_at))
@@ -442,6 +443,7 @@ onMounted(async () => {
     await fetchOrders()
 
     // запускаем polling отмен (интервал 60s)
+    console.log('🚀 Стартує polling скасованих замовлень')
     startCancelledPolling(60_000)
 
     // экспортируем в window функцию tryAcceptOrder, чтобы кнопка в popup могла её вызвать
