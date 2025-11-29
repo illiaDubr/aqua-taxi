@@ -247,7 +247,7 @@ XML;
             <amount>{$amount}</amount>
             <currency>UAH</currency>
             <desc>Поповнення балансу водія</desc>
-            <info>{$infoJson}</info>
+            <info>{"dogovor":37973023}</info>
             <smch_id>{$merchantId}</smch_id>
         </transaction>
     </transactions>
