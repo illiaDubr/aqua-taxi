@@ -251,7 +251,8 @@ XML;
             <smch_id>{$merchantId}</smch_id>
         </transaction>
     </transactions>
-    <lifetime>0.1</lifetime>
+     <trademark>{"ru":"aquataxi","ua":"aquataxi","en":"aquataxi"}</trademark>
+    <lifetime>24</lifetime>
     <lang>ua</lang>
 </payment>
 XML;
