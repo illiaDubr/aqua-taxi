@@ -179,9 +179,15 @@ XML;
 
     public function initiatePayment(Request $request)
 {
+    // Входящие данные
+    Log::debug('initiatePayment request received', [
+        'headers' => $request->headers->all(),
+        'body'    => $request->all(),
+    ]);
+
     Log::debug('initiatePayment request headers', [
         'authorization' => $request->header('Authorization'),
-        'all_headers' => $request->headers->all(),
+        'all_headers'   => $request->headers->all(),
     ]);
 
     $validated = $request->validate([
@@ -195,13 +201,14 @@ XML;
     $driver = $driverOrResponse;
 
     $amountGrn = (float) $request->input('amount');
-    $amount = (int) round($amountGrn * 100);
+    $amount    = (int) round($amountGrn * 100);
 
     $merchantId = $this->getMerchantId();
     $signKey    = config('ipay.sign_key');
     $systemKey  = config('ipay.system_key');
     $endpoint   = $this->getEndpoint();
 
+    // Конфигурация
     Log::debug('iPay config loaded', [
         'merchant_id' => $merchantId ? 'present' : null,
         'sign_key'    => $signKey ? 'present' : null,
@@ -223,7 +230,11 @@ XML;
     $callbackBad  = url('/ordersDrive?ipay=fail');
     $callbackSrv  = url('/api/driver/pay/callback');
 
-    Log::info('iPay callback URL set', ['callback' => $callbackSrv]);
+    Log::info('iPay callback URLs set', [
+        'good'     => $callbackGood,
+        'bad'      => $callbackBad,
+        'callback' => $callbackSrv,
+    ]);
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
@@ -251,7 +262,7 @@ XML;
             <smch_id>{$merchantId}</smch_id>
         </transaction>
     </transactions>
-     <trademark>{"ru":"Aquataxi","ua":"Aquataxi","en":"Aquataxi"}</trademark>
+    <trademark>{"ru":"Aquataxi","ua":"Aquataxi","en":"Aquataxi"}</trademark>
     <lifetime>0.5</lifetime>
     <lang>ua</lang>
 </payment>
@@ -260,23 +271,26 @@ XML;
     Log::debug('iPay full XML payload', ['xml' => $xml]);
 
     try {
+        $start = microtime(true);
         $response = Http::asForm()->withHeaders([
-            'Accept' => 'application/xml',
+            'Accept'       => 'application/xml',
             'Content-Type' => 'application/x-www-form-urlencoded',
         ])->post($endpoint, ['data' => $xml]);
+        $duration = round(microtime(true) - $start, 3);
 
-        Log::info('iPay XML sent', ['endpoint' => $endpoint]);
+        Log::info('iPay XML sent', ['endpoint' => $endpoint, 'duration_sec' => $duration]);
 
         Log::debug('iPay HTTP response received', [
-            'status' => $response->status(),
-            'body_snippet' => substr($response->body(), 0, 500),
+            'status'  => $response->status(),
+            'headers' => $response->headers(),
+            'body'    => $response->body(),
         ]);
 
         if (!$response->successful()) {
             Log::error('iPay request failed', [
-                'url' => $endpoint,
+                'url'    => $endpoint,
                 'status' => $response->status(),
-                'body' => $response->body()
+                'body'   => $response->body(),
             ]);
             return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
         }
@@ -284,8 +298,16 @@ XML;
         libxml_use_internal_errors(true);
         $bodyXml = simplexml_load_string($response->body());
         if (!$bodyXml) {
-            Log::error('iPay: invalid XML response', ['raw' => $response->body()]);
+            Log::error('iPay XML parse failed', [
+                'raw'    => $response->body(),
+                'errors' => libxml_get_errors(),
+            ]);
+            libxml_clear_errors();
             return response()->json(['error' => 'Invalid response from payment gateway'], 500);
+        }
+
+        foreach ($bodyXml as $key => $value) {
+            Log::debug("iPay response field", [$key => (string) $value]);
         }
 
         $respSalt   = (string) ($bodyXml->salt ?? $bodyXml->auth->salt ?? '');
@@ -308,11 +330,18 @@ XML;
 
         $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
 
+        Log::debug('iPay response signature check', [
+            'salt'          => $respSalt,
+            'received_sign' => $respSign,
+            'expected_sign' => $expectedRespSign,
+            'match'         => $respSign === $expectedRespSign,
+        ]);
+
         if ($expectedRespSign && $respSign !== $expectedRespSign) {
             Log::warning('iPay: response signature mismatch', [
                 'expected' => $expectedRespSign,
                 'received' => $respSign,
-                'body' => $response->body(),
+                'body'     => $response->body(),
             ]);
             return response()->json(['error' => 'Invalid response signature'], 400);
         }
@@ -326,18 +355,16 @@ XML;
             'response_data' => $response->body(),
         ]);
 
-        Log::info('iPay payment created', [
-            'payment_id' => $payment->id,
-            'driver_id'  => $driver->id,
-            'amount'     => $amountGrn,
-            'url'        => $respUrl,
+        Log::info('DriverPayment created', [
+            'id'        => $payment->id,
+            'driver_id' => $payment->driver_id,
+            'order_id'  => $payment->order_id,
+            'amount'    => $payment->amount,
+            'status'    => $payment->status,
         ]);
 
-        // ===============================
-        //  FIX: добавлено определение $statusSalt
-        // ===============================
+        // Повторная проверка статуса
         $statusSalt = sha1(microtime(true));
-
         $statusSign = hash_hmac('sha512', $statusSalt, $systemKey);
 
         $statusXml = <<<XML
@@ -352,19 +379,26 @@ XML;
 </payment>
 XML;
 
+        Log::debug('iPay status XML payload', ['xml' => $statusXml]);
+
         $statusResponse = Http::asForm()->withHeaders([
-            'Accept' => 'application/xml',
+            'Accept'       => 'application/xml',
             'Content-Type' => 'application/x-www-form-urlencoded',
         ])->post($endpoint, ['data' => $statusXml]);
 
+        Log::debug('iPay status response', [
+            'status_code' => $statusResponse->status(),
+            'body'        => $statusResponse->body(),
+        ]);
+
         if ($statusResponse->successful()) {
             $statusXmlBody = simplexml_load_string($statusResponse->body());
-            $statusCode = (string) ($statusXmlBody->status ?? '');
+            $statusCode    = (string) ($statusXmlBody->status ?? '');
 
             Log::info('iPay status check after creation', [
                 'payment_id' => $payment->id,
-                'status' => $statusCode,
-            ]);
+                'status'     => $statusCode,
+             ]);
 
             if ($statusCode === '5' && $payment->status !== 'success') {
                 $driver = Driver::find($payment->driver_id);
