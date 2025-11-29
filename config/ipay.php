@@ -11,7 +11,7 @@ return [
     |
     */
 
-    'merchant_id' => env('IPAY_MERCHANT_ID', '0000'),
+    'merchant_id' => env('IPAY_MERCHANT_ID', '5521'),
     'sign_key' => env('IPAY_SIGN_KEY', ''),
     'system_key' => env('IPAY_SYSTEM_KEY', ''), // если понадобится для callback-подписи
 
