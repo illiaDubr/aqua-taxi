@@ -198,7 +198,7 @@ XML;
     $amount = (int) round($amountGrn * 100);
 
     $merchantId = $this->getMerchantId();
-    $signKey    = $this->getSignKey();
+    $signKey    = config('ipay.sign_key');
     $systemKey  = config('ipay.system_key');
     $endpoint   = $this->getEndpoint();
 
@@ -251,8 +251,8 @@ XML;
             <smch_id>{$merchantId}</smch_id>
         </transaction>
     </transactions>
-     <trademark>{"ru":"aquataxi","ua":"aquataxi","en":"aquataxi"}</trademark>
-    <lifetime>24</lifetime>
+     <trademark>{"ru":"Aquataxi","ua":"Aquataxi","en":"Aquataxi"}</trademark>
+    <lifetime>0.5</lifetime>
     <lang>ua</lang>
 </payment>
 XML;
