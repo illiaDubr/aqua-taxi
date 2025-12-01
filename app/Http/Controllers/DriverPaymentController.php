@@ -248,7 +248,7 @@ XML;
             <currency>UAH</currency>
             <desc>Поповнення балансу водія</desc>
             <info>{"dogovor":37973023}</info>
-            <smch_id>{$merchantId}</smch_id>
+           
         </transaction>
     </transactions>
     <lifetime>0.1</lifetime>
