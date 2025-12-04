@@ -251,7 +251,7 @@ XML;
            
         </transaction>
     </transactions>
-    <lifetime>0.1</lifetime>
+    <lifetime>0.5</lifetime>
     <lang>ua</lang>
 </payment>
 XML;
@@ -387,6 +387,49 @@ XML;
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
+
+
+public function redirectHandler(Request $request)
+{
+    $status = $request->query('ipay');
+
+    if ($status !== 'success') {
+        return redirect('/somewhere')->with('error', 'Оплата не пройшла');
+    }
+
+    $driver = auth('driver')->user();
+
+    if (!$driver) {
+        return redirect('/login')->with('error', 'Необхідно увійти');
+    }
+
+    $payment = DriverPayment::where('driver_id', $driver->id)
+        ->where('status', 'pending')
+        ->latest()
+        ->first();
+
+    if (!$payment) {
+        return redirect('/balance')->with('error', 'Платіж не знайдено');
+    }
+
+    $ipayStatus = $this->checkIpayStatus($payment->payment_id);
+
+    if ($ipayStatus === 'success') {
+
+        // 3. Начисляем деньги
+        $driver->balance += $payment->amount;
+        $driver->save();
+
+        // 4. Обновляем платёж
+        $payment->status = 'success';
+        $payment->save();
+
+        return redirect('/balance')->with('success', 'Баланс поповнено!');
+    }
+
+    return redirect('/balance')->with('error', 'Платіж не підтверджено');
+}
+
 
 
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
