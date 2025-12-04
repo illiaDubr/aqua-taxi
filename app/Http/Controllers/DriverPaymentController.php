@@ -219,9 +219,8 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    $callbackGood = url('/api/driver/pay/good');
+    $callbackGood = url('/ordersDrive?ipay=success&pid={$pid}');
     $callbackBad  = url('/ordersDrive?ipay=fail');
-    $callbackSrv  = url('/api/driver/pay/callback');
 
     Log::info('iPay callback URL set', ['callback' => $callbackSrv]);
 
@@ -238,7 +237,6 @@ XML;
     <urls>
         <good>{$callbackGood}</good>
         <bad>{$callbackBad}</bad>
-        <callback>{$callbackSrv}</callback>
         <auto_redirect_good>1</auto_redirect_good>
         <auto_redirect_bad>1</auto_redirect_bad>
     </urls>
@@ -389,35 +387,70 @@ XML;
 }
 
 
-public function handleGoodRedirect(Request $request)
+public function checkStatus(Request $request)
 {
-    // 1. Получаем ID пользователя
-    $driver = auth('driver')->user();
+    $pid = $request->query('pid');
 
-    if (!$driver) {
-        return redirect('https://example.com/login?error=no_driver');
+    if (!$pid) {
+        return response()->json(['error' => 'PID not provided'], 400);
     }
 
-    // 2. Получаем последний неоплаченный платёж
-    $payment = DriverPayment::where('driver_id', $driver->id)
-        ->where('status', 'pending')
-        ->latest()
-        ->first();
+    // Находим локальный платеж
+    $payment = Payment::where('ipay_pid', $pid)->first();
 
     if (!$payment) {
-        return redirect('https://example.com/ordersDrive?error=no_payment');
+        return response()->json(['error' => 'Payment not found'], 404);
     }
 
-    // 3. Начисляем деньги
-    $driver->balance += $payment->amount;
-    $driver->save();
+    // Создаём XML для payment.status
+    $salt = bin2hex(random_bytes(16));
+    $sign = hash('sha512', $salt . config('ipay.secret'));
 
-    // 4. Закрываем платёж
-    $payment->status = 'success';
-    $payment->save();
+    $xml = "
+        <payment>
+            <auth>
+                <mch_id>" . config('ipay.merchant_id') . "</mch_id>
+                <salt>$salt</salt>
+                <sign>$sign</sign>
+            </auth>
+            <action>status</action>
+            <pid>$pid</pid>
+        </payment>
+    ";
 
-    // 5. Редиректим на фронт
-    return redirect("https://example.com/ordersDrive?ipay=success");
+    // Отправляем запрос в iPay
+    $response = Http::withHeaders([
+        'Content-Type' => 'application/xml'
+    ])->withBody($xml, 'application/xml')
+        ->post("https://checkout.ipay.ua/api302");
+
+    if (!$response->ok()) {
+        return response()->json(['error' => 'iPay request failed'], 500);
+    }
+
+    $data = simplexml_load_string($response->body());
+
+    $status = (string) $data->status;
+
+    // 5 = успешный платёж
+    if ($status == "5" && $payment->status != 'paid') {
+
+        DB::transaction(function () use ($payment, $data) {
+            $payment->status = 'paid';
+            $payment->save();
+
+            // Увеличиваем баланс водителя
+            $driver = Driver::find($payment->driver_id);
+            $driver->balance += ($payment->amount);
+            $driver->save();
+        });
+    }
+
+    return response()->json([
+        'pid' => $pid,
+        'ipay_status' => $status,
+        'local_status' => $payment->status
+    ]);
 }
 
 
@@ -425,189 +458,210 @@ public function handleGoodRedirect(Request $request)
 
  
 
-    public function checkStatus($paymentId)
-{
-    $payment = DriverPayment::find($paymentId);
-    if (! $payment) {
-        return response()->json(['error' => 'Payment not found'], 404);
-    }
-
-    $merchantId = config('ipay.merchant_id');
-    $systemKey  = config('ipay.system_key');
-    $salt       = sha1(microtime(true));
-    $sign       = hash_hmac('sha512', $salt, $systemKey);
-
-    $xml = <<<XML
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<payment>
-    <auth>
-        <mch_id>{$merchantId}</mch_id>
-        <salt>{$salt}</salt>
-        <sign>{$sign}</sign>
-    </auth>
-    <action>status</action>
-    <pid>{$payment->order_id}</pid>
-</payment>
-XML;
-
-    $endpoint = config('ipay.sandbox_endpoint'); // или боевой endpoint
-    $response = Http::asForm()->withHeaders([
-        'Accept' => 'application/xml',
-        'Content-Type' => 'application/x-www-form-urlencoded',
-    ])->post($endpoint, ['data' => $xml]);
-
-    if (! $response->successful()) {
-        Log::error('iPay status request failed', ['status' => $response->status(), 'body' => $response->body()]);
-        return response()->json(['error' => 'iPay error'], 500);
-    }
-
-    $bodyXml = simplexml_load_string($response->body());
-    $status = (string) ($bodyXml->status ?? '');
-
-    Log::info('iPay status response', ['payment_id' => $payment->id, 'status' => $status]);
-
-    if ($status === '5' && $payment->status !== 'success') {
-        $driver = Driver::find($payment->driver_id);
-        if ($driver) {
-            $driver->balance += $payment->amount;
-            $driver->save();
-            $payment->status = 'success';
-            $payment->credited = true;
-            $payment->save();
-            Log::info('iPay status: credited driver balance', ['driver_id' => $driver->id, 'amount' => $payment->amount]);
-        }
-    }
-
-    return response()->json(['status' => $status]);
-}
 
 public function handleCallback(Request $request)
 {
-    Log::info("iPay CALLBACK HIT", [
-        'ip'       => $request->ip(),
-        'method'   => $request->method(),
-        'url'      => $request->fullUrl(),
-        'query'    => $request->query(),
-        'headers'  => $request->headers->all(),
-        'raw_len'  => strlen($request->getContent()),
-        'raw_body_first_5k' => substr($request->getContent(), 0, 5000),
-    ]);
-
     $raw = $request->getContent();
-    $systemKey = config('ipay.system_key');
+    $systemKey = config('ipay.system_key'); 
+    Log::info('iPay callback received', ['content_snippet' => substr($raw, 0, 1000), 'content_length' => strlen($raw)]);
 
-    if (empty($raw)) {
-        Log::warning("iPay callback: EMPTY BODY");
-        return response('EMPTY', 200); // 200 чтобы iPay не слал заново
-    }
-
-    // --- XML DETECT ---
-    if ($this->looksLikeXml($raw)) {
-        Log::info("iPay callback detected: XML payload");
-
+    // Если это XML
+    if (!empty($raw) && $this->looksLikeXml($raw)) {
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($raw);
-
         if (!$xml) {
-            Log::error("iPay callback: invalid XML", [
-                'errors' => libxml_get_errors(),
-                'body'   => substr($raw, 0, 2000),
-            ]);
-            return response('INVALID XML', 200);
+            Log::warning('iPay callback: invalid XML', ['raw_snippet' => substr($raw, 0, 1000)]);
+            return response('Invalid XML', 400);
         }
 
-        Log::info("iPay callback: XML parsed ok", [
-            'pid'    => (string)($xml->pid ?? ''),
-            'status' => (string)($xml->status ?? ''),
-            'action' => (string)($xml->action ?? ''),
-        ]);
-
-        // Sign check
+        // Если это ответ на создание платежа или нотификация по оплате
+        $pid = (string) ($xml->pid ?? '');
+        $status = (string) ($xml->status ?? '');
+        $action = (string) ($xml->action ?? '');
         $respSalt = (string) ($xml->salt ?? $xml->auth->salt ?? '');
         $respSign = (string) ($xml->sign ?? '');
 
+        // Проверка подписи iPay — подпись должна проверяться системным ключом
         if ($respSalt && $respSign && $systemKey) {
             $expected = hash_hmac('sha512', $respSalt, $systemKey);
             if (!hash_equals($expected, $respSign)) {
-                Log::error("iPay callback: signature mismatch", [
-                    'expected_start' => substr($expected, 0, 24),
-                    'received_start' => substr($respSign, 0, 24),
+                Log::warning('iPay callback: signature mismatch (xml)', [
+                    'pid' => $pid, 'expected' => substr($expected, 0, 16), 'received' => substr($respSign, 0, 16)
                 ]);
-                return response('BAD SIGNATURE', 200);
+                return response('Invalid signature', 400);
             }
-            Log::info("iPay callback: signature OK");
+        } else {
+            Log::warning('iPay callback: missing signature fields', ['salt' => $respSalt ? true : false, 'sign' => $respSign ? true : false]);
+            // Не всегда требуется подпись? если требуется — вернуть 400
         }
 
-        // Pid
-        $pid = (string) ($xml->pid ?? '');
-        if (!$pid) {
-            Log::error("iPay callback: missing PID");
-            return response('NO PID', 200);
+        // Найдём платёж по pid
+        if (empty($pid)) {
+            Log::warning('iPay callback: missing pid', ['xml' => substr($raw, 0, 500)]);
+            return response('Missing pid', 400);
         }
 
         $payment = DriverPayment::where('order_id', $pid)->first();
-        if (!$payment) {
-            Log::error("iPay callback: payment not found", ['pid' => $pid]);
-            return response('NOT FOUND', 200);
+        if (! $payment) {
+            Log::warning('iPay callback: payment not found', ['pid' => $pid]);
+            // Возвращаем 200, чтобы iPay не повторял (или 200/404 в зависимости от соглашения)
+            return response('Not found', 200);
         }
 
-        Log::info("iPay callback: payment found", [
-            'payment_id' => $payment->id,
-            'driver_id'  => $payment->driver_id
-        ]);
-
-        // Status mapping
-        $xmlStatus = (string)($xml->status ?? '');
-        $mapped = [
-            '1' => 'registered',
-            '3' => 'authorized',
-            '4' => 'failed',
-            '5' => 'success',
-        ][$xmlStatus] ?? $xmlStatus;
-
-        Log::info("iPay callback: mapped status", ['mapped' => $mapped]);
-
-        DB::transaction(function () use ($payment, $mapped, $xml) {
-
+        // Обработка completion (action) или обычного статуса
+        // Внутри используем транзакцию для идемпотентного обновления и начисления баланса
+        DB::transaction(function () use ($xml, $payment, $status) {
+            // Если уже success — ничего не делаем (идемпотентность)
             if ($payment->status === 'success') {
-                Log::info("iPay callback: already success – skipping");
+                Log::info('iPay callback: payment already success, skipping', ['payment_id' => $payment->id]);
                 return;
             }
 
+            // Определим новый статус
+            $xmlStatus = (string) ($xml->status ?? '');
+            $statusMap = [
+                '1' => 'registered',
+                '3' => 'authorized',
+                '4' => 'failed',
+                '5' => 'success',
+            ];
+            $mapped = $statusMap[$xmlStatus] ?? $xmlStatus;
+
+            // Если это completion с транзакциями — аккумулируем сумму из транзакций
+            $totalReceivedCents = null;
+            if (!empty($xml->transactions) && !empty($xml->transactions->transaction)) {
+                $sum = 0;
+                foreach ($xml->transactions->transaction as $t) {
+                    // сначала смотрим invoice (пример ответа completion), иначе amount
+                    $invoice = (string) ($t->invoice ?? '');
+                    $amountField = (string) ($t->amount ?? '');
+                    $value = 0;
+                    if (is_numeric($invoice) && $invoice != '') {
+                        $value = (int)$invoice;
+                    } elseif (is_numeric($amountField) && $amountField != '') {
+                        $value = (int)$amountField;
+                    }
+                    $sum += $value;
+                }
+                $totalReceivedCents = $sum > 0 ? $sum : null;
+            }
+
+            // Сохраняем response_data (чтобы можно было отладить)
+            $payment->response_data = (string) $xml->asXML();
             $payment->status = $mapped;
-            $payment->response_data = $xml->asXML();
+            // если у нас есть сумма из транзакций — её следует записать как amount_cents (может быть частичное списание)
+            if ($totalReceivedCents !== null) {
+                $payment->amount_cents = $totalReceivedCents;
+                $payment->amount = round($totalReceivedCents / 100, 2); // если есть поле amount (в гривнах)
+            }
             $payment->save();
 
+            // Если успешный платёж — начисляем баланс драйверу (если ещё не начислено)
             if ($mapped === 'success') {
-                $amount = (float)$payment->amount;
                 $driver = Driver::find($payment->driver_id);
-
                 if ($driver) {
-                    $driver->balance += $amount;
-                    $driver->save();
+                    // Определи сумму для начисления: либо payment.amount (грн) либо amount_cents
+                    $toAdd = 0.0;
+                    if (!empty($payment->amount_cents)) {
+                        $toAdd = (float)($payment->amount_cents) / 100.0;
+                    } elseif (!empty($payment->amount)) {
+                        $toAdd = (float)$payment->amount;
+                    } else {
+                        // last ditch: попытаемся взять из xml first transaction amount
+                        $firstTr = $xml->transactions->transaction[0] ?? null;
+                        if ($firstTr) {
+                            $amt = (string)($firstTr->amount ?? $firstTr->invoice ?? 0);
+                            if (is_numeric($amt)) {
+                                $toAdd = ((int)$amt) / 100.0;
+                            }
+                        }
+                    }
 
-                    Log::info("iPay callback: BALANCE CREDITED", [
-                        'driver_id' => $driver->id,
-                        'amount'    => $amount,
-                        'new_balance' => $driver->balance
-                    ]);
+                    // Чтобы не дублировать начисление, можно хранить флаг payment->processed_at или проверять, что balance уже увеличен.
+                    // Простая защита: если payment->meta->credited = true (если есть поле) — пропускаем. Тут для простоты проверим статус был не success.
+                    if ($toAdd > 0) {
+                        $driver->balance = (float)$driver->balance + $toAdd;
+                        $driver->save();
+                        Log::info('iPay callback: credited driver balance', ['driver_id' => $driver->id, 'amount' => $toAdd]);
+                    } else {
+                        Log::warning('iPay callback: success received but amount to credit is zero', ['payment_id' => $payment->id]);
+                    }
                 } else {
-                    Log::error("iPay callback: driver not found");
+                    Log::warning('iPay callback: driver not found for payment', ['payment_id' => $payment->id, 'driver_id' => $payment->driver_id]);
                 }
             }
-        });
+        }); // DB transaction
 
-        return response("OK", 200);
+        return response('OK', 200);
     }
 
-    // Not XML → log
-    Log::warning("iPay callback: NON-XML PAYLOAD", [
-        'json' => $request->all(),
-    ]);
+    // NOT XML — возможно form-data от старого интеграционного варианта
+    $data = $request->all();
+    if (empty($data)) {
+        Log::warning('iPay callback: empty payload', ['content_snippet' => substr($raw, 0, 500)]);
+        return response('Empty', 400);
+    }
 
-    return response("OK", 200);
+    // Пример проверки подписи для form-варианта (подстрой под вашу интеграцию)
+    $merchantKey = $this->getSignKey(); // для form-подписей может использоваться sign_key
+    $expectedSignature = hash('sha256',
+        ($data['MERCHANT_ID'] ?? '') .
+        ($data['ORDER_ID'] ?? '') .
+        ($data['AMOUNT'] ?? '') .
+        ($data['CURRENCY'] ?? '') .
+        ($data['DESCRIPTION'] ?? '') .
+        ($data['STATUS'] ?? '') .
+        $merchantKey
+    );
+
+    if (isset($data['SIGNATURE']) && !hash_equals($expectedSignature, $data['SIGNATURE'])) {
+        Log::warning('iPay callback: signature mismatch (form)', [
+            'expected' => substr($expectedSignature, 0, 16),
+            'received' => substr($data['SIGNATURE'] ?? '', 0, 16),
+            'payload' => $data,
+        ]);
+        return response('Invalid signature', 400);
+    }
+
+    $orderId = $data['ORDER_ID'] ?? ($data['ORDERID'] ?? null);
+    $payment = DriverPayment::where('order_id', $orderId)->first();
+    if (! $payment) {
+        Log::warning('iPay callback: payment not found (form)', ['order_id' => $orderId]);
+        return response('Not found', 200);
+    }
+
+    // idempotent update similar to XML branch
+    DB::transaction(function () use ($payment, $data) {
+        if ($payment->status === 'success') return;
+
+        $status = strtoupper($data['STATUS'] ?? '');
+        $mapped = $status === 'SUCCESS' ? 'success' : ($status === 'FAIL' ? 'failed' : strtolower($status));
+
+        $payment->status = $mapped;
+        $payment->response_data = json_encode($data);
+        $payment->save();
+
+        if ($mapped === 'success') {
+            $driver = Driver::find($payment->driver_id);
+            if ($driver) {
+                $amountRaw = $data['AMOUNT'] ?? $payment->amount;
+                $toAdd = 0;
+                if (is_numeric($amountRaw)) {
+                    $amtInt = (int)$amountRaw;
+                    // Если сумма явно в копейках (больше 1000), то /100
+                    $toAdd = $amtInt > 1000 ? ($amtInt / 100.0) : (float)$amtInt;
+                }
+                if ($toAdd > 0) {
+                    $driver->balance += $toAdd;
+                    $driver->save();
+                    Log::info('iPay callback (form): credited driver', ['driver_id' => $driver->id, 'amount' => $toAdd]);
+                }
+            }
+        }
+    });
+
+    return response('OK', 200);
 }
-
 
     protected function looksLikeXml(string $s): bool
     {

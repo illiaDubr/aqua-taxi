@@ -447,9 +447,31 @@ const fetchOrders = async () => {
 /* ---------- init ---------- */
 onMounted(async () => {
     const urlParams = new URLSearchParams(window.location.search)
-    if (urlParams.get('ipay') === 'success') {
-        alert('✅ Баланс успішно поповнено')
+    const ipay = urlParams.get('ipay')
+    const pid  = urlParams.get('pid')
+
+    // ─────────────────────────────────────────────
+    // 🟢 Обработка успешного платежа через PID → checkStatus API
+    // ─────────────────────────────────────────────
+    if (ipay === 'success' && pid) {
+        try {
+            const res = await axios.get(`/api/driver/pay/check?pid=${pid}`, {
+                headers: authHeaders()
+            })
+
+            if (res.data.ipay_status == 5) {
+                alert('✅ Баланс успішно поповнено!')
+                // Обновляем данные водителя
+                await fetchDriverData()
+            } else {
+                alert('ℹ️ Оплата ще не підтверджена. Спробуйте оновити сторінку через 20–30 сек.')
+            }
+        } catch (e) {
+            console.error('Помилка перевірки платежу:', e)
+            alert('⚠️ Помилка при перевірці платежу')
+        }
     }
+    // ─────────────────────────────────────────────
 
     await fetchDriverData()
     await nextTick()
@@ -465,10 +487,9 @@ onMounted(async () => {
     console.log('🚀 Стартує polling скасованих замовлень')
     startCancelledPolling(60_000)
 
-    // экспортируем в window функцию tryAcceptOrder, чтобы кнопка в popup могла её вызвать
+    // экспортируем в window функцию tryAcceptOrder, чтобы кнопка могла её вызвать
     window.tryAcceptOrder = async function(orderId) {
         try {
-            // найдем заказ в локальном состоянии (если нет — подгрузим с бэка)
             let order = ordersState.value.find(o => String(o.id) === String(orderId))
             if (!order) {
                 const res = await axios.get(`/api/orders/${orderId}`, { headers: authHeaders() }).catch(()=>null)
@@ -479,33 +500,28 @@ onMounted(async () => {
                 return
             }
 
-            // рассчеты: требуемое кол-во бутлей
             const requiredBottles = Number(order.quantity ?? order.qty ?? order.count ?? 0)
             const driverBottles = Number(bottles.value ?? 0)
 
-            // проверка бутлей у водія
             if (driverBottles < requiredBottles) {
                 refillMessage.value = `У вас ${driverBottles} бут., а потрібно ${requiredBottles}. Спочатку наберіть води або поверніться після поповнення запасу.`
                 showRefillModal.value = true
                 return
             }
 
-            // проверка баланса: если меньше 10% от суммы заказа — блокируем
             const orderSum = Number(order.total_price ?? order.totalPrice ?? order.price ?? 0)
             const minRequiredBalance = 0.1 * orderSum
-            // Если сумма заказа = 0 (например при оплате готівкою) — считаем что проверка баланса не применяется
+
             if (orderSum > 0 && Number(balance.value ?? 0) < minRequiredBalance) {
                 showLowBalanceModal.value = true
                 return
             }
 
-            // все проверки пройдены — подтверждаем действие у водителя
             const confirmAccept = confirm('Підтвердити прийняття замовлення?')
             if (!confirmAccept) return
 
-            // выполняем запрос принятия
             await axios.post(`/api/driver/orders/${orderId}/accept`, {}, { headers: authHeaders() })
-            // После успешного принятия показываем модалку с информацией о списании 10%
+
             const fee = Number(0.1 * orderSum)
             if (orderSum > 0) {
                 postAcceptMessage.value = `Після виконання цього замовлення з Вашого балансу буде списано <b>${fee.toFixed(2)} грн</b> (10% від суми замовлення ${fmt(orderSum)} грн).`
@@ -514,7 +530,6 @@ onMounted(async () => {
             }
             showPostAcceptModal.value = true
 
-            // закрываем popup и обновляем данные
             map.value?.closePopup()
             const marker = orderMarkers.value[orderId]
             if (marker) { try { map.value?.removeLayer(marker) } catch(_){}; delete orderMarkers.value[orderId] }
@@ -528,6 +543,7 @@ onMounted(async () => {
         }
     }
 }) // end onMounted
+
 
 onBeforeUnmount(() => {
     // очищаем polling и window.tryAcceptOrder

@@ -31,6 +31,8 @@ Route::middleware('auth:driver')->post('/driver/pay', [DriverPaymentController::
 Route::get('/driver/pay/status/{paymentId}', [DriverPaymentController::class, 'checkStatus']);
 Route::post('/driver/pay/callback', [DriverPaymentController::class, 'handleCallback']);
 Route::post('/driver/pay/poll/{payment}', [DriverPaymentController::class, 'pollUntilSuccess']);
+Route::get('/driver/pay/check', [PaymentController::class, 'checkStatus']);
+
 /*
 |--------------------------------------------------------------------------
 | DRIVER (приватные) — нужен токен с ability: driver
