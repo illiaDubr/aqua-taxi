@@ -60,6 +60,7 @@ Route::prefix('user')->group(function () {
     Route::post('login',    [UserAuthController::class, 'login']);
     Route::middleware(['auth:sanctum','abilities:user'])->post('logout', [UserAuthController::class, 'logout']);
 });
+Route::get('/driver/pay/good', [DriverPaymentController::class, 'handleGoodRedirect']);
 
 /*
 |--------------------------------------------------------------------------

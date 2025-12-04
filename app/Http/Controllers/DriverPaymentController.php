@@ -219,7 +219,7 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    $callbackGood = url('/ordersDrive?ipay=success');
+    $callbackGood = url('/api/driver/pay/good');
     $callbackBad  = url('/ordersDrive?ipay=fail');
     $callbackSrv  = url('/api/driver/pay/callback');
 
@@ -389,47 +389,36 @@ XML;
 }
 
 
-public function redirectHandler(Request $request)
+public function handleGoodRedirect(Request $request)
 {
-    $status = $request->query('ipay');
-
-    if ($status !== 'success') {
-        return redirect('/somewhere')->with('error', 'Оплата не пройшла');
-    }
-
+    // 1. Получаем ID пользователя
     $driver = auth('driver')->user();
 
     if (!$driver) {
-        return redirect('/login')->with('error', 'Необхідно увійти');
+        return redirect('https://example.com/login?error=no_driver');
     }
 
+    // 2. Получаем последний неоплаченный платёж
     $payment = DriverPayment::where('driver_id', $driver->id)
         ->where('status', 'pending')
         ->latest()
         ->first();
 
     if (!$payment) {
-        return redirect('/balance')->with('error', 'Платіж не знайдено');
+        return redirect('https://example.com/ordersDrive?error=no_payment');
     }
 
-    $ipayStatus = $this->checkIpayStatus($payment->payment_id);
+    // 3. Начисляем деньги
+    $driver->balance += $payment->amount;
+    $driver->save();
 
-    if ($ipayStatus === 'success') {
+    // 4. Закрываем платёж
+    $payment->status = 'success';
+    $payment->save();
 
-        // 3. Начисляем деньги
-        $driver->balance += $payment->amount;
-        $driver->save();
-
-        // 4. Обновляем платёж
-        $payment->status = 'success';
-        $payment->save();
-
-        return redirect('/balance')->with('success', 'Баланс поповнено!');
-    }
-
-    return redirect('/balance')->with('error', 'Платіж не підтверджено');
+    // 5. Редиректим на фронт
+    return redirect("https://example.com/ordersDrive?ipay=success");
 }
-
 
 
     // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
