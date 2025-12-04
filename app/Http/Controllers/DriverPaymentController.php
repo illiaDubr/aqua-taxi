@@ -195,7 +195,7 @@ XML;
     $driver = $driverOrResponse;
 
     $amountGrn = (float) $request->input('amount');
-    $amount = (int) round($amountGrn * 100);
+    $amountCents = (int) round($amountGrn * 100);
 
     $merchantId = $this->getMerchantId();
     $signKey    = $this->getSignKey();
@@ -219,9 +219,9 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    $callbackGood = url("/ordersDrive?ipay=success&pid={$Pid}");
+    // Роут, на который iPay редиректит после оплаты — наш endpoint который проверит статус
+    $callbackGood = url('/api/driver/payment/check');
     $callbackBad  = url('/ordersDrive?ipay=fail');
-
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
@@ -241,11 +241,10 @@ XML;
     </urls>
     <transactions>
         <transaction>
-            <amount>{$amount}</amount>
+            <amount>{$amountCents}</amount>
             <currency>UAH</currency>
             <desc>Поповнення балансу водія</desc>
-            <info>{"dogovor":37973023}</info>
-           
+            <info>{$infoJson}</info>
         </transaction>
     </transactions>
     <lifetime>0.5</lifetime>
@@ -265,7 +264,7 @@ XML;
 
         Log::debug('iPay HTTP response received', [
             'status' => $response->status(),
-            'body_snippet' => substr($response->body(), 0, 500),
+            'body_snippet' => substr($response->body(), 0, 1000),
         ]);
 
         if (!$response->successful()) {
@@ -298,28 +297,28 @@ XML;
             'respStatus' => $respStatus,
         ]);
 
-        if (!$respPid) {
-            Log::warning('iPay response missing pid', ['body' => $response->body()]);
-        }
-
+        // Сигнатура ответа проверяем системным ключом
         $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
-
         if ($expectedRespSign && $respSign !== $expectedRespSign) {
             Log::warning('iPay: response signature mismatch', [
-                'expected' => $expectedRespSign,
-                'received' => $respSign,
+                'expected' => substr($expectedRespSign,0,16),
+                'received' => substr($respSign,0,16),
                 'body' => $response->body(),
             ]);
+            // не обязательно рубить, но безопаснее вернуть ошибку
             return response()->json(['error' => 'Invalid response signature'], 400);
         }
 
+        // Сохраняем платёж локально — ставим статус pending (в дальнейшем проверим при редиректе)
         $payment = DriverPayment::create([
             'driver_id'     => $driver->id,
             'order_id'      => $respPid ?: uniqid('ipay_'),
+            'pid'           => $respPid ?: null,
             'amount'        => $amountGrn,
-            'amount_cents'  => $amount,
-            'status'        => $respStatus ?: 'created',
-            'response_data' => $response->body(),
+            'amount_cents'  => $amountCents,
+            'status'        => 'pending',
+            'credited'      => false,
+            'response_data' => (string)$response->body(),
         ]);
 
         Log::info('iPay payment created', [
@@ -327,58 +326,10 @@ XML;
             'driver_id'  => $driver->id,
             'amount'     => $amountGrn,
             'url'        => $respUrl,
+            'pid'        => $respPid,
         ]);
 
-        // ===============================
-        //  FIX: добавлено определение $statusSalt
-        // ===============================
-        $statusSalt = sha1(microtime(true));
-
-        $statusSign = hash_hmac('sha512', $statusSalt, $systemKey);
-
-        $statusXml = <<<XML
-<payment>
-    <auth>
-        <mch_id>{$merchantId}</mch_id>
-        <salt>{$statusSalt}</salt>
-        <sign>{$statusSign}</sign>
-    </auth>
-    <action>status</action>
-    <pid>{$payment->order_id}</pid>
-</payment>
-XML;
-
-        $statusResponse = Http::asForm()->withHeaders([
-            'Accept' => 'application/xml',
-            'Content-Type' => 'application/x-www-form-urlencoded',
-        ])->post($endpoint, ['data' => $statusXml]);
-
-        if ($statusResponse->successful()) {
-            $statusXmlBody = simplexml_load_string($statusResponse->body());
-            $statusCode = (string) ($statusXmlBody->status ?? '');
-
-            Log::info('iPay status check after creation', [
-                'payment_id' => $payment->id,
-                'status' => $statusCode,
-            ]);
-
-            if ($statusCode === '5' && $payment->status !== 'success') {
-                $driver = Driver::find($payment->driver_id);
-                if ($driver) {
-                    $driver->balance += $payment->amount;
-                    $driver->save();
-                    $payment->status = 'success';
-                    $payment->credited = true;
-                    $payment->save();
-                    Log::info('Driver balance credited via status check', [
-                        'driver_id' => $driver->id,
-                        'amount' => $payment->amount,
-                    ]);
-                }
-            }
-        }
-
-        return response()->json(['url' => $respUrl, 'payment_id' => $payment->id]);
+        return response()->json(['url' => $respUrl, 'payment_id' => $payment->id, 'pid' => $respPid]);
     } catch (\Exception $e) {
         Log::error('iPay exception', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         return response()->json(['error' => 'Internal error'], 500);
@@ -386,70 +337,102 @@ XML;
 }
 
 
+
 public function checkStatus(Request $request)
 {
+    // Получим аутентифицированного водителя (если редирект идет от браузера, токен может не передаваться;
+    // тогда ищем последний pending платеж глобально — но безопаснее по driver_id)
+    $driver = $this->driver($request);
+    if ($driver instanceof \Illuminate\Http\JsonResponse) {
+        // если запрос приходит как обычный GET редирект (не авторизованный), попробуем определить по последнему pending (без guard)
+        $driver = null;
+    }
+
+    // Если в URL есть pid — можно его использовать
     $pid = $request->query('pid');
 
-    if (!$pid) {
-        return response()->json(['error' => 'PID not provided'], 400);
+    $query = DriverPayment::query()->where('status', 'pending');
+    if ($pid) {
+        $query->where('pid', $pid);
+    } elseif ($driver && isset($driver->id)) {
+        $query->where('driver_id', $driver->id);
+    } else {
+        // как fallback — возьмём самый последний pending
+        $query->orderByDesc('created_at');
     }
 
-    // Находим локальный платеж
-    $payment = Payment::where('ipay_pid', $pid)->first();
+    $payment = $query->latest()->first();
 
-    if (!$payment) {
-        return response()->json(['error' => 'Payment not found'], 404);
+    if (! $payment) {
+        Log::warning('checkStatus: no pending payment found', ['pid' => $pid, 'driver_id' => $driver ? $driver->id : null]);
+        return redirect('/?error=no_payment');
     }
 
-    // Создаём XML для payment.status
-    $salt = bin2hex(random_bytes(16));
-    $sign = hash('sha512', $salt . config('ipay.secret'));
+    // формируем status-запрос к iPay
+    $merchantId = $this->getMerchantId();
+    $systemKey  = config('ipay.system_key');
+    $salt = sha1(microtime(true));
+    $sign = hash_hmac('sha512', $salt, $systemKey);
 
-    $xml = "
-        <payment>
-            <auth>
-                <mch_id>" . config('ipay.merchant_id') . "</mch_id>
-                <salt>$salt</salt>
-                <sign>$sign</sign>
-            </auth>
-            <action>status</action>
-            <pid>$pid</pid>
-        </payment>
-    ";
+    $xml = <<<XML
+<payment>
+    <auth>
+        <mch_id>{$merchantId}</mch_id>
+        <salt>{$salt}</salt>
+        <sign>{$sign}</sign>
+    </auth>
+    <action>status</action>
+    <pid>{$payment->pid}</pid>
+</payment>
+XML;
 
-    // Отправляем запрос в iPay
-    $response = Http::withHeaders([
-        'Content-Type' => 'application/xml'
-    ])->withBody($xml, 'application/xml')
-        ->post("https://checkout.ipay.ua/api302");
+    $endpoint = $this->getEndpoint();
+    $response = Http::asForm()->withHeaders([
+        'Accept' => 'application/xml',
+        'Content-Type' => 'application/x-www-form-urlencoded',
+    ])->post($endpoint, ['data' => $xml]);
 
-    if (!$response->ok()) {
-        return response()->json(['error' => 'iPay request failed'], 500);
+    Log::info('checkStatus: iPay status request', ['payment_id' => $payment->id, 'pid' => $payment->pid, 'status' => $response->status()]);
+
+    if (! $response->successful()) {
+        Log::error('checkStatus: iPay status fetch failed', ['status' => $response->status(), 'body' => $response->body()]);
+        return redirect('/ordersDrive?ipay=fail');
     }
 
-    $data = simplexml_load_string($response->body());
+    $bodyXml = simplexml_load_string($response->body());
+    $status = (string) ($bodyXml->status ?? '');
 
-    $status = (string) $data->status;
+    Log::info('checkStatus: iPay returned', ['pid' => $payment->pid, 'status' => $status]);
 
-    // 5 = успешный платёж
-    if ($status == "5" && $payment->status != 'paid') {
+    if ($status === '5') {
+        // successful: начисляем если ещё не начислено
+        if (! $payment->credited) {
+            DB::transaction(function () use ($payment) {
+                $driver = Driver::find($payment->driver_id);
+                if ($driver) {
+                    // сумма в грн: либо amount (грн) либо amount_cents / 100
+                    $toAdd = $payment->amount ?? ( ($payment->amount_cents ?? 0) / 100 );
+                    $driver->balance = (float)$driver->balance + (float)$toAdd;
+                    $driver->save();
 
-        DB::transaction(function () use ($payment, $data) {
-            $payment->status = 'paid';
-            $payment->save();
+                    $payment->status = 'success';
+                    $payment->credited = true;
+                    $payment->save();
 
-            // Увеличиваем баланс водителя
-            $driver = Driver::find($payment->driver_id);
-            $driver->balance += ($payment->amount);
-            $driver->save();
-        });
+                    Log::info('checkStatus: credited driver', ['driver_id' => $driver->id, 'amount' => $toAdd]);
+                } else {
+                    Log::warning('checkStatus: driver not found', ['payment_id' => $payment->id]);
+                }
+            });
+        }
+        // редирект на фронт (ваш маршрут)
+        return redirect('/ordersDrive?ipay=success');
+    } else {
+        // failed or still pending
+        $payment->status = $status === '4' ? 'failed' : 'pending';
+        $payment->save();
+        return redirect('/ordersDrive?ipay=fail');
     }
-
-    return response()->json([
-        'pid' => $pid,
-        'ipay_status' => $status,
-        'local_status' => $payment->status
-    ]);
 }
 
 
