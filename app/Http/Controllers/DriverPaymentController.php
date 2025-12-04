@@ -30,26 +30,22 @@ class DriverPaymentController extends Controller
         return config('ipay.sign_key');
     }
 
-    /**
-     * Универсальный метод получения водителя из запроса.
-     * Логирует все варианты и возвращает JSON 401 вместо HTML abort — удобнее для API.
-     */
+  
     private function driver(Request $request)
     {
-        $userFromRequest = $request->user(); // sanctum / default auth
-        $userFromGuard   = Auth::guard('driver')->user(); // на случай кастомного guard
+        $userFromRequest = $request->user(); 
+        $userFromGuard   = Auth::guard('driver')->user();
 
-        // Логируем базовую информацию
+       
         Log::debug('Driver auth check start', [
             'request_user_id' => $userFromRequest ? $userFromRequest->id : null,
             'request_user_model' => $userFromRequest ? get_class($userFromRequest) : null,
             'guard_user_id' => $userFromGuard ? $userFromGuard->id : null,
             'auth_default_guard' => config('auth.defaults.guard'),
             'authorization_header' => $request->header('Authorization'),
-            'all_headers' => $request->headers->all(), // В проде можно убрать/сократить
+            'all_headers' => $request->headers->all(),
         ]);
 
-        // Если есть bearer token — проверим запись в personal_access_tokens
         $bearer = $request->bearerToken();
         if ($bearer) {
             try {
@@ -83,8 +79,7 @@ public function pollUntilSuccess(DriverPayment $payment)
 {
     $merchantId = config('ipay.merchant_id');
     $systemKey  = config('ipay.system_key');
-    $endpoint   = config('ipay.sandbox_endpoint'); // или боевой
-
+    $endpoint   = config('ipay.sandbox_endpoint'); 
     if (! $merchantId || ! $systemKey || ! $endpoint) {
         Log::error('iPay polling: missing config', [
             'merchant_id' => $merchantId,
@@ -94,8 +89,7 @@ public function pollUntilSuccess(DriverPayment $payment)
         return;
     }
 
-    sleep(2); // дать iPay время зарегистрировать платёж
-
+    sleep(2); 
     for ($i = 0; $i < 6; $i++) {
         $salt = sha1(microtime(true));
         $sign = hash_hmac('sha512', $salt, $systemKey);
@@ -219,7 +213,7 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    // Роут, на который iPay редиректит после оплаты — наш endpoint который проверит статус
+   
     $callbackGood = url('/api/driver/payment/check');
     $callbackBad  = url('/ordersDrive?ipay=fail');
 
@@ -297,7 +291,7 @@ XML;
             'respStatus' => $respStatus,
         ]);
 
-        // Сигнатура ответа проверяем системным ключом
+       
         $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
         if ($expectedRespSign && $respSign !== $expectedRespSign) {
             Log::warning('iPay: response signature mismatch', [
@@ -305,11 +299,11 @@ XML;
                 'received' => substr($respSign,0,16),
                 'body' => $response->body(),
             ]);
-            // не обязательно рубить, но безопаснее вернуть ошибку
+            
             return response()->json(['error' => 'Invalid response signature'], 400);
         }
 
-        // Сохраняем платёж локально — ставим статус pending (в дальнейшем проверим при редиректе)
+      
         $payment = DriverPayment::create([
             'driver_id'     => $driver->id,
             'order_id'      => $respPid ?: uniqid('ipay_'),
@@ -340,15 +334,14 @@ XML;
 
 public function checkStatus(Request $request)
 {
-    // Получим аутентифицированного водителя (если редирект идет от браузера, токен может не передаваться;
-    // тогда ищем последний pending платеж глобально — но безопаснее по driver_id)
+    
     $driver = $this->driver($request);
     if ($driver instanceof \Illuminate\Http\JsonResponse) {
-        // если запрос приходит как обычный GET редирект (не авторизованный), попробуем определить по последнему pending (без guard)
+        
         $driver = null;
     }
 
-    // Если в URL есть pid — можно его использовать
+   
     $pid = $request->query('pid');
 
     $query = DriverPayment::query()->where('status', 'pending');
@@ -357,7 +350,7 @@ public function checkStatus(Request $request)
     } elseif ($driver && isset($driver->id)) {
         $query->where('driver_id', $driver->id);
     } else {
-        // как fallback — возьмём самый последний pending
+        
         $query->orderByDesc('created_at');
     }
 
@@ -368,7 +361,7 @@ public function checkStatus(Request $request)
         return redirect('/?error=no_payment');
     }
 
-    // формируем status-запрос к iPay
+    
     $merchantId = $this->getMerchantId();
     $systemKey  = config('ipay.system_key');
     $salt = sha1(microtime(true));
@@ -405,12 +398,12 @@ XML;
     Log::info('checkStatus: iPay returned', ['pid' => $payment->pid, 'status' => $status]);
 
     if ($status === '5') {
-        // successful: начисляем если ещё не начислено
+       
         if (! $payment->credited) {
             DB::transaction(function () use ($payment) {
                 $driver = Driver::find($payment->driver_id);
                 if ($driver) {
-                    // сумма в грн: либо amount (грн) либо amount_cents / 100
+                    
                     $toAdd = $payment->amount ?? ( ($payment->amount_cents ?? 0) / 100 );
                     $driver->balance = (float)$driver->balance + (float)$toAdd;
                     $driver->save();
@@ -425,10 +418,10 @@ XML;
                 }
             });
         }
-        // редирект на фронт (ваш маршрут)
+       
         return redirect('/ordersDrive?ipay=success');
     } else {
-        // failed or still pending
+       
         $payment->status = $status === '4' ? 'failed' : 'pending';
         $payment->save();
         return redirect('/ordersDrive?ipay=fail');
@@ -436,7 +429,7 @@ XML;
 }
 
 
-    // ------------------- Универсальная обработка callback'ов (оставлена твоя логика) -------------------
+ 
 
  
 
@@ -456,14 +449,14 @@ public function handleCallback(Request $request)
             return response('Invalid XML', 400);
         }
 
-        // Если это ответ на создание платежа или нотификация по оплате
+     
         $pid = (string) ($xml->pid ?? '');
         $status = (string) ($xml->status ?? '');
         $action = (string) ($xml->action ?? '');
         $respSalt = (string) ($xml->salt ?? $xml->auth->salt ?? '');
         $respSign = (string) ($xml->sign ?? '');
 
-        // Проверка подписи iPay — подпись должна проверяться системным ключом
+       
         if ($respSalt && $respSign && $systemKey) {
             $expected = hash_hmac('sha512', $respSalt, $systemKey);
             if (!hash_equals($expected, $respSign)) {
@@ -474,7 +467,7 @@ public function handleCallback(Request $request)
             }
         } else {
             Log::warning('iPay callback: missing signature fields', ['salt' => $respSalt ? true : false, 'sign' => $respSign ? true : false]);
-            // Не всегда требуется подпись? если требуется — вернуть 400
+            
         }
 
         // Найдём платёж по pid
@@ -486,20 +479,19 @@ public function handleCallback(Request $request)
         $payment = DriverPayment::where('order_id', $pid)->first();
         if (! $payment) {
             Log::warning('iPay callback: payment not found', ['pid' => $pid]);
-            // Возвращаем 200, чтобы iPay не повторял (или 200/404 в зависимости от соглашения)
+            
             return response('Not found', 200);
         }
 
-        // Обработка completion (action) или обычного статуса
-        // Внутри используем транзакцию для идемпотентного обновления и начисления баланса
+       
         DB::transaction(function () use ($xml, $payment, $status) {
-            // Если уже success — ничего не делаем (идемпотентность)
+            
             if ($payment->status === 'success') {
                 Log::info('iPay callback: payment already success, skipping', ['payment_id' => $payment->id]);
                 return;
             }
 
-            // Определим новый статус
+           
             $xmlStatus = (string) ($xml->status ?? '');
             $statusMap = [
                 '1' => 'registered',
@@ -509,12 +501,12 @@ public function handleCallback(Request $request)
             ];
             $mapped = $statusMap[$xmlStatus] ?? $xmlStatus;
 
-            // Если это completion с транзакциями — аккумулируем сумму из транзакций
+           
             $totalReceivedCents = null;
             if (!empty($xml->transactions) && !empty($xml->transactions->transaction)) {
                 $sum = 0;
                 foreach ($xml->transactions->transaction as $t) {
-                    // сначала смотрим invoice (пример ответа completion), иначе amount
+                    
                     $invoice = (string) ($t->invoice ?? '');
                     $amountField = (string) ($t->amount ?? '');
                     $value = 0;
@@ -528,28 +520,28 @@ public function handleCallback(Request $request)
                 $totalReceivedCents = $sum > 0 ? $sum : null;
             }
 
-            // Сохраняем response_data (чтобы можно было отладить)
+            
             $payment->response_data = (string) $xml->asXML();
             $payment->status = $mapped;
-            // если у нас есть сумма из транзакций — её следует записать как amount_cents (может быть частичное списание)
+          
             if ($totalReceivedCents !== null) {
                 $payment->amount_cents = $totalReceivedCents;
-                $payment->amount = round($totalReceivedCents / 100, 2); // если есть поле amount (в гривнах)
+                $payment->amount = round($totalReceivedCents / 100, 2); 
             }
             $payment->save();
 
-            // Если успешный платёж — начисляем баланс драйверу (если ещё не начислено)
+          
             if ($mapped === 'success') {
                 $driver = Driver::find($payment->driver_id);
                 if ($driver) {
-                    // Определи сумму для начисления: либо payment.amount (грн) либо amount_cents
+                   
                     $toAdd = 0.0;
                     if (!empty($payment->amount_cents)) {
                         $toAdd = (float)($payment->amount_cents) / 100.0;
                     } elseif (!empty($payment->amount)) {
                         $toAdd = (float)$payment->amount;
                     } else {
-                        // last ditch: попытаемся взять из xml first transaction amount
+                       
                         $firstTr = $xml->transactions->transaction[0] ?? null;
                         if ($firstTr) {
                             $amt = (string)($firstTr->amount ?? $firstTr->invoice ?? 0);
@@ -559,8 +551,7 @@ public function handleCallback(Request $request)
                         }
                     }
 
-                    // Чтобы не дублировать начисление, можно хранить флаг payment->processed_at или проверять, что balance уже увеличен.
-                    // Простая защита: если payment->meta->credited = true (если есть поле) — пропускаем. Тут для простоты проверим статус был не success.
+                 
                     if ($toAdd > 0) {
                         $driver->balance = (float)$driver->balance + $toAdd;
                         $driver->save();
@@ -572,20 +563,19 @@ public function handleCallback(Request $request)
                     Log::warning('iPay callback: driver not found for payment', ['payment_id' => $payment->id, 'driver_id' => $payment->driver_id]);
                 }
             }
-        }); // DB transaction
-
+        });
         return response('OK', 200);
     }
 
-    // NOT XML — возможно form-data от старого интеграционного варианта
+   
     $data = $request->all();
     if (empty($data)) {
         Log::warning('iPay callback: empty payload', ['content_snippet' => substr($raw, 0, 500)]);
         return response('Empty', 400);
     }
 
-    // Пример проверки подписи для form-варианта (подстрой под вашу интеграцию)
-    $merchantKey = $this->getSignKey(); // для form-подписей может использоваться sign_key
+    
+    $merchantKey = $this->getSignKey(); 
     $expectedSignature = hash('sha256',
         ($data['MERCHANT_ID'] ?? '') .
         ($data['ORDER_ID'] ?? '') .
@@ -612,7 +602,7 @@ public function handleCallback(Request $request)
         return response('Not found', 200);
     }
 
-    // idempotent update similar to XML branch
+   
     DB::transaction(function () use ($payment, $data) {
         if ($payment->status === 'success') return;
 
@@ -630,7 +620,7 @@ public function handleCallback(Request $request)
                 $toAdd = 0;
                 if (is_numeric($amountRaw)) {
                     $amtInt = (int)$amountRaw;
-                    // Если сумма явно в копейках (больше 1000), то /100
+                    
                     $toAdd = $amtInt > 1000 ? ($amtInt / 100.0) : (float)$amtInt;
                 }
                 if ($toAdd > 0) {
