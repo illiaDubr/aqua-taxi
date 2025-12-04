@@ -219,7 +219,7 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    $callbackGood = url("/ordersDrive?ipay=success&pid={$respPid}");
+    $callbackGood = url("/ordersDrive?ipay=success&pid={$Pid}");
     $callbackBad  = url('/ordersDrive?ipay=fail');
 
 
