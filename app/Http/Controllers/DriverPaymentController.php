@@ -219,10 +219,9 @@ XML;
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-    $callbackGood = url('/ordersDrive?ipay=success&pid={$pid}');
+    $callbackGood = url("/ordersDrive?ipay=success&pid={$respPid}");
     $callbackBad  = url('/ordersDrive?ipay=fail');
 
-    Log::info('iPay callback URL set', ['callback' => $callbackSrv]);
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
