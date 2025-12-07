@@ -346,7 +346,7 @@ public function checkStatus(Request $request)
 
     $query = DriverPayment::query()->where('status', 'pending');
     if ($pid) {
-        $query->where('pid', $pid);
+        $query->where('order_id', $pid);
     } elseif ($driver && isset($driver->id)) {
         $query->where('driver_id', $driver->id);
     } else {
