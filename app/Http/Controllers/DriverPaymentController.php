@@ -196,7 +196,8 @@ public function checkStatus(Request $request)
     $merchantId = config('ipay.merchant_id');
     $signKey    = config('ipay.sign_key');
     $systemKey  = config('ipay.system_key');
-   
+    $salt = sha1(microtime(true));
+    $sign = hash_hmac('sha512', $salt, $sign_key);
     // В XML всегда идёт настоящий pid от iPay
     $xml = <<<XML
 <payment>
