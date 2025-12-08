@@ -255,16 +255,18 @@ XML;
     ]);
 
     if ($status === '5') {
-    if (!$payment->credited) {
+
+    // Если ещё не было success — зачисляем
+    if ($payment->status !== 'success') {
         DB::transaction(function () use ($payment) {
             $driver = Driver::find($payment->driver_id);
+
             if ($driver) {
                 $toAdd = $payment->amount ?? (($payment->amount_cents ?? 0) / 100);
                 $driver->balance = (float)$driver->balance + (float)$toAdd;
                 $driver->save();
 
-                $payment->status   = 'success';
-                $payment->credited = true;
+                $payment->status = 'success';
                 $payment->save();
 
                 Log::info('checkStatus: credited driver', [
@@ -278,6 +280,7 @@ XML;
             }
         });
     }
+
     return redirect('/ordersDrive?ipay=success');
     } else {
         $payment->status = $status === '4' ? 'failed' : 'pending';
