@@ -15,6 +15,7 @@ return new class extends Migration
 
             // внутренний ID заказа/начисления
             $table->unsignedBigInteger('order_id')->nullable();
+             $table->unsignedBigInteger('pid')->nullable();
 
             // ID платежа на стороне iPay
             $table->string('transaction_id')->nullable();

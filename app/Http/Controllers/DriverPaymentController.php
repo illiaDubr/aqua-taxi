@@ -307,7 +307,7 @@ XML;
         $payment = DriverPayment::create([
             'driver_id'     => $driver->id,
             'order_id'      => $respPid ?: uniqid('ipay_'),
-            'pid'           => $respPid ?: null,
+            'pid'           => $respPid ?: uniqid('ipay_'),
             'amount'        => $amountGrn,
             'amount_cents'  => $amountCents,
             'status'        => 'pending',
@@ -355,6 +355,7 @@ public function checkStatus(Request $request)
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $systemKey);
 
+    // 👇 используем order_id вместо pid
     $xml = <<<XML
 <payment>
     <auth>
@@ -363,7 +364,7 @@ public function checkStatus(Request $request)
         <sign>{$sign}</sign>
     </auth>
     <action>status</action>
-    <pid>{$payment->pid}</pid>
+    <pid>{$payment->order_id}</pid>
 </payment>
 XML;
 
@@ -375,7 +376,7 @@ XML;
 
     Log::info('checkStatus: iPay status request', [
         'payment_id' => $payment->id,
-        'pid' => $payment->pid,
+        'pid' => $payment->order_id,
         'status' => $response->status()
     ]);
 
@@ -403,7 +404,7 @@ XML;
     $status = (string) ($bodyXml->status ?? '');
 
     Log::info('checkStatus: iPay returned', [
-        'pid' => $payment->pid,
+        'pid' => $payment->order_id,
         'status' => $status
     ]);
 
@@ -439,9 +440,6 @@ XML;
     }
 }
 
-
-
- 
 
  
 
