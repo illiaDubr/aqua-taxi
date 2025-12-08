@@ -134,8 +134,22 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driv
 // --- polling cancelled state ---
 const cancelledNotifications = ref([])   // список уведомлений об отменах
 const lastCheckedCancelledAt = ref(new Date().toISOString()) // ISO string для since
+
+
+
 let cancelledPollTimer = null
 let ordersPollTimer = null
+
+const formatDate = (date) => {
+  if (!date) return '—'
+  return new Date(date).toLocaleString('uk-UA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
 
 const driverId = ref(null)
 
