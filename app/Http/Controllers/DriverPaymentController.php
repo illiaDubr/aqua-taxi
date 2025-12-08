@@ -288,10 +288,15 @@ public function checkStatus(Request $request)
         return redirect('/?error=no_payment');
     }
 
-    $merchantId = $this->getMerchantId();
-    $systemKey  = config('ipay.system_key');
-    $salt = sha1(microtime(true));
-    $sign = hash_hmac('sha512', $salt, $systemKey);
+   $merchantId = $this->getMerchantId();
+$systemKey  = config('ipay.system_key');
+
+$action = 'status';
+$pid    = $payment->pid;
+
+$salt = sha1(microtime(true));
+
+$sign = hash_hmac('sha512', $action . $pid . $salt, $systemKey);
 
     // В XML всегда идёт настоящий pid от iPay
     $xml = <<<XML
