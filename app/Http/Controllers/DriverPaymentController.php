@@ -351,7 +351,7 @@ public function checkStatus(Request $request)
     }
 
     // 👇 Для теста укажи ключи прямо тут
-    $merchantId = '5521';
+    $merchantId = '40fc2925da51789c7b7914f6e6e2bafa0ffc0bd3';
     $systemKey  = 'e5817ba6ce82a941e2be9623aabcd9e37e78f19a';
 
     $salt = sha1(microtime(true));
