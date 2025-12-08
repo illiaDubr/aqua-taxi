@@ -334,22 +334,11 @@ XML;
 
 public function checkStatus(Request $request)
 {
-    // Авторизация водителя (если есть токен)
-    $driver = $request->user() ?: Auth::guard('driver')->user();
-    if (!$driver && !$request->query('pid')) {
-        Log::warning('Driver auth failed: no authenticated driver found', [
-            'bearer_present' => (bool)$request->bearerToken()
-        ]);
-        return redirect('/?error=unauthorized');
-    }
-
     $pid = $request->query('pid');
 
     $query = DriverPayment::query()->where('status', 'pending');
     if ($pid) {
         $query->where('order_id', $pid);
-    } elseif ($driver && isset($driver->id)) {
-        $query->where('driver_id', $driver->id);
     } else {
         $query->orderByDesc('created_at');
     }
@@ -357,10 +346,7 @@ public function checkStatus(Request $request)
     $payment = $query->latest()->first();
 
     if (!$payment) {
-        Log::warning('checkStatus: no pending payment found', [
-            'pid' => $pid,
-            'driver_id' => $driver ? $driver->id : null
-        ]);
+        Log::warning('checkStatus: no pending payment found', ['pid' => $pid]);
         return redirect('/?error=no_payment');
     }
 
