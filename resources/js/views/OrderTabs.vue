@@ -34,7 +34,7 @@
           <div v-for="n in cancelledNotifications" :key="n.id" class="cancel-item" :class="{ seen: n.seen }">
             <div class="cancel-item__head">
               <strong>⚠️ Замовлення скасоване</strong>
-              <small>{{ formatDate(n.cancelled_at) }}</small>
+              <small>{{ order.formattedDate = formatDate(order.created_at) }}</small>
             </div>
             <div class="cancel-item__body">
               <div><strong>Адреса:</strong> {{ n.address ?? '—' }}</div>
@@ -502,8 +502,8 @@ onMounted(async () => {
     // запускаем polling отмен (интервал 60s)
     console.log('🚀 Стартує polling скасованих замовлень')
     startCancelledPolling(60_000)
-    console.log('🚀 Стартує polling нових/активних замовлень')
-    startOrdersPolling(20_000)
+        console.log('🚀 Стартує polling нових/активних замовлень')
+startOrdersPolling(20_000)
     // экспортируем в window функцию tryAcceptOrder, чтобы кнопка могла её вызвать
     window.tryAcceptOrder = async function(orderId) {
         try {
