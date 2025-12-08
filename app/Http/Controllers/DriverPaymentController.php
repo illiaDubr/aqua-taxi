@@ -173,22 +173,13 @@ XML;
 
     public function initiatePayment(Request $request)
 {
-    Log::debug('initiatePayment request headers', [
-        'authorization' => $request->header('Authorization'),
-        'all_headers' => $request->headers->all(),
-    ]);
-
     $validated = $request->validate([
         'amount' => 'required|numeric|min:0.01',
     ]);
 
-    $driverOrResponse = $this->driver($request);
-    if ($driverOrResponse instanceof \Illuminate\Http\JsonResponse) {
-        return $driverOrResponse;
-    }
-    $driver = $driverOrResponse;
+    $driver = $this->driver($request);
 
-    $amountGrn = (float) $request->input('amount');
+    $amountGrn   = (float) $request->input('amount');
     $amountCents = (int) round($amountGrn * 100);
 
     $merchantId = $this->getMerchantId();
@@ -196,24 +187,13 @@ XML;
     $systemKey  = config('ipay.system_key');
     $endpoint   = $this->getEndpoint();
 
-    Log::debug('iPay config loaded', [
-        'merchant_id' => $merchantId ? 'present' : null,
-        'sign_key'    => $signKey ? 'present' : null,
-        'system_key'  => $systemKey ? 'present' : null,
-        'endpoint'    => $endpoint,
-        'sandbox'     => config('ipay.use_sandbox'),
-        'driver_id'   => $driver->id ?? null,
-    ]);
-
     if (!$merchantId || !$signKey || !$systemKey) {
-        Log::error('iPay: missing config (merchant, sign key, or system key)');
         return response()->json(['error' => 'Payment gateway not configured'], 500);
     }
 
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $signKey);
 
-   
     $callbackGood = url('/api/driver/payment/check');
     $callbackBad  = url('/ordersDrive?ipay=fail');
 
@@ -246,68 +226,29 @@ XML;
 </payment>
 XML;
 
-    Log::debug('iPay full XML payload', ['xml' => $xml]);
-
     try {
         $response = Http::asForm()->withHeaders([
             'Accept' => 'application/xml',
             'Content-Type' => 'application/x-www-form-urlencoded',
         ])->post($endpoint, ['data' => $xml]);
 
-        Log::info('iPay XML sent', ['endpoint' => $endpoint]);
-
-        Log::debug('iPay HTTP response received', [
-            'status' => $response->status(),
-            'body_snippet' => substr($response->body(), 0, 1000),
-        ]);
-
         if (!$response->successful()) {
-            Log::error('iPay request failed', [
-                'url' => $endpoint,
-                'status' => $response->status(),
-                'body' => $response->body()
-            ]);
             return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
         }
 
         libxml_use_internal_errors(true);
         $bodyXml = simplexml_load_string($response->body());
         if (!$bodyXml) {
-            Log::error('iPay: invalid XML response', ['raw' => $response->body()]);
             return response()->json(['error' => 'Invalid response from payment gateway'], 500);
         }
 
-        $respSalt   = (string) ($bodyXml->salt ?? $bodyXml->auth->salt ?? '');
-        $respSign   = (string) ($bodyXml->sign ?? '');
         $respPid    = (string) ($bodyXml->pid ?? '');
         $respUrl    = (string) ($bodyXml->url ?? '');
-        $respStatus = (string) ($bodyXml->status ?? '');
 
-        Log::debug('iPay parsed response', [
-            'respSalt'   => $respSalt,
-            'respSign'   => $respSign,
-            'respPid'    => $respPid,
-            'respUrl'    => $respUrl,
-            'respStatus' => $respStatus,
-        ]);
-
-       
-        $expectedRespSign = $respSalt && $systemKey ? hash_hmac('sha512', $respSalt, $systemKey) : null;
-        if ($expectedRespSign && $respSign !== $expectedRespSign) {
-            Log::warning('iPay: response signature mismatch', [
-                'expected' => substr($expectedRespSign,0,16),
-                'received' => substr($respSign,0,16),
-                'body' => $response->body(),
-            ]);
-            
-            return response()->json(['error' => 'Invalid response signature'], 400);
-        }
-
-      
         $payment = DriverPayment::create([
             'driver_id'     => $driver->id,
-            'order_id'      => uniqid('ipay_'),
-            'pid'           => $respPid, 
+            'order_id'      => uniqid('ipay_'), // внутренний ID
+            'pid'           => $respPid,        // настоящий iPay pid
             'amount'        => $amountGrn,
             'amount_cents'  => $amountCents,
             'status'        => 'pending',
@@ -315,30 +256,27 @@ XML;
             'response_data' => (string)$response->body(),
         ]);
 
-        Log::info('iPay payment created', [
-            'payment_id' => $payment->id,
-            'driver_id'  => $driver->id,
-            'amount'     => $amountGrn,
-            'url'        => $respUrl,
-            'pid'        => $respPid,
+        return response()->json([
+            'url'       => $respUrl,
+            'payment_id'=> $payment->id,
+            'order_id'  => $payment->order_id, // фронт работает с этим
+            'pid'       => $respPid            // но сохраняем и возвращаем настоящий pid
         ]);
-
-        return response()->json(['url' => $respUrl, 'payment_id' => $payment->id, 'pid' => $respPid]);
     } catch (\Exception $e) {
-        Log::error('iPay exception', ['exception' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         return response()->json(['error' => 'Internal error'], 500);
     }
 }
 
 
 
+
 public function checkStatus(Request $request)
 {
-    $pid = $request->query('pid');
+    $orderId = $request->query('order_id');
 
     $query = DriverPayment::query()->where('status', 'pending');
-    if ($pid) {
-        $query->where('pid', $pid);
+    if ($orderId) {
+        $query->where('order_id', $orderId); // ищем по внутреннему ID
     } else {
         $query->orderByDesc('created_at');
     }
@@ -346,7 +284,6 @@ public function checkStatus(Request $request)
     $payment = $query->latest()->first();
 
     if (!$payment) {
-        Log::warning('checkStatus: no pending payment found', ['pid' => $pid]);
         return redirect('/?error=no_payment');
     }
 
@@ -355,7 +292,7 @@ public function checkStatus(Request $request)
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $systemKey);
 
-    // 👇 используем order_id вместо pid
+    // В XML всегда идёт настоящий pid от iPay
     $xml = <<<XML
 <payment>
     <auth>
@@ -374,39 +311,16 @@ XML;
         'Content-Type' => 'application/x-www-form-urlencoded',
     ])->post($endpoint, ['data' => $xml]);
 
-    Log::info('checkStatus: iPay status request', [
-        'payment_id' => $payment->id,
-        'pid' => $payment->pid,
-        'status' => $response->status()
-    ]);
-
     if (!$response->successful()) {
-        Log::error('checkStatus: iPay status fetch failed', [
-            'status' => $response->status(),
-            'body' => $response->body()
-        ]);
         return redirect('/ordersDrive?ipay=fail');
     }
 
-    $body = $response->body();
-    if (empty($body) || strpos(trim($body), '<') !== 0) {
-        Log::error('checkStatus: invalid XML response', ['raw' => $body]);
-        return redirect('/ordersDrive?ipay=fail');
-    }
-
-    libxml_use_internal_errors(true);
-    $bodyXml = simplexml_load_string($body);
+    $bodyXml = simplexml_load_string($response->body());
     if (!$bodyXml) {
-        Log::error('checkStatus: XML parse failed', ['raw' => $body]);
         return redirect('/ordersDrive?ipay=fail');
     }
 
     $status = (string) ($bodyXml->status ?? '');
-
-    Log::info('checkStatus: iPay returned', [
-        'pid' => $payment->pid,
-        'status' => $status
-    ]);
 
     if ($status === '5') {
         if (!$payment->credited) {
@@ -417,18 +331,9 @@ XML;
                     $driver->balance = (float)$driver->balance + (float)$toAdd;
                     $driver->save();
 
-                    $payment->status = 'success';
+                    $payment->status   = 'success';
                     $payment->credited = true;
                     $payment->save();
-
-                    Log::info('checkStatus: credited driver', [
-                        'driver_id' => $driver->id,
-                        'amount' => $toAdd
-                    ]);
-                } else {
-                    Log::warning('checkStatus: driver not found', [
-                        'payment_id' => $payment->id
-                    ]);
                 }
             });
         }
@@ -439,6 +344,7 @@ XML;
         return redirect('/ordersDrive?ipay=fail');
     }
 }
+
 
 
  
