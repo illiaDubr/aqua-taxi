@@ -171,7 +171,8 @@ class OrderController extends Controller
     $data = $request->validate([
         'rating' => ['nullable','integer','min:1','max:5'],
     ]);
-    $rating = (int) ($data['rating'] ?? 5);
+
+    $rating = (int)($data['rating'] ?? 5);
 
     // Авторизация: заказ принадлежит текущему пользователю
     $user = $request->user();
@@ -179,7 +180,7 @@ class OrderController extends Controller
         return response()->json(['message' => 'Forbidden'], 403);
     }
 
-    // Разрешённые статусы к завершению
+    // Разрешённые статусы для завершения
     if (!in_array($order->status, ['accepted','in_progress'], true)) {
         return response()->json(['message' => 'Order is not deliverable'], 422);
     }
@@ -187,39 +188,39 @@ class OrderController extends Controller
     $updatedDriver = null;
 
     DB::transaction(function () use ($order, $rating, &$updatedDriver) {
-        // 1) Лочим заказ
-        $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+        // Лочим заказ
+        $locked = Order::whereKey($order->id)
+            ->lockForUpdate()
+            ->firstOrFail();
 
         if (!in_array($locked->status, ['accepted','in_progress'], true)) {
             abort(409, 'Order status changed');
         }
 
-        // 2) Если у заказа есть назначенный водитель — лочим строку водителя и обновляем bottles и balance
+        // Если есть назначенный водитель — обновляем его данные
         if ($locked->driver_id) {
-            // Лочим запись водителя
+
+            // Лочим строку водителя
             $driverRow = DB::table('drivers')
                 ->where('id', $locked->driver_id)
                 ->lockForUpdate()
                 ->first();
 
             if ($driverRow) {
-                // Считаем количество бутлей, которые нужно списать у водителя.
-                // Используем purchase_bottle_count если задан, иначе если bottle_option == 'buy' — считаем quantity, иначе 0
-                $purchaseCount = isset($locked->purchase_bottle_count) && $locked->purchase_bottle_count !== null
-    ? (int)$locked->purchase_bottle_count
-    : (int)$locked->quantity;
 
-                // Новое количество бутлей (не ниже 0)
+                // ✔ ВСЕГДА списываем quantity, независимо от опции
+                $purchaseCount = (int)$locked->quantity;
+
                 $newBottles = max(0, (int)$driverRow->bottles - $purchaseCount);
 
-                // Комиссия 10% от total_price
-                $orderSum = (float) ($locked->total_price ?? 0);
+                // ✔ Комиссия 10%
+                $orderSum = (float)($locked->total_price ?? 0);
                 $commission = round($orderSum * 0.10, 2);
 
-                // Новый баланс (не ниже 0)
                 $newBalance = max(0, round((float)$driverRow->balance - $commission, 2));
 
-                // Применяем обновления
+                // Обновляем водителя
                 DB::table('drivers')
                     ->where('id', $driverRow->id)
                     ->update([
@@ -227,17 +228,16 @@ class OrderController extends Controller
                         'balance' => $newBalance,
                     ]);
 
-                // Вернём данные об обновлённом водителе в ответ
                 $updatedDriver = [
-                    'id'      => (int)$driverRow->id,
+                    'id' => (int)$driverRow->id,
                     'bottles' => $newBottles,
                     'balance' => (float)$newBalance,
-                    'commission_deducted' => (float)$commission,
+                    'commission_deducted' => $commission,
                 ];
             }
         }
 
-        // 3) Завершаем заказ
+        // Завершаем заказ
         $locked->status = 'completed';
         $locked->rating = $rating;
 
@@ -248,14 +248,13 @@ class OrderController extends Controller
         $locked->save();
     });
 
-    // отправим событие для фронто (если нужно — можно расшарить событие здесь)
-
     return response()->json([
         'message' => 'Order completed',
         'order'   => $order->fresh(),
-        'driver'  => $updatedDriver, // null, если списание не применялось
+        'driver'  => $updatedDriver,
     ], 200);
 }
+
  public function cancel(Request $request, Order $order)
     {
         $user = $request->user();
