@@ -350,8 +350,10 @@ public function checkStatus(Request $request)
         return redirect('/?error=no_payment');
     }
 
-    $merchantId = $this->getMerchantId();
-    $systemKey  = config('ipay.system_key');
+    // 👇 Для теста укажи ключи прямо тут
+    $merchantId = '5521';
+    $systemKey  = 'e5817ba6ce82a941e2be9623aabcd9e37e78f19a';
+
     $salt = sha1(microtime(true));
     $sign = hash_hmac('sha512', $salt, $systemKey);
 
@@ -378,14 +380,6 @@ XML;
         'pid' => $payment->pid,
         'status' => $response->status()
     ]);
-
-    if (!$response->successful()) {
-        Log::error('checkStatus: iPay status fetch failed', [
-            'status' => $response->status(),
-            'body' => $response->body()
-        ]);
-        return redirect('/ordersDrive?ipay=fail');
-    }
 
     $body = $response->body();
     if (empty($body) || strpos(trim($body), '<') !== 0) {
@@ -438,6 +432,7 @@ XML;
         return redirect('/ordersDrive?ipay=fail');
     }
 }
+
 
 
 
