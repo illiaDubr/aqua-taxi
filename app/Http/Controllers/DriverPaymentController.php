@@ -306,8 +306,8 @@ XML;
       
         $payment = DriverPayment::create([
             'driver_id'     => $driver->id,
-            'order_id'      => $respPid ?: uniqid('ipay_'),
-            'pid'           => $respPid ?: uniqid('ipay_'),
+            'order_id'      => uniqid('ipay_'),
+            'pid'           => $respPid, 
             'amount'        => $amountGrn,
             'amount_cents'  => $amountCents,
             'status'        => 'pending',
@@ -364,7 +364,7 @@ public function checkStatus(Request $request)
         <sign>{$sign}</sign>
     </auth>
     <action>status</action>
-    <pid>{$payment->order_id}</pid>
+    <pid>{$payment->pid}</pid>
 </payment>
 XML;
 
