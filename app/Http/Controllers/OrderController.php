@@ -205,14 +205,9 @@ class OrderController extends Controller
             if ($driverRow) {
                 // Считаем количество бутлей, которые нужно списать у водителя.
                 // Используем purchase_bottle_count если задан, иначе если bottle_option == 'buy' — считаем quantity, иначе 0
-                $purchaseCount = 0;
-                if (isset($locked->purchase_bottle_count) && $locked->purchase_bottle_count !== null) {
-                    $purchaseCount = (int)$locked->purchase_bottle_count;
-                } elseif (($locked->bottle_option ?? '') === 'buy') {
-                    $purchaseCount = (int)$locked->quantity;
-                } else {
-                    $purchaseCount = 0;
-                }
+                $purchaseCount = isset($locked->purchase_bottle_count) && $locked->purchase_bottle_count !== null
+    ? (int)$locked->purchase_bottle_count
+    : (int)$locked->quantity;
 
                 // Новое количество бутлей (не ниже 0)
                 $newBottles = max(0, (int)$driverRow->bottles - $purchaseCount);

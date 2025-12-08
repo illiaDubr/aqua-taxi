@@ -134,6 +134,8 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('driv
 const cancelledNotifications = ref([])   // список уведомлений об отменах
 const lastCheckedCancelledAt = ref(new Date().toISOString()) // ISO string для since
 let cancelledPollTimer = null
+let ordersPollTimer = null
+
 const driverId = ref(null)
 
 // helpers
@@ -219,7 +221,7 @@ const logoutDriver = async () => {
         stopCancelledPolling()
 
         // редирект на логин водителя
-        router.push('/auth-driver')
+        router.push('/')
     } catch (error) {
         console.error('❌ Помилка виходу:', error)
     }
@@ -262,6 +264,20 @@ console.log('🔄 Запит на скасовані замовлення', last
         console.error('❌ Помилка отримання скасованих замовлень', e)
     }
 }
+
+const startOrdersPolling = (intervalMs = 20_000) => {
+    fetchOrders() // сразу обновим
+    if (ordersPollTimer) clearInterval(ordersPollTimer)
+    ordersPollTimer = setInterval(fetchOrders, intervalMs)
+}
+
+const stopOrdersPolling = () => {
+    if (ordersPollTimer) {
+        clearInterval(ordersPollTimer)
+        ordersPollTimer = null
+    }
+}
+
 
 const startCancelledPolling = (intervalMs = 60_000) => {
     // сразу один запрос, затем интервал
@@ -486,7 +502,8 @@ onMounted(async () => {
     // запускаем polling отмен (интервал 60s)
     console.log('🚀 Стартує polling скасованих замовлень')
     startCancelledPolling(60_000)
-
+    console.log('🚀 Стартує polling нових/активних замовлень')
+    startOrdersPolling(20_000)
     // экспортируем в window функцию tryAcceptOrder, чтобы кнопка могла её вызвать
     window.tryAcceptOrder = async function(orderId) {
         try {
