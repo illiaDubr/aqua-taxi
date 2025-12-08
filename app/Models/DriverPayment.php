@@ -9,6 +9,7 @@ class DriverPayment extends Model
     protected $fillable = [
         'driver_id',
         'order_id',
+        'pid',
         'amount',
         'status',
         'response_data',
