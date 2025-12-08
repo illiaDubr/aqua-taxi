@@ -338,7 +338,7 @@ public function checkStatus(Request $request)
 
     $query = DriverPayment::query()->where('status', 'pending');
     if ($pid) {
-        $query->where('order_id', $pid);
+        $query->where('pid', $pid);
     } else {
         $query->orderByDesc('created_at');
     }
