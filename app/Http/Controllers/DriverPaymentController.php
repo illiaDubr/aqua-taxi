@@ -164,7 +164,7 @@ XML;
         return response()->json([
             'url'       => $respUrl,
             'payment_id'=> $payment->id,
-            'order_id'  => $payment->order_id, // фронт работает с этим
+            'order_id'  => $payment->order_id, 
             'pid'       => $respPid            // но сохраняем и возвращаем настоящий pid
         ]);
     } catch (\Exception $e) {
@@ -193,8 +193,8 @@ public function checkStatus(Request $request)
         return redirect('/?error=no_payment');
     }
 
-    $merchantId = $this->getMerchantId();
-    $signKey    = $this->getSignKey();
+    $merchantId = config('ipay.merchant_id');
+    $signKey    = config('ipay.sign_key');
     $systemKey  = config('ipay.system_key');
    
     // В XML всегда идёт настоящий pid от iPay
