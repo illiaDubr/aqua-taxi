@@ -255,30 +255,30 @@ XML;
     ]);
 
     if ($status === '5') {
-        if (!$payment->credited) {
-            DB::transaction(function () use ($payment) {
-                $driver = Driver::find($payment->driver_id);
-                if ($driver) {
-                    $toAdd = $payment->amount ?? (($payment->amount_cents ?? 0) / 100);
-                    $driver->balance = (float)$driver->balance + (float)$toAdd;
-                    $driver->save();
+    if (!$payment->credited) {
+        DB::transaction(function () use ($payment) {
+            $driver = Driver::find($payment->driver_id);
+            if ($driver) {
+                $toAdd = $payment->amount ?? (($payment->amount_cents ?? 0) / 100);
+                $driver->balance = (float)$driver->balance + (float)$toAdd;
+                $driver->save();
 
-                    $payment->status   = 'success';
-                    $payment->credited = true;
-                    $payment->save();
+                $payment->status   = 'success';
+                $payment->credited = true;
+                $payment->save();
 
-                    Log::info('checkStatus: credited driver', [
-                        'driver_id' => $driver->id,
-                        'amount'    => $toAdd
-                    ]);
-                } else {
-                    Log::warning('checkStatus: driver not found', [
-                        'payment_id' => $payment->id
-                    ]);
-                }
-            });
-        }
-        return redirect('/ordersDrive?ipay=success');
+                Log::info('checkStatus: credited driver', [
+                    'driver_id' => $driver->id,
+                    'amount'    => $toAdd
+                ]);
+            } else {
+                Log::warning('checkStatus: driver not found', [
+                    'payment_id' => $payment->id
+                ]);
+            }
+        });
+    }
+    return redirect('/ordersDrive?ipay=success');
     } else {
         $payment->status = $status === '4' ? 'failed' : 'pending';
         $payment->save();
