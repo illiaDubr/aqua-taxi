@@ -100,7 +100,7 @@ class DriverPaymentController extends Controller
     $sign = hash_hmac('sha512', $salt, $signKey);
 
     $callbackGood = url('/api/driver/payment/check');
-    $callbackBad  = url('/ordersDrive?ipay=fail');
+    $callbackBad  = url('/api/driver/payment/check');
 
     $infoJson = json_encode(['driver_id' => $driver->id]);
 
