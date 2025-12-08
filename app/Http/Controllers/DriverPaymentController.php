@@ -376,7 +376,7 @@ XML;
 
     Log::info('checkStatus: iPay status request', [
         'payment_id' => $payment->id,
-        'pid' => $payment->order_id,
+        'pid' => $payment->pid,
         'status' => $response->status()
     ]);
 
@@ -404,7 +404,7 @@ XML;
     $status = (string) ($bodyXml->status ?? '');
 
     Log::info('checkStatus: iPay returned', [
-        'pid' => $payment->order_id,
+        'pid' => $payment->pid,
         'status' => $status
     ]);
 
