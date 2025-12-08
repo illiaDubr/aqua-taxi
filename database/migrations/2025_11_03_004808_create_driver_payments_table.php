@@ -14,7 +14,7 @@ return new class extends Migration
             $table->unsignedBigInteger('driver_id');
 
             // внутренний ID заказа/начисления
-            $table->unsignedBigInteger('order_id')->nullable();
+            $table->string('order_id')->nullable();
              $table->unsignedBigInteger('pid')->nullable();
 
             // ID платежа на стороне iPay
