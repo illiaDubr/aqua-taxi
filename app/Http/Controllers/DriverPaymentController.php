@@ -75,101 +75,6 @@ class DriverPaymentController extends Controller
     }
 
 
-public function pollUntilSuccess(DriverPayment $payment)
-{
-    $merchantId = config('ipay.merchant_id');
-    $systemKey  = config('ipay.system_key');
-    $endpoint   = config('ipay.sandbox_endpoint'); 
-    if (! $merchantId || ! $systemKey || ! $endpoint) {
-        Log::error('iPay polling: missing config', [
-            'merchant_id' => $merchantId,
-            'system_key'  => $systemKey,
-            'endpoint'    => $endpoint,
-        ]);
-        return;
-    }
-
-    sleep(2); 
-    for ($i = 0; $i < 6; $i++) {
-        $salt = sha1(microtime(true));
-        $sign = hash_hmac('sha512', $salt, $systemKey);
-
-        $xml = <<<XML
-<payment>
-    <auth>
-        <mch_id>{$merchantId}</mch_id>
-        <salt>{$salt}</salt>
-        <sign>{$sign}</sign>
-    </auth>
-    <action>status</action>
-    <pid>{$payment->order_id}</pid>
-</payment>
-XML;
-
-        $response = Http::asForm()->withHeaders([
-            'Accept' => 'application/xml',
-            'Content-Type' => 'application/x-www-form-urlencoded',
-        ])->post($endpoint, ['data' => $xml]);
-
-        if (! $response->successful()) {
-            Log::warning('iPay polling failed', [
-                'payment_id' => $payment->id,
-                'status'     => $response->status(),
-                'body'       => $response->body(),
-            ]);
-            sleep(5);
-            continue;
-        }
-
-        Log::debug('iPay polling raw XML', [
-            'payment_id' => $payment->id,
-            'attempt'    => $i + 1,
-            'body'       => $response->body(),
-        ]);
-
-        $bodyXml = simplexml_load_string($response->body());
-        if (! $bodyXml) {
-            Log::warning('iPay polling: invalid XML', [
-                'payment_id' => $payment->id,
-                'raw'        => $response->body(),
-            ]);
-            sleep(5);
-            continue;
-        }
-
-        $status = (string) ($bodyXml->status ?? '');
-
-        Log::info('iPay polling attempt', [
-            'payment_id' => $payment->id,
-            'attempt'    => $i + 1,
-            'status'     => $status,
-        ]);
-
-        if ($status === '5' && $payment->status !== 'success' && ! $payment->credited) {
-            $driver = Driver::find($payment->driver_id);
-            if ($driver) {
-                $driver->balance += $payment->amount;
-                $driver->save();
-
-                $payment->status = 'success';
-                $payment->credited = true;
-                $payment->save();
-
-                Log::info('Driver balance credited via polling', [
-                    'driver_id' => $driver->id,
-                    'amount'    => $payment->amount,
-                ]);
-            }
-            return;
-        }
-
-        sleep(5);
-    }
-
-    Log::info('iPay polling ended without success', ['payment_id' => $payment->id]);
-}
-
-
 
     public function initiatePayment(Request $request)
 {
@@ -288,16 +193,10 @@ public function checkStatus(Request $request)
         return redirect('/?error=no_payment');
     }
 
-   $merchantId = $this->getMerchantId();
-$systemKey  = config('ipay.system_key');
-
-$action = 'status';
-$pid    = $payment->pid;
-
-$salt = sha1(microtime(true));
-
-$sign = hash_hmac('sha512', $action . $pid . $salt, $systemKey);
-
+    $merchantId = $this->getMerchantId();
+    $signKey    = $this->getSignKey();
+    $systemKey  = config('ipay.system_key');
+   
     // В XML всегда идёт настоящий pid от iPay
     $xml = <<<XML
 <payment>
