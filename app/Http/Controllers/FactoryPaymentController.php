@@ -49,8 +49,8 @@ class FactoryPaymentController extends Controller
 
 
     public function initiatePayment(Request $request)
-{
-    $validated = $request->validate([
+    {
+        $validated = $request->validate([
         'amount' => 'required|numeric|min:0.01',
     ]);
 
@@ -79,7 +79,7 @@ class FactoryPaymentController extends Controller
 
     $infoJson = json_encode(['factory_id' => $factory->id]);
 
-    $xml = <<<XML
+        $xml = <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <payment>
     <auth>
@@ -106,44 +106,46 @@ class FactoryPaymentController extends Controller
 </payment>
 XML;
 
-    try {
-        $response = Http::asForm()->withHeaders([
-            'Accept' => 'application/xml',
-            'Content-Type' => 'application/x-www-form-urlencoded',
-        ])->post($endpoint, ['data' => $xml]);
+        try {
+            $response = Http::asForm()->withHeaders([
+                'Accept' => 'application/xml',
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ])->post($endpoint, ['data' => $xml]);
 
-        if (!$response->successful()) {
-            return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
+            if (!$response->successful()) {
+                return response()->json(['error' => 'iPay error', 'details' => $response->body()], 400);
+            }
+
+            libxml_use_internal_errors(true);
+            $bodyXml = simplexml_load_string($response->body());
+            if (!$bodyXml) {
+                return response()->json(['error' => 'Invalid response from payment gateway'], 500);
+            }
+
+            $respPid    = (string) ($bodyXml->pid ?? '');
+            $respUrl    = (string) ($bodyXml->url ?? '');
+
+            $payment = FactoryPayment::create([
+                'factory_id'    => $factory->id,
+                'order_id'      => uniqid('ipay_'),
+                'pid'           => $respPid,
+                'amount'        => $amountGrn,
+                'amount_cents'  => $amountCents,
+                'status'        => 'pending',
+                'credited'      => false,
+                'response_data' => (string)$response->body(),
+            ]);
+
+            return response()->json([
+                'url'       => $respUrl,
+                'payment_id'=> $payment->id,
+                'order_id'  => $payment->order_id,
+                'pid'       => $respPid
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Internal error'], 500);
         }
-
-        libxml_use_internal_errors(true);
-        $bodyXml = simplexml_load_string($response->body());
-        if (!$bodyXml) {
-            return response()->json(['error' => 'Invalid response from payment gateway'], 500);
-        }
-
-        $respPid    = (string) ($bodyXml->pid ?? '');
-        $respUrl    = (string) ($bodyXml->url ?? '');
-
-        $payment = FactoryPayment::create([
-            'factory_id'    => $factory->id,
-            'order_id'      => uniqid('ipay_'),
-            'pid'           => $respPid,
-            'amount'        => $amountGrn,
-            'amount_cents'  => $amountCents,
-            'status'        => 'pending',
-            'credited'      => false,
-            'response_data' => (string)$response->body(),
-        ]);
-
-        // 🔁 Вариант 1: сразу редиректим пользователя на iPay
-        return redirect()->away($respUrl);
-
-    } catch (\Exception $e) {
-        return response()->json(['error' => 'Internal error'], 500);
     }
-}
-
 
     public function checkStatus(Request $request)
     {
