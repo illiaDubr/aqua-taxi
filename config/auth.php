@@ -40,7 +40,7 @@ return [
             'provider' => 'drivers',
         ],
         'factory' => [
-        'driver' => 'session',
+        'driver' => 'sanctum',
         'provider' => 'factories',
     ],
         // если есть админка
