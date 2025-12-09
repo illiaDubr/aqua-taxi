@@ -133,7 +133,7 @@ Route::middleware(['auth:sanctum','abilities:factory'])->group(function () {
     
 });
 
-Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiinitiatePaymentate']);
+Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiatePayment']);
 Route::post('/factory/payment/check', [FactoryPaymentController::class, 'checkStatus']);
 /*
 |--------------------------------------------------------------------------
