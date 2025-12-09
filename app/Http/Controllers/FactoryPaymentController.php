@@ -50,7 +50,7 @@ class FactoryPaymentController extends Controller
 
     public function initiatePayment(Request $request)
     {
-        validated = $request->validate([
+        $validated = $request->validate([
         'amount' => 'required|numeric|min:0.01',
     ]);
 
