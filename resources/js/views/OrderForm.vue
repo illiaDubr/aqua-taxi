@@ -297,7 +297,7 @@ const createOrder = async () => {
             <!-- адрес -->
             <div class="form__group">
                 <label>Введіть ваші дані</label>
-                <input type="text" placeholder="ВВедіть назву міста та адрессу" v-model="address" />
+                <input type="text" placeholder="Введіть назву міста та адресу" v-model="address" />
 
                 <!-- КНОПКА ТОЛЬКО ВКЛЮЧАЕТ КАРТУ -->
                 <button
