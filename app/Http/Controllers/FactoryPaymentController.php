@@ -30,35 +30,22 @@ class FactoryPaymentController extends Controller
         return config('ipay.sign_key');
     }
 
-    private function factory(Request $request)
-    {
-        $userFromRequest = $request->user(); 
-        $userFromGuard   = Auth::guard('factory')->user();
+    private function factory(Request $request): ?Factory
+{
+    $userFromRequest = $request->user(); 
+    $userFromGuard   = Auth::guard('factory')->user();
 
-        Log::debug('Factory auth check start', [
-            'request_user_id' => $userFromRequest ? $userFromRequest->id : null,
-            'request_user_model' => $userFromRequest ? get_class($userFromRequest) : null,
-            'guard_user_id' => $userFromGuard ? $userFromGuard->id : null,
-            'auth_default_guard' => config('auth.defaults.guard'),
-            'authorization_header' => $request->header('Authorization'),
-            'all_headers' => $request->headers->all(),
+    $factory = $userFromRequest ?: $userFromGuard;
+
+    if (! $factory) {
+        Log::warning('Factory auth failed: no authenticated factory found', [
+            'bearer_present' => $request->bearerToken() ? true : false,
         ]);
+        return null; // вместо JsonResponse
+    }
 
-        $bearer = $request->bearerToken();
-        if ($bearer) {
-            try {
-                $pat = PersonalAccessToken::findToken($bearer);
-                Log::debug('PersonalAccessToken lookup', [
-                    'token_exists' => (bool) $pat,
-                    'tokenable_type' => $pat ? $pat->tokenable_type : null,
-                    'tokenable_id' => $pat ? $pat->tokenable_id : null,
-                    'abilities' => $pat ? $pat->abilities : null,
-                    'last_used_at' => $pat ? $pat->last_used_at : null,
-                ]);
-            } catch (\Throwable $ex) {
-                Log::error('PAT lookup failed', ['ex' => $ex->getMessage()]);
-            }
-        }
+    return $factory;
+}
 
         $factory = $userFromRequest ?: $userFromGuard;
 
