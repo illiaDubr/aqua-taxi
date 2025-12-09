@@ -16,7 +16,7 @@ class Factory extends Authenticatable
         'warehouse_address','water_types',
         'certificate_path','certificate_status',
         'certificate_expiration','is_verified',
-        'verified_until','lat','lng',
+        'verified_until','lat','lng','balance'
     ];
 
     protected $hidden = ['password','remember_token'];

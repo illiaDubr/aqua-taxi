@@ -16,7 +16,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\Admin\FactoryController;
 use App\Http\Controllers\FactoryModerationController;
 use App\Http\Controllers\FactoryOrderController;
-
+use App\Http\Controllers\FactoryPaymentController;
 /*
 |--------------------------------------------------------------------------
 | DRIVER (публичные)
@@ -130,8 +130,11 @@ Route::middleware(['auth:sanctum','abilities:factory'])->group(function () {
     Route::get('/factory-orders',                       [FactoryOrderController::class, 'forFactory']);
     Route::post('/factory-orders/{order}/accept',       [FactoryOrderController::class, 'acceptByFactory']);
     Route::post('/factory-orders/{order}/complete',     [FactoryOrderController::class, 'completeByFactory']);
+    Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiate']);
 });
 
+
+Route::post('/factory/payment/check', [FactoryPaymentController::class, 'check']);
 /*
 |--------------------------------------------------------------------------
 | FACTORY ORDERS, сторона водителя — только ability: driver
