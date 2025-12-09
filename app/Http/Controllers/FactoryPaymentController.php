@@ -50,31 +50,34 @@ class FactoryPaymentController extends Controller
 
     public function initiatePayment(Request $request)
     {
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-        ]);
+        validated = $request->validate([
+        'amount' => 'required|numeric|min:0.01',
+    ]);
 
-        $factory = $this->factory($request);
+    $factory = $this->factory($request);
+    if (! $factory) {
+        return response()->json(['error' => 'Необхідна авторизація фабрики'], 401);
+    }
 
-        $amountGrn   = (float) $request->input('amount');
-        $amountCents = (int) round($amountGrn * 100);
+    $amountGrn   = (float) $request->input('amount');
+    $amountCents = (int) round($amountGrn * 100);
 
-        $merchantId = $this->getMerchantId();
-        $signKey    = $this->getSignKey();
-        $systemKey  = config('ipay.system_key');
-        $endpoint   = $this->getEndpoint();
+    $merchantId = $this->getMerchantId();
+    $signKey    = $this->getSignKey();
+    $systemKey  = config('ipay.system_key');
+    $endpoint   = $this->getEndpoint();
 
-        if (!$merchantId || !$signKey || !$systemKey) {
-            return response()->json(['error' => 'Payment gateway not configured'], 500);
-        }
+    if (!$merchantId || !$signKey || !$systemKey) {
+        return response()->json(['error' => 'Payment gateway not configured'], 500);
+    }
 
-        $salt = sha1(microtime(true));
-        $sign = hash_hmac('sha512', $salt, $signKey);
+    $salt = sha1(microtime(true));
+    $sign = hash_hmac('sha512', $salt, $signKey);
 
-        $callbackGood = url('/api/factory/payment/check');
-        $callbackBad  = url('/api/factory/payment/check');
+    $callbackGood = url('/api/factory/payment/check');
+    $callbackBad  = url('/api/factory/payment/check');
 
-        $infoJson = json_encode(['factory_id' => $factory->id]);
+    $infoJson = json_encode(['factory_id' => $factory->id]);
 
         $xml = <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
