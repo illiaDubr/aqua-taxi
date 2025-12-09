@@ -395,34 +395,6 @@ const handleVisibilityChange = () => {
 const handleOnline  = () => startPolling(currentTab.value === 'new' ? pollNew : pollActive)
 const handleOffline = () => stopPolling()
 const handleExternalRefresh = () => refreshNow()
-async function topUp() {
-    const amount = prompt("Введіть суму поповнення (грн):");
-    if (!amount) return;
-
-    const sum = Number(amount);
-
-    if (isNaN(sum) || sum <= 0) {
-        alert("Некоректна сума");
-        return;
-    }
-
-    try {
-        const { data } = await axios.post('/api/factory/payment/initiate', {
-            amount: sum
-        }, cfg());
-
-        if (data?.payment_url) {
-            // Перенаправляем на оплату iPay
-            window.location.href = data.payment_url;
-        } else {
-            alert("Помилка: немає payment_url");
-        }
-
-    } catch (e) {
-        console.error("Помилка поповнення", e);
-        alert(e?.response?.data?.message || "Не вдалося створити платіж");
-    }
-}
 
 /** --- Mount/Unmount --- */
 onMounted(() => {
