@@ -137,7 +137,7 @@ XML;
             ]);
 
             return response()->json([
-                'url'       => $respUrl,
+                'payment_url'       => $respUrl,
                 'payment_id'=> $payment->id,
                 'order_id'  => $payment->order_id,
                 'pid'       => $respPid
