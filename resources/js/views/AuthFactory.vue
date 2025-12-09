@@ -83,7 +83,7 @@
                             </div>
 
                             <div class="field">
-                                <input class="auth__input" type="text" placeholder="Ваша адреса складу" v-model.trim="warehouse" />
+                                <input class="auth__input" type="text" placeholder="ВВедіть назву міста та адрессу" v-model.trim="warehouse" />
                                 <small v-if="fieldErr.warehouse_address" class="fld-err">{{ fieldErr.warehouse_address }}</small>
                             </div>
 
