@@ -174,6 +174,7 @@ async function topUp() {
 
     try {
         const { data } = await axios.post('/api/factory/payment/initiate', { amount: num }, cfg())
+        console.log('payment initiate response', data)
         if (!data?.payment_url) {
             alert("Не вдалося створити платіж")
             return
