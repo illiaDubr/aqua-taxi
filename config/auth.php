@@ -39,7 +39,10 @@ return [
             'driver' => 'sanctum',
             'provider' => 'drivers',
         ],
-
+        'factory' => [
+        'driver' => 'session',
+        'provider' => 'factories',
+    ],
         // если есть админка
         'admin' => [
             'driver' => 'sanctum',
@@ -58,7 +61,10 @@ return [
             'driver' => 'eloquent',
             'model' => App\Models\User::class,
         ],
-
+        'factories' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Factory::class,
+    ],
         'admins' => [
             'driver' => 'eloquent',
             'model' => App\Models\Admin::class,
