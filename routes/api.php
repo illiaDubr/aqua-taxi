@@ -130,10 +130,10 @@ Route::middleware(['auth:sanctum','abilities:factory'])->group(function () {
     Route::get('/factory-orders',                       [FactoryOrderController::class, 'forFactory']);
     Route::post('/factory-orders/{order}/accept',       [FactoryOrderController::class, 'acceptByFactory']);
     Route::post('/factory-orders/{order}/complete',     [FactoryOrderController::class, 'completeByFactory']);
-    Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiate']);
+    
 });
 
-
+Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiate']);
 Route::post('/factory/payment/check', [FactoryPaymentController::class, 'check']);
 /*
 |--------------------------------------------------------------------------
