@@ -47,17 +47,6 @@ class FactoryPaymentController extends Controller
     return $factory;
 }
 
-        $factory = $userFromRequest ?: $userFromGuard;
-
-        if (! $factory) {
-            Log::warning('Factory auth failed: no authenticated factory found', [
-                'bearer_present' => $bearer ? true : false,
-            ]);
-            return response()->json(['error' => 'Необхідна авторизація фабрики'], 401);
-        }
-
-        return $factory;
-    }
 
     public function initiatePayment(Request $request)
     {
