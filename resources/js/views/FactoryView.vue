@@ -2,17 +2,16 @@
     <div class="producer-orders">
         <!-- Верхняя панель -->
         <div class="producer-orders__topbar">
-  <div class="status-toggle" :class="{ offline: !isOnline }" @click="toggleStatus">
-    <span class="label">{{ isOnline ? 'Онлайн' : 'Оффлайн' }}</span>
-    <div class="toggle-circle"></div>
-  </div>
-  <div class="balance-box">
-    <span class="amount">{{ (balance ?? 0).toFixed(2) }}грн</span>
-    <button class="plus" @click="topUp">＋</button>
-  </div>
-  <button class="logout-btn" @click="logoutFactory">Вийти</button>
-</div>
-
+            <div class="status-toggle" :class="{ offline: !isOnline }" @click="toggleStatus">
+                <span class="label">{{ isOnline ? 'Онлайн' : 'Оффлайн' }}</span>
+                <div class="toggle-circle"></div>
+            </div>
+            <div class="balance-box">
+                <span class="amount">{{ (balance ?? 0).toFixed(2) }}грн</span>
+                <button class="plus" @click="topUp">＋</button>
+            </div>
+            <button class="logout-btn" @click="logoutFactory">Вийти</button>
+        </div>
 
         <div class="bg">
             <!-- Табы -->
@@ -149,38 +148,9 @@ const busy      = ref({})
 
 let abortCtl = null
 
-function logoutFactory() {
-  const token = getFactoryToken()
-
-  // Если токена нет — сразу редирект
-  if (!token) {
-    window.location.href = 'https://example.com/'
-    return
-  }
-
-  axios.post('/api/logout', {}, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(() => {
-    localStorage.removeItem('factory_token')
-    localStorage.removeItem('token')
-  })
-  .catch(err => {
-    console.error('❌ Помилка при виході', err)
-    alert('Помилка при виході')
-  })
-  .finally(() => {
-    // Редирект в любом случае
-    window.location.href = 'https://example.com/'
-  })
-}
-
-
 /** --- Auth helpers --- */
 function getFactoryToken () {
-    return localStorage.getItem('factory_token')
-        || localStorage.getItem('token')
-        || ''
+    return localStorage.getItem('factory_token') || localStorage.getItem('token') || ''
 }
 function cfg(extra = {}) {
     const t = getFactoryToken()
@@ -192,15 +162,35 @@ function cfg(extra = {}) {
 
 /** --- UI helpers --- */
 function toggleStatus() { isOnline.value = !isOnline.value }
-function topUp() {}
+
+async function topUp() {
+    const amount = prompt("Введіть суму поповнення (грн):")
+    if (!amount) return
+    const num = Number(amount)
+    if (isNaN(num) || num <= 0) {
+        alert("Некоректна сума")
+        return
+    }
+
+    try {
+        const { data } = await axios.post('/api/factory/payment/initiate', { amount: num }, cfg())
+        if (!data?.payment_url) {
+            alert("Не вдалося створити платіж")
+            return
+        }
+        window.location.href = data.payment_url
+    } catch (err) {
+        console.error(err)
+        alert(err?.response?.data?.message || "Помилка створення платежу")
+    }
+}
+
 function money(v) { const n = Number(v ?? 0); return `${n.toFixed(2)} грн` }
 function fmtTime(iso) { try { return new Date(iso).toLocaleString('uk-UA') } catch { return '' } }
 
-/** water_type → человекочитаемо */
 function waterName(code, types) {
     const raw = (code ?? '').toString().trim().toLowerCase()
     if (!raw) return '—'
-    // если фабрика вернула water_types — ищем name там
     if (Array.isArray(types)) {
         const hit = types.find(t => {
             const c = (t.code ?? '').toString().toLowerCase()
@@ -209,10 +199,8 @@ function waterName(code, types) {
         })
         if (hit?.name) return hit.name
     }
-    // локальный словарь
     if (raw === 'silver') return 'Срібна'
     if (raw === 'deep')   return 'Глибокого очищення'
-    // фолбэк — капитализация
     return raw.charAt(0).toUpperCase() + raw.slice(1)
 }
 
@@ -227,7 +215,7 @@ function mergeOrders(targetRef, incoming) {
     targetRef.value = Array.from(map.values()).sort((a,b) => b.id - a.id)
 }
 
-/** --- Abort helpers (axios + AbortController) --- */
+/** --- Abort helpers --- */
 function cancelInFlight() {
     if (abortCtl) abortCtl.abort()
     abortCtl = null
@@ -235,8 +223,7 @@ function cancelInFlight() {
 async function withAbort(getter) {
     cancelInFlight()
     abortCtl = new AbortController()
-    try { return await getter({ signal: abortCtl.signal }) }
-    finally {}
+    try { return await getter({ signal: abortCtl.signal }) } finally {}
 }
 
 /** --- Errors --- */
@@ -267,13 +254,9 @@ async function pollNew() {
         lastSeenNew.value = data?.meta?.server_time || new Date().toISOString()
     } catch (e) {
         if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-            if (!handleAuthError(e, 'new')) {
-                errorNew.value = e?.response?.data?.message || 'Помилка завантаження'
-            }
+            if (!handleAuthError(e, 'new')) errorNew.value = e?.response?.data?.message || 'Помилка завантаження'
         }
-    } finally {
-        loadingNew.value = false
-    }
+    } finally { loadingNew.value = false }
 }
 
 async function pollActive() {
@@ -290,90 +273,57 @@ async function pollActive() {
         lastSeenActive.value = data?.meta?.server_time || new Date().toISOString()
     } catch (e) {
         if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-            if (!handleAuthError(e, 'active')) {
-                errorActive.value = e?.response?.data?.message || 'Помилка завантаження'
-            }
+            if (!handleAuthError(e, 'active')) errorActive.value = e?.response?.data?.message || 'Помилка завантаження'
         }
-    } finally {
-        loadingActive.value = false
-    }
+    } finally { loadingActive.value = false }
 }
 
 async function accept(id) {
     busy.value[id] = true
     try {
         await axios.post(`/api/factory-orders/${id}/accept`, {}, cfg())
-        // переносим карточку из "новых" в "активные"
         const idx = ordersNew.value.findIndex(x => x.id === id)
         if (idx !== -1) {
             const o = { ...ordersNew.value[idx], status: 'accepted', accepted_at: new Date().toISOString() }
             ordersNew.value.splice(idx, 1)
             ordersActive.value.unshift(o)
-        } else {
-            await pollActive()
-        }
+        } else await pollActive()
     } catch (e) {
         if (!handleAuthError(e, 'new')) {
             errorNew.value = e?.response?.data?.message || 'Не вдалося прийняти замовлення'
             await Promise.allSettled([pollNew(), pollActive()])
         }
-    } finally {
-        delete busy.value[id]
-    }
+    } finally { delete busy.value[id] }
 }
 
 async function complete(id) {
     busy.value[id] = true
     try {
         await axios.post(`/api/factory-orders/${id}/complete`, {}, cfg())
-        // убираем из активных
-        const before = ordersActive.value.length
         ordersActive.value = ordersActive.value.filter(x => x.id !== id)
-        if (before === ordersActive.value.length) await pollActive()
+        await pollActive()
     } catch (e) {
-        if (!handleAuthError(e, 'active')) {
-            errorActive.value = e?.response?.data?.message || 'Не вдалося завершити замовлення'
-            await pollActive()
-        }
-    } finally {
-        delete busy.value[id]
-    }
+        if (!handleAuthError(e, 'active')) errorActive.value = e?.response?.data?.message || 'Не вдалося завершити замовлення'
+    } finally { delete busy.value[id] }
 }
 
-/** --- Polling (fake realtime) --- */
-function refreshNow () {
-    if (currentTab.value === 'new')    pollNew()
-    if (currentTab.value === 'active') pollActive()
+/** --- Polling --- */
+function refreshNow() {
+    if (currentTab.value === 'new') pollNew()
+    else if (currentTab.value === 'active') pollActive()
 }
 
 function startPolling(fn) {
     stopPolling()
-
-    if (!getFactoryToken()) {
-        errorNew.value = errorActive.value = 'Потрібен вхід як виробник'
-        return
-    }
-
-    // первый запрос
+    if (!getFactoryToken()) { errorNew.value = errorActive.value = 'Потрібен вхід як виробник'; return }
     fn()
-
-    // далее — раз в минуту, если вкладка видима и есть интернет
-    pollTimer.value = window.setInterval(() => {
-        if (document.visibilityState === 'visible' && navigator.onLine) {
-            fn()
-        }
+    pollTimer.value = setInterval(() => {
+        if (document.visibilityState === 'visible' && navigator.onLine) fn()
     }, POLL_MS)
 }
 
-function stopPolling() {
-    if (pollTimer.value) {
-        clearInterval(pollTimer.value)
-        pollTimer.value = null
-    }
-    cancelInFlight()
-}
-
-function manualRefreshNew()    { pollNew() }
+function stopPolling() { if (pollTimer.value) { clearInterval(pollTimer.value); pollTimer.value = null } cancelInFlight() }
+function manualRefreshNew() { pollNew() }
 function manualRefreshActive() { pollActive() }
 
 function switchTab(tab) {
@@ -383,20 +333,28 @@ function switchTab(tab) {
     else stopPolling()
 }
 
+/** --- Logout --- */
+function logoutFactory() {
+    const token = getFactoryToken()
+    if (!token) { window.location.href = 'https://example.com/'; return }
+    axios.post('/api/logout', {}, { headers: { Authorization: `Bearer ${token}` } })
+        .catch(err => console.error(err))
+        .finally(() => {
+            localStorage.removeItem('factory_token')
+            localStorage.removeItem('token')
+            window.location.href = 'https://example.com/'
+        })
+}
+
 /** --- Events --- */
 const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible') {
-        refreshNow()
-        startPolling(currentTab.value === 'new' ? pollNew : pollActive)
-    } else {
-        stopPolling()
-    }
+    if (document.visibilityState === 'visible') { refreshNow(); startPolling(currentTab.value==='new'?pollNew:pollActive) }
+    else stopPolling()
 }
-const handleOnline  = () => startPolling(currentTab.value === 'new' ? pollNew : pollActive)
+const handleOnline  = () => startPolling(currentTab.value==='new'?pollNew:pollActive)
 const handleOffline = () => stopPolling()
 const handleExternalRefresh = () => refreshNow()
 
-/** --- Mount/Unmount --- */
 onMounted(() => {
     switchTab('active')
     document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -404,7 +362,6 @@ onMounted(() => {
     window.addEventListener('offline', handleOffline)
     window.addEventListener('factory-orders:refresh', handleExternalRefresh)
 })
-
 onBeforeUnmount(() => {
     stopPolling()
     document.removeEventListener('visibilitychange', handleVisibilityChange)
