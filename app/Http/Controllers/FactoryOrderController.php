@@ -122,29 +122,69 @@ class FactoryOrderController extends Controller
     /**
      * Производитель принимает заказ (new -> accepted).
      */
-    public function acceptByFactory(Request $request, FactoryOrder $order) // ← тип меняем на FactoryOrder
-    {
-        $user = Auth::user();
-        if (!$this->isFactory($user)) {
-            return response()->json(['message' => 'Only factories can accept orders'], 403);
-        }
-
-        // Заказ должен принадлежать этой фабрике и быть новым
-        if ($order->factory_id !== (int)$this->factoryIdFromUser($user)) {
-            return response()->json(['message' => 'Order does not belong to this factory'], 403);
-        }
-        if ($order->status !== 'new') {
-            return response()->json(['message' => 'Order is not new'], 422);
-        }
-
-        DB::transaction(function () use ($order) {
-            $order->status      = 'accepted';
-            $order->accepted_at = now();
-            $order->save();
-        });
-
-        return response()->json(['message' => 'Accepted', 'order' => $order->fresh()]);
+    public function acceptByFactory(Request $request, FactoryOrder $order)
+{
+    $user = Auth::user();
+    if (!$this->isFactory($user)) {
+        return response()->json(['message' => 'Only factories can accept orders'], 403);
     }
+
+    $factoryId = (int) $this->factoryIdFromUser($user);
+
+    // Проверяем принадлежность заказа фабрике
+    if ($order->factory_id !== $factoryId) {
+        return response()->json(['message' => 'Order does not belong to this factory'], 403);
+    }
+
+    // Заказ должен быть новым
+    if ($order->status !== 'new') {
+        return response()->json(['message' => 'Order is not new'], 422);
+    }
+
+    // Получаем саму фабрику
+    $factory = Factory::findOrFail($factoryId);
+
+    // Рассчитываем комиссию 10%
+    $fee = round($order->total_price * 0.10, 2);
+
+    // Баланс должен быть >= fee
+    if ($factory->balance < $fee) {
+        return response()->json([
+            'message' => 'Недостатньо коштів на балансі для прийняття замовлення',
+            'required' => $fee,
+            'balance'  => $factory->balance
+        ], 422);
+    }
+
+    DB::transaction(function () use ($order, $factory, $fee) {
+
+        // 1. Списываем комиссию
+        $factory->balance -= $fee;
+        $factory->save();
+
+        // 2. Обновляем заказ
+        $order->status      = 'accepted';
+        $order->accepted_at = now();
+        $order->save();
+
+        // 3. (по желанию) пишем лог транзакции
+        FactoryTransaction::create([
+            'factory_id' => $factory->id,
+            'order_id'   => $order->id,
+            'amount'     => -$fee,
+            'type'       => 'order_accept_fee',
+            'description'=> 'Комісія за прийняття замовлення #' . $order->id,
+        ]);
+
+    });
+
+    return response()->json([
+        'message' => 'Accepted',
+        'order'   => $order->fresh(),
+        'balance' => $factory->fresh()->balance
+    ]);
+}
+
 
 
     /**
