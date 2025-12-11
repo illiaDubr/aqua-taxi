@@ -167,14 +167,7 @@ class FactoryOrderController extends Controller
         $order->accepted_at = now();
         $order->save();
 
-        // 3. (по желанию) пишем лог транзакции
-        FactoryTransaction::create([
-            'factory_id' => $factory->id,
-            'order_id'   => $order->id,
-            'amount'     => -$fee,
-            'type'       => 'order_accept_fee',
-            'description'=> 'Комісія за прийняття замовлення #' . $order->id,
-        ]);
+    
 
     });
 
