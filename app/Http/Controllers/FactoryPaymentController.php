@@ -252,13 +252,13 @@ XML;
                 });
             }
 
-            return redirect('/factory-page?ipay=success');
+            return redirect('/factory-page');
         } else {
             // если статус не 5 — считаем неуспешным
             $payment->status = $status === '4' ? 'failed' : 'pending';
             $payment->save();
 
-            return redirect('/factory-page?ipay=fail');
+            return redirect('/factory-page');
         }
     }
 }
