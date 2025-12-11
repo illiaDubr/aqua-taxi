@@ -47,6 +47,19 @@ class FactoryPaymentController extends Controller
     return $factory;
 }
 
+public function getBalance(Request $request)
+{
+    $factory = $this->factory($request);
+
+    if (! $factory) {
+        return response()->json(['error' => 'Необхідна авторизація фабрики'], 401);
+    }
+
+    return response()->json([
+        'factory_id' => $factory->id,
+        'balance'    => $factory->balance,
+    ]);
+}
 
     public function initiatePayment(Request $request)
     {

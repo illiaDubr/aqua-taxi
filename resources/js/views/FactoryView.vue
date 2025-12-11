@@ -333,6 +333,14 @@ function switchTab(tab) {
     else if (tab === 'active') startPolling(pollActive)
     else stopPolling()
 }
+    async function loadBalance() {
+    try {
+        const { data } = await axios.get('/api/factory/balance', cfg())
+        balance.value = Number(data?.balance ?? 0)
+    } catch (err) {
+        console.error("Balance load error", err)
+    }
+}
 
 /** --- Logout --- */
 function logoutFactory() {
@@ -357,6 +365,7 @@ const handleOffline = () => stopPolling()
 const handleExternalRefresh = () => refreshNow()
 
 onMounted(() => {
+    loadBalance()
     switchTab('active')
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('online',  handleOnline)
