@@ -134,7 +134,7 @@ Route::middleware(['auth:sanctum','abilities:factory'])->group(function () {
 });
 
 Route::post('/factory/payment/initiate', [FactoryPaymentController::class, 'initiatePayment']);
-Route::post('/factory/payment/check', [FactoryPaymentController::class, 'checkStatus']);
+Route::get('/factory/payment/check', [FactoryPaymentController::class, 'checkStatus']);
 /*
 |--------------------------------------------------------------------------
 | FACTORY ORDERS, сторона водителя — только ability: driver
