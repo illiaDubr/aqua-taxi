@@ -342,6 +342,17 @@ function switchTab(tab) {
     }
 }
 
+const confirmModal = ref({ show: false, order: null, fee: 0 })
+
+
+function askAccept(o) {
+const fee = Number(o.total_price) * 0.1
+confirmModal.value = {
+show: true,
+order: o,
+fee: fee.toFixed(2)
+}
+}
 /** --- Logout --- */
 function logoutFactory() {
     const token = getFactoryToken()
@@ -368,12 +379,14 @@ onMounted(() => {
     loadBalance()
     switchTab('active')
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', loadBalance)
     window.addEventListener('online',  handleOnline)
     window.addEventListener('offline', handleOffline)
     window.addEventListener('factory-orders:refresh', handleExternalRefresh)
 })
 onBeforeUnmount(() => {
     stopPolling()
+    window.removeEventListener('focus', loadBalance)
     document.removeEventListener('visibilitychange', handleVisibilityChange)
     window.removeEventListener('online',  handleOnline)
     window.removeEventListener('offline', handleOffline)
@@ -382,6 +395,52 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+    .orders-page { padding: 15px; }
+.balance-block { margin-bottom: 15px; font-size: 18px; }
+
+
+.tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+.tabs button { padding: 8px 12px; border-radius: 6px; border: none; background: #ddd; }
+.tabs .active { background: #4caf50; color: white; }
+
+
+.order-card { padding: 12px; border-radius: 10px; background: #f1f1f1; margin-bottom: 10px; }
+.actions button { padding: 8px 14px; border-radius: 6px; border: none; background: #28a745; color: #fff; }
+
+
+/* МОДАЛКА */
+.modal-overlay {
+position: fixed;
+inset: 0;
+background: rgba(0,0,0,0.5);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 2000;
+}
+.modal {
+background: #fff;
+padding: 20px;
+border-radius: 12px;
+width: 90%;
+max-width: 350px;
+text-align: center;
+}
+.modal-actions {
+margin-top: 15px;
+display: flex;
+justify-content: space-between;
+gap: 10px;
+}
+.btn-cancel,
+.btn-confirm {
+flex: 1;
+padding: 10px;
+border-radius: 8px;
+border: none;
+}
+.btn-confirm { background: #28a745; color: white; }
+.btn-cancel { background: #ccc; color: black; }
 .bg{
     margin: 0 auto;
     background: white;
