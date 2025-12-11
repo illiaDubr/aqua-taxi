@@ -162,7 +162,7 @@ XML;
 
         if (!$payment) {
             Log::warning('checkStatus: no pending factory payment found', ['order_id' => $orderId]);
-            return redirect('/factoryPanel?error=no_payment');
+            return redirect('/factory-page?error=no_payment');
         }
 
         $merchantId = config('ipay.merchant_id');
