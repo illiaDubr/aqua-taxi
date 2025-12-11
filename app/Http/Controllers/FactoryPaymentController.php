@@ -202,20 +202,20 @@ XML;
                 'status' => $response->status(),
                 'body'   => $response->body()
             ]);
-            return redirect('/factoryPanel?ipay=fail');
+            return redirect('/factory-page?ipay=fail');
         }
 
         $body = $response->body();
         if (empty($body) || strpos(trim($body), '<') !== 0) {
             Log::error('checkStatus: invalid XML response', ['raw' => $body]);
-            return redirect('/factoryPanel?ipay=fail');
+            return redirect('/factory-page?ipay=fail');
         }
 
         libxml_use_internal_errors(true);
         $bodyXml = simplexml_load_string($body);
         if (!$bodyXml) {
             Log::error('checkStatus: XML parse failed', ['raw' => $body]);
-            return redirect('/factoryPanel?ipay=fail');
+            return redirect('/factory-page?ipay=fail');
         }
 
         $status = (string) ($bodyXml->status ?? '');
