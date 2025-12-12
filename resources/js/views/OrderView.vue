@@ -100,8 +100,8 @@ const activeTab = ref('order')
 const activeOrders = ref([])
 
 const products = ref([
-   { title: 'Глибокого\nочищення, 19л', price: "від 70 грн", image: water2 },
-  { title: 'Срібна вода, 19л', price: "від 75 грн", image: water1 },
+   { title: 'Глибокого\nочищення, 19л', price: "від 70", image: water2 },
+  { title: 'Срібна вода, 19л', price: "від 75", image: water1 },
  
 ])
 
