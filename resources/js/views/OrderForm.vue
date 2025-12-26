@@ -347,7 +347,7 @@ const createOrder = async () => {
                         В квартиру/В офіс
                     </button>
                     <button :class="{ active: deliveryOption === 'entrance' }" @click="deliveryOption = 'entrance'">
-                        Під під’їзд (-20%)
+                        Додому/Офіс (-20%)
                     </button>
                     <button :class="{ active: deliveryOption === 'coffee' }" @click="deliveryOption = 'coffee'">
                         Кав’ярня (від 2 бутлів)
