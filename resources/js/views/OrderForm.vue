@@ -344,7 +344,7 @@ const createOrder = async () => {
                 <label>Варіант доставки</label>
                 <div class="form__switch">
                     <button :class="{ active: deliveryOption === 'home' }" @click="deliveryOption = 'home'">
-                        В квартиру/В офіс
+                        Додому/Офіс
                     </button>
                     <button :class="{ active: deliveryOption === 'entrance' }" @click="deliveryOption = 'entrance'">
                         Додому/Офіс (-20%)
