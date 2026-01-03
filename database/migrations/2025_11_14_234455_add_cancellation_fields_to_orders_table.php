@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->timestamp('cancelled_at')->nullable()->after('completed_at');
+            $table->timestamp('cancelled_at')->nullable()->after('total_price');
             $table->string('cancelled_by')->nullable()->after('cancelled_at'); // 'user' | 'driver' | 'system'
             $table->unsignedBigInteger('cancelled_by_id')->nullable()->after('cancelled_by');
             $table->text('cancel_reason')->nullable()->after('cancelled_by_id');
