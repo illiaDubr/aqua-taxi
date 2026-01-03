@@ -80,18 +80,29 @@ const UNIT_PRICES = {
 }
 const BUY_SURCHARGE = 350      // + за покупку бутля
 const COFFEE_PRICE  = 70       // кав’ярня (від 5 бутлів)
-
+const COFFEE_TIER_PRICES = {
+  2: 120,
+  3: 100,
+  4: 90,
+  5: 80,
+  more: 70,
+}
 // --- цена за 1 бутыль (только вода)
 const unitWaterPrice = computed(() => {
-    const qty = Number.parseInt(quantity.value, 10) || 0
-    const wt = waterType.value
-    if (!wt) return 0
+  const qty = Number.parseInt(quantity.value, 10) || 0
+  const wt = waterType.value
+  if (!wt || !qty) return 0
 
-    // кав'ярня: фикс. цена, но только если qty >= 5
-    if (deliveryOption.value === 'coffee') return qty >= 5 ? COFFEE_PRICE : 0
+  // === КАВ’ЯРНЯ ===
+  if (deliveryOption.value === 'coffee') {
+    if (qty < 2) return 0
+    if (qty >= 6) return COFFEE_TIER_PRICES.more
+    return COFFEE_TIER_PRICES[qty] ?? 0
+  }
 
-    const tier = qty >= 2 ? 'many' : 'one'
-    return UNIT_PRICES[wt]?.[tier] ?? 0
+  // === ОБЫЧНАЯ ЛОГИКА ===
+  const tier = qty >= 2 ? 'many' : 'one'
+  return UNIT_PRICES[wt]?.[tier] ?? 0
 })
 
 // --- наценка за покупку бутля (за 1 шт)
@@ -106,7 +117,7 @@ const totalAmount = computed(() => {
     if (!qty || !waterType.value) return 0
 
     // защита для кофе-режима
-    if (deliveryOption.value === 'coffee' && qty < 5) return 0
+   if (deliveryOption.value === 'coffee' && qty < 2) return 0
 
     const waterPart  = Math.round(unitWaterPrice.value * discountFactor.value) * qty
     const bottlePart = unitBottleSurcharge.value * (bottleOption.value === 'buy' ? qty : 0)
@@ -115,19 +126,23 @@ const totalAmount = computed(() => {
 
 // --- мета для бэка (чтобы не пересчитал по старому)
 const pricingMeta = computed(() => {
-    const qty = Number.parseInt(quantity.value, 10) || 0
-    const wt  = waterType.value
-    const tier = qty >= 2 ? 'many' : 'one'
-    return {
-        water_type: wt,
-        tier, // 'one' | 'many'
-        base_unit_water_price: UNIT_PRICES[wt]?.[tier] ?? 0,
-        discount_applied: deliveryOption.value === 'entrance' ? 0.2 : 0,
-        unit_bottle_surcharge: unitBottleSurcharge.value,
-        delivery_option: deliveryOption.value,
-        coffee_rule: deliveryOption.value === 'coffee' ? { min_qty: 5, price: COFFEE_PRICE } : null
-    }
+  const qty = Number.parseInt(quantity.value, 10) || 0
+  const wt  = waterType.value
+
+  return {
+    water_type: wt,
+    delivery_option: deliveryOption.value,
+    coffee_pricing: deliveryOption.value === 'coffee'
+      ? {
+          tiers: COFFEE_TIER_PRICES,
+          applied_unit_price: unitWaterPrice.value,
+        }
+      : null,
+    discount_applied: deliveryOption.value === 'entrance' ? 0.2 : 0,
+    unit_bottle_surcharge: unitBottleSurcharge.value,
+  }
 })
+
 
 // --- уничтожение карты
 const destroyMap = () => {
@@ -202,7 +217,7 @@ const createOrder = async () => {
 
         const qty = Number.parseInt(quantity.value, 10) || 0
         if (!qty) { alert('❌ Оберіть кількість'); return }
-        if (deliveryOption.value === 'coffee' && qty < 5) { alert('❌ Мінімальне замовлення для кав’ярні — 5 бутлів'); return }
+        if (deliveryOption.value === 'coffee' && qty < 2) { alert('❌ Мінімальне замовлення для кав’ярні — 2 бутлі'); return }
         if (!waterType.value) { alert('❌ Невідомий тип води. Оновіть сторінку або виберіть товар повторно.'); return }
 
         const token = localStorage.getItem('user_token')
@@ -329,13 +344,13 @@ const createOrder = async () => {
                 <label>Варіант доставки</label>
                 <div class="form__switch">
                     <button :class="{ active: deliveryOption === 'home' }" @click="deliveryOption = 'home'">
-                        В квартиру
+                        Додому/Офіс
                     </button>
                     <button :class="{ active: deliveryOption === 'entrance' }" @click="deliveryOption = 'entrance'">
-                        Під під’їзд (-20%)
+                        Додому/Офіс (-20%)
                     </button>
                     <button :class="{ active: deliveryOption === 'coffee' }" @click="deliveryOption = 'coffee'">
-                        Кав’ярня (від 5 бутлів)
+                        Кав’ярня (від 2 бутлів)
                     </button>
                 </div>
             </div>
