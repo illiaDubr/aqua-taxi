@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Events\NewOrderCreated;
 use App\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -151,6 +152,25 @@ class OrderController extends Controller
             'total_price' => $total,
             'status' => 'new',
         ]);
+
+        // 5) Рассылаем внутренние уведомления
+        event(new NewOrderCreated($order));
+
+        try {
+            $nodeWebhookUrl = config('services.nodesocket.host') . '/webhooks/new-order';
+            $nodeWebhookToken = config('services.nodesocket.token');
+            Http::timeout(3)
+                ->withHeaders([
+                    'X-Node-Socket-Token' => $nodeWebhookToken,
+                ])
+                ->post($nodeWebhookUrl, [
+                    'order' => $order->load('user')->toArray(),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Node websocket webhook failed', ['error' => $e->getMessage()]);
+        }
+
+        return response()->json(['message' => 'Order created', 'order' => $order], 201);
     }
 
         public function activeOrders(Request $request)

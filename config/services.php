@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'nodesocket' => [
+        'host' => env('NODE_SOCKET_URL', 'http://localhost:3000'),
+        'token' => env('NODE_SOCKET_TOKEN', null),
+    ],
+
 ];

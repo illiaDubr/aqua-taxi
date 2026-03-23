@@ -20,6 +20,9 @@ class Driver extends Authenticatable
         'balance',
         'bottles',
          'api_token',
+         'telegram_id',
+         'last_lat',
+         'last_lng',
     ];
 
     protected $hidden = [

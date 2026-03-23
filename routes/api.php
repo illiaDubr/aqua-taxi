@@ -16,7 +16,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\Admin\FactoryController;
 use App\Http\Controllers\FactoryModerationController;
 use App\Http\Controllers\FactoryOrderController;
-use App\Http\Controllers\FactoryPaymentController;
+use App\Http\Controllers\DriverTelegramController;
 /*
 |--------------------------------------------------------------------------
 | DRIVER (публичные)
@@ -48,6 +48,9 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
     Route::post('orders/{order}/accept', [DriverOrderController::class, 'accept']);
     Route::get('/orders/cancelled', [DriverOrderController::class, 'cancelled']);
     Route::post('logout', [DriverAuthController::class, 'logout']);
+    // Новые routes
+    Route::post('telegram/link', [DriverTelegramController::class, 'generateLinkCode']);
+    Route::post('location', [DriverTelegramController::class, 'updateLocation']);
 });
 
 
@@ -98,6 +101,17 @@ Route::prefix('factory')->group(function () {
 });
 
 Route::get('/factories/verified',    [FactoryController::class, 'verified']);
+
+/*
+|--------------------------------------------------------------------------
+| TELEGRAM WEBHOOKS (от Node.js бота)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('webhooks/telegram')->group(function () {
+    Route::post('attach', [DriverTelegramController::class, 'attach']);
+    Route::post('accept-order', [DriverTelegramController::class, 'acceptOrder']);
+    Route::get('get-drivers-with-telegram', [DriverTelegramController::class, 'getDriversWithTelegram']);
+});
 Route::get('/factories/coordinates', [FactoryController::class, 'coordinates']);
 
 Route::post('/admin/login', [AdminAuthController::class, 'login']);

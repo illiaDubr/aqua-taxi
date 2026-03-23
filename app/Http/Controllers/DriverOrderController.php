@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class DriverOrderController extends Controller
@@ -28,7 +30,24 @@ class DriverOrderController extends Controller
      */
     public function newOrders(Request $request)
     {
-        return $this->buildNewOrdersQuery($request)->get($this->orderFields());
+        $driver = $this->driver($request);
+        $orders = $this->buildNewOrdersQuery($request)->get($this->orderFields());
+
+        // Добавляем расстояние до заказа, если у водителя есть координаты
+        if ($driver->last_lat && $driver->last_lng) {
+            $orders = $orders->map(function ($order) use ($driver) {
+                $lat = $order->latitude ?? $order->lat;
+                $lng = $order->longitude ?? $order->lng;
+                if ($lat && $lng) {
+                    $order->distance_km = $this->calculateDistance($driver->last_lat, $driver->last_lng, $lat, $lng);
+                } else {
+                    $order->distance_km = null;
+                }
+                return $order;
+            });
+        }
+
+        return $orders;
     }
 
     /**
@@ -79,6 +98,19 @@ class DriverOrderController extends Controller
                 ]);
 
                 event(new OrderStatusUpdated($fresh));
+
+                try {
+                    $nodeWebhookUrl = config('services.nodesocket.host') . '/webhooks/order-status';
+                    $nodeWebhookToken = config('services.nodesocket.token');
+                    Http::timeout(3)
+                        ->withHeaders(['X-Node-Socket-Token' => $nodeWebhookToken])
+                        ->post($nodeWebhookUrl, [
+                            'status' => 'in_progress',
+                            'order' => $fresh->toArray(),
+                        ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Node websocket order-status webhook failed', ['error' => $e->getMessage()]);
+                }
             });
 
             return response()->json(['message' => 'Замовлення прийнято'], 200);
@@ -180,6 +212,24 @@ class DriverOrderController extends Controller
         $driver = $request->user() ?: Auth::guard('driver')->user();
         abort_if(!$driver, 401, 'Необхідна авторизація водія');
         return $driver;
+    }
+
+    /**
+     * Расчет расстояния между двумя точками (Haversine formula)
+     */
+    private function calculateDistance($lat1, $lng1, $lat2, $lng2)
+    {
+        $earthRadius = 6371; // km
+
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lngDelta = deg2rad($lng2 - $lng1);
+
+        $a = sin($latDelta / 2) * sin($latDelta / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($lngDelta / 2) * sin($lngDelta / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return round($earthRadius * $c, 2);
     }
 
     public function profile(Request $request)

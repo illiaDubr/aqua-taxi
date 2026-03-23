@@ -24,14 +24,11 @@ class UserFactory extends Factory
     public function definition()
     {
         return [
-            'name' => $this->faker->name,
+            'name' => $this->faker->firstName,
+            'surname' => $this->faker->lastName,
+            'email' => $this->faker->unique()->safeEmail,
             'phone' => $this->faker->unique()->numerify('+380#########'),
-            'role' => 'client',
-            'is_verified' => true,
-            'is_available' => null,
-            'lat' => null,
-            'lng' => null,
-            'remember_token' => Str::random(10),
+            'password' => bcrypt('password'),
         ];
     }
 
