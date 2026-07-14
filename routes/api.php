@@ -24,7 +24,7 @@ use App\Http\Controllers\DriverTelegramController;
 */
 Route::prefix('driver')->group(function () {
     Route::post('register', [DriverAuthController::class, 'register']);
-    Route::post('login',    [DriverAuthController::class, 'login']);
+    Route::post('login',    [DriverAuthController::class, 'login'])->middleware('throttle:5,1');
 });
 
 Route::middleware('auth:driver')->post('/driver/pay', [DriverPaymentController::class, 'initiatePayment']);
@@ -62,7 +62,7 @@ Route::prefix('driver')->middleware(['auth:sanctum','abilities:driver'])->group(
 */
 Route::prefix('user')->group(function () {
     Route::post('register', [UserAuthController::class, 'register']);
-    Route::post('login',    [UserAuthController::class, 'login']);
+    Route::post('login',    [UserAuthController::class, 'login'])->middleware('throttle:5,1');
     Route::middleware(['auth:sanctum','abilities:user'])->post('logout', [UserAuthController::class, 'logout']);
 });
 Route::get('/driver/pay/good', [DriverPaymentController::class, 'handleGoodRedirect']);
@@ -96,7 +96,7 @@ Route::prefix('admin')->middleware(['auth:sanctum','abilities:admin'])->post('/l
 
 Route::prefix('factory')->group(function () {
     Route::post('/register', [FactoryAuthController::class, 'register']);
-    Route::post('/login',    [FactoryAuthController::class, 'login']);
+    Route::post('/login',    [FactoryAuthController::class, 'login'])->middleware('throttle:5,1');
     
 });
 
@@ -114,7 +114,7 @@ Route::prefix('webhooks/telegram')->group(function () {
 });
 Route::get('/factories/coordinates', [FactoryController::class, 'coordinates']);
 
-Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('throttle:5,1');
 
 /*
 |--------------------------------------------------------------------------

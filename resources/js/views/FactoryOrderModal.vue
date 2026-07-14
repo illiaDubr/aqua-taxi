@@ -108,26 +108,18 @@ async function createOrder () {
 </script>
 
 <style scoped>
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal__card{background:#fff;border-radius:12px;padding:16px;min-width:320px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-label{display:block;margin:8px 0 4px;font-weight:600}
-select,input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px}
-.summary{margin:12px 0;display:grid;gap:6px}
-.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-.error{color:#c62828;margin-top:8px}
-.ok{color:#2e7d32;margin-top:8px}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+.modal{position:fixed;inset:0;background:rgba(11,31,51,.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal__card{background:#fff;border-radius:var(--r-lg);padding:22px;width:100%;max-width:400px;box-shadow:var(--sh-lg)}
+.modal__card h3{font-size:18px;margin-bottom:6px}
+label{display:block;margin:14px 0 6px;font-weight:700;font-size:14px;color:var(--ink)}
+select,input{width:100%;box-sizing:border-box;padding:13px 14px;font-size:16px;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;transition:border-color .18s,box-shadow .18s}
+select:focus,input:focus{border-color:var(--aqua-400);box-shadow:0 0 0 4px var(--tap)}
+.summary{margin:16px 0;display:grid;gap:8px;padding:14px 16px;background:var(--aqua-50);border-radius:var(--r-md);font-size:14px;color:var(--ink-2)}
+.summary b{color:var(--aqua-700)}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.actions button{padding:12px 18px;border-radius:var(--r-sm);border:none;font-weight:700;font-size:14px;cursor:pointer;background:var(--surface-2);color:var(--ink-2)}
+.actions button:last-child{background:var(--grad-aqua);color:#fff;box-shadow:var(--sh-aqua)}
+.actions button:disabled{opacity:.55;box-shadow:none}
+.error{color:var(--danger);margin-top:10px;font-size:13.5px}
+.ok{color:var(--success);margin-top:10px;font-size:13.5px}
 </style>

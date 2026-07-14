@@ -454,37 +454,32 @@ const createOrder = async () => {
   gap: 8px;
   margin-top: 12px;
 }
-
 .quality-label {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
-  color: #333;
+  color: var(--ink);
 }
-
 .quality-select {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  font-size: 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+  font-size: 15px;
 }
-
 .quality-alert {
   position: relative;
-  background-color: #f8d7da;
+  background-color: var(--danger-bg);
   color: #721c24;
   border: 1px solid #f5c6cb;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   margin-top: 8px;
   font-size: 14px;
   animation: fadeIn 0.3s ease;
 }
-
 .quality-alert-text {
   display: block;
   padding-right: 24px;
 }
-
 .quality-alert-close {
   position: absolute;
   top: 6px;
@@ -503,32 +498,25 @@ const createOrder = async () => {
 .bottle-section .segmented {
     display: flex;
     gap: 6px;
-    background: #f3f4f6;
+    background: var(--surface-2);
     padding: 6px;
-    border-radius: 14px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 0 rgba(0,0,0,.03);
+    border-radius: var(--r-sm);
 }
-
 .bottle-section .segmented button {
     flex: 1;
-    padding: 10px 12px;
+    padding: 11px 12px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--r-xs);
     background: transparent;
-    color: #374151;
+    color: var(--muted);
     font-weight: 600;
     cursor: pointer;
     transition: transform .06s ease, background .2s ease, color .2s ease, box-shadow .2s ease;
 }
-
-.bottle-section .segmented button:hover {
-    transform: translateY(-1px);
-}
-
 .bottle-section .segmented button.active {
-    background: #2563eb;           /* насыщенный синий */
+    background: var(--grad-aqua);
     color: #fff;
-    box-shadow: 0 6px 16px rgba(37,99,235,.28);
+    box-shadow: var(--sh-aqua);
 }
 
 /* Ряд качества */
@@ -538,55 +526,35 @@ const createOrder = async () => {
     gap: 10px;
     margin-top: 6px;
 }
-.close-alert {
-  position: absolute;
-  top: 6px;
-  right: 10px;
-  background: none;
-  border: none;
-  font-size: 18px;
-  color: #721c24;
-  cursor: pointer;
-}
 .quality-badge {
     display: inline-flex;
     align-items: center;
     height: 30px;
-    padding: 0 10px;
+    padding: 0 12px;
     font-size: 12px;
     font-weight: 700;
-    color: #1f2937;
-    background: #e5f0ff;
-    border: 1px solid #cfe0ff;
-    border-radius: 999px;
+    color: var(--aqua-700);
+    background: var(--aqua-50);
+    border: 1px solid var(--aqua-200);
+    border-radius: var(--r-pill);
 }
-
-/* Селект качества — компактнее и с красивым фокусом */
 .quality-select {
     flex: 1;
     text-align: center;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid #d1d5db;
-    background: #ffffff;
-    font-size: 14px;
-    color: #111827;
+    padding: 0 14px;
+    height: 46px;
+    border-radius: var(--r-sm);
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    font-size: 15px;
+    color: var(--ink);
     transition: box-shadow .15s ease, border-color .15s ease;
     appearance: none;
-    background-image:
-        linear-gradient(45deg, transparent 50%, #6b7280 50%),
-        linear-gradient(135deg, #6b7280 50%, transparent 50%);
-    background-position:
-        calc(100% - 18px) calc(50% - 3px),
-        calc(100% - 12px) calc(50% - 3px);
-    background-size: 6px 6px, 6px 6px;
-    background-repeat: no-repeat;
 }
-
 .quality-select:focus {
     outline: none;
-    border-color: #93c5fd;
-    box-shadow: 0 0 0 4px rgba(59,130,246,.15);
+    border-color: var(--aqua-400);
+    box-shadow: 0 0 0 4px var(--tap);
 }
 
 /* Инфо-чип для покупки */
@@ -595,22 +563,20 @@ const createOrder = async () => {
     align-items: center;
     gap: 8px;
     margin-top: 8px;
-    padding: 8px 12px;
+    padding: 8px 14px;
     font-size: 13px;
-    color: #0f5132;
-    background: #d1e7dd;
-    border: 1px solid #badbcc;
-    border-radius: 999px;
+    color: var(--success);
+    background: var(--success-bg);
+    border-radius: var(--r-pill);
 }
-
 .info-chip .chip-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #198754;
+    background: var(--success);
 }
 
-/* Плавное появление блока качества/чипа */
+/* Плавное появление */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
     transition: opacity .18s ease, transform .18s ease;
@@ -620,174 +586,184 @@ const createOrder = async () => {
     opacity: 0;
     transform: translateY(-4px);
 }
+
 .form__switch {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 .form__switch button {
     flex: 1;
-    padding: 12px;
-    border-radius: 10px;
-    background: #f1f1f1;
-    border: none;
-    font-size: 15px;
-    font-weight: 500;
-    color: #555;
+    min-width: 92px;
+    padding: 12px 10px;
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    border: 1.5px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s var(--ease);
 }
 .form__switch button.active {
-    background: #007bff;
-    color: white;
+    background: var(--aqua-50);
+    color: var(--aqua-700);
+    border-color: var(--aqua-300);
 }
 
 .form {
     min-height: 100vh;
-    background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%);
+    max-width: var(--maxw);
+    margin: 0 auto;
+    background: var(--bg);
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding-top: 140px;
+    padding: 96px 14px 24px;
     position: relative;
 }
-
 .form__bg {
     position: absolute;
-    top: 30px;
+    top: 0; left: 0;
     width: 100%;
-    height: 140px;
-    background: url('@/assets/city.png') no-repeat center;
-    background-size: cover;
+    height: 150px;
+    background: var(--grad-hero);
+    border-radius: 0 0 28px 28px;
     z-index: 0;
 }
-
 .form__card {
-    background: #fff;
-    border-radius: 20px;
-    padding: 24px;
+    background: var(--surface);
+    border-radius: var(--r-xl);
+    padding: 24px 20px;
     width: 100%;
-    max-width: 400px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    max-width: 420px;
+    box-shadow: var(--sh-md);
     z-index: 1;
     position: relative;
 }
-
 .form__title {
     text-align: center;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1.3;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
     margin-bottom: 4px;
+    color: var(--ink);
 }
-
 .form__subtitle {
     text-align: center;
-    color: #666;
-    margin-bottom: 20px;
+    color: var(--muted);
+    margin-bottom: 22px;
+    font-weight: 600;
 }
-
 .form__group {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 22px;
 }
-
 .form__group label {
     font-size: 14px;
-    font-weight: 600;
-    color: #444;
+    font-weight: 700;
+    color: var(--ink);
 }
-
 .form__group input,
 .form__group select {
-    padding: 14px;
-    font-size: 15px;
-    border: 1px solid #ccc;
-    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 16px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--r-sm);
     outline: none;
-    background: #f9f9f9;
+    background: var(--surface);
+    color: var(--ink);
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s;
 }
-
+.form__group input:focus,
+.form__group select:focus {
+    border-color: var(--aqua-400);
+    box-shadow: 0 0 0 4px var(--tap);
+    background: var(--aqua-50);
+}
 .form__footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+    padding: 16px 18px;
+    background: var(--aqua-50);
+    border-radius: var(--r-md);
 }
-
 .form__total {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
+    color: var(--ink-2);
 }
-
 .form__amount {
-    font-size: 18px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--aqua-700);
 }
-
 .form__submit {
     width: 100%;
-    padding: 14px;
+    min-height: 54px;
+    padding: 15px;
     font-size: 16px;
-    font-weight: 600;
-    background: #007bff;
+    font-weight: 700;
+    background: var(--grad-aqua);
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: var(--r-md);
     cursor: pointer;
+    box-shadow: var(--sh-aqua);
+    transition: transform .15s var(--ease);
 }
+.form__submit:active { transform: scale(.98); }
 
 /* ручной выбор */
 .manual-btn {
-    margin-top: -8px;
+    margin-top: -4px;
     margin-bottom: 8px;
-    padding: 8px 12px;
+    padding: 11px 14px;
     font-size: 14px;
-    border: 1px solid #007bff;
-    background: #fff;
-    color: #007bff;
-    border-radius: 8px;
+    font-weight: 600;
+    border: 1.5px solid var(--aqua-300);
+    background: var(--aqua-50);
+    color: var(--aqua-700);
+    border-radius: var(--r-sm);
     cursor: pointer;
 }
-
+.manual-btn:active { transform: scale(.98); }
 .manual-badge {
     margin-top: -6px;
     margin-bottom: 8px;
-    padding: 8px 12px;
+    padding: 10px 14px;
     font-size: 14px;
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
-    color: #334155;
-    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border-radius: var(--r-sm);
     user-select: none;
     pointer-events: none;
 }
-
 .geo-warning {
-    background: #fef3c7;
+    background: var(--warn-bg);
     border: 1px solid #fcd34d;
-    padding: 10px;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: var(--r-sm);
     font-size: 14px;
     color: #92400e;
     margin-bottom: 10px;
 }
-
 .map-container {
     height: 250px;
     margin-top: 10px;
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     overflow: hidden;
 }
-
 .info-note {
     font-size: 13px;
-    color: #0f5132;
-    background: #d1e7dd;
-    border: 1px solid #badbcc;
-    padding: 8px 10px;
-    border-radius: 8px;
+    color: var(--success);
+    background: var(--success-bg);
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
 }
 </style>

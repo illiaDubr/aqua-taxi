@@ -1,22 +1,25 @@
 <template>
     <div class="driver-map">
-        <!-- Табы -->
-        <div class="order-switcher">
-            <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
-            <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
-        </div>
+        <!-- Шапка: панель зверху, таби нижче -->
+        <div class="driver-map__header">
+            <!-- Верхняя панель -->
+            <div class="driver-map__top-panel">
+                <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
+                    <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
+                    <button>＋</button>
+                </div>
+                <div class="driver-map__block">
+                    <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
+                    <button @click="showTopUpModal = true">＋</button>
+                </div>
+                <button class="logout-btn" @click="logoutDriver">Вийти</button>
+            </div>
 
-        <!-- Верхняя панель -->
-        <div class="driver-map__top-panel">
-            <div class="driver-map__block" @click="goToMap" style="cursor: pointer;">
-                <span>{{ bottles !== null ? bottles : 0 }} бут.</span>
-                <button>＋</button>
+            <!-- Табы (тепер під панеллю) -->
+            <div class="order-switcher">
+                <button :class="{ active: currentTab === 'active' }" @click="switchTab('active')">Активні замовлення</button>
+                <button :class="{ active: currentTab === 'new' }" @click="switchTab('new')">Нові замовлення</button>
             </div>
-            <div class="driver-map__block">
-                <span>{{ typeof balance === 'number' ? balance.toFixed(2) : '0.00' }} грн</span>
-                <button @click="showTopUpModal = true">＋</button>
-            </div>
-            <button class="logout-btn" @click="logoutDriver">Вийти</button>
         </div>
 
         <!-- Фильтр -->
@@ -462,7 +465,7 @@ const fetchOrders = async () => {
             const m = L.marker([lat, lng], { icon }).addTo(map.value).bindPopup(popupHtml)
             orderMarkers.value[order.id] = m
 
-            const pulse = L.circle([lat, lng], { radius: 60, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.3 }).addTo(map.value)
+            const pulse = L.circle([lat, lng], { radius: 60, color: 'var(--aqua-500)', fillColor: 'var(--aqua-500)', fillOpacity: 0.3 }).addTo(map.value)
             setTimeout(() => { try { map.value?.removeLayer(pulse) } catch(_){} }, 3000)
         })
 
@@ -596,154 +599,108 @@ const closePostAcceptModal = () => {
 </script>
 
 <style scoped>
-/* Простейшие стили модалок (подложка, окно) — при необходимости адаптируйте под ваш дизайн */
+.driver-map { position: fixed; width: 100%; height: 100%; max-width: var(--maxw); left: 50%; transform: translateX(-50%); }
+.driver-map__container { height: 100%; width: 100%; }
+
+/* Модалки */
 .modal-backdrop{
-    position: fixed;
-    left:0;right:0;top:0;bottom:0;
-    background: rgba(0,0,0,0.5);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    z-index: 9999;
+    position: fixed; inset: 0;
+    background: rgba(11,31,51,.45);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; padding: 20px;
 }
 .modal{
     background: #fff;
-    padding: 18px;
-    border-radius: 8px;
-    width: 360px;
-    max-width: 92%;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    padding: 22px;
+    border-radius: var(--r-lg);
+    width: 100%;
+    max-width: 360px;
+    box-shadow: var(--sh-lg);
 }
-.modal h3{ margin:0 0 8px 0; }
-.modal p{ margin:0 0 12px 0; line-height:1.4; }
-.modal-actions{ display:flex; gap:8px; justify-content:flex-end; }
-.modal-actions button{ padding:8px 12px; border-radius:6px; cursor:pointer; border:none; background:#0095FF; color:white; font-weight:600; }
-.modal-actions button:hover { opacity:0.9; }
-.accept-button { padding:6px 8px; cursor:pointer; }
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+.modal h3{ margin: 0 0 10px 0; font-size: 17px; }
+.modal p{ margin: 0 0 16px 0; line-height: 1.5; color: var(--ink-2); }
+.modal-actions{ display: flex; gap: 10px; justify-content: flex-end; }
+.modal-actions button{
+    padding: 11px 16px; border-radius: var(--r-sm); cursor: pointer; border: none;
+    background: var(--grad-aqua); color: #fff; font-weight: 700; font-size: 14px; box-shadow: var(--sh-aqua);
 }
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  width: 300px;
-}
+.modal-actions button:active { transform: scale(.98); }
 
-.driver-map { position: fixed; width: 100%; height: 100%; }
-
-.logout-btn {
-  margin-left: auto;
-  background-color: #ffffffdd;
-  color: #3498db;
-  border: 1px solid #3498db;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.logout-btn:hover {
-  background-color: #3498db;
-  color: white;
-}
-
-/* Табы */
+/* Табы (сегмент) */
 .order-switcher {
-    display: flex; justify-content: center; gap: 20px; padding: 12px;
-    background: #e9f1fc; border-radius: 0 0 12px 12px; font-weight: 600;
+    display: flex; gap: 4px; padding: 5px;
+    margin: 12px 12px 0;
+    background: var(--surface); border-radius: var(--r-pill);
+    box-shadow: var(--sh-sm); font-weight: 600;
 }
 .order-switcher button {
-    background: none; border: none; padding: 8px 12px; cursor: pointer; color: #888; border-bottom: 3px solid transparent; font-size: 15px;
+    flex: 1; background: none; border: none; padding: 11px 10px; cursor: pointer;
+    color: var(--muted); font-size: 14px; font-weight: 600; border-radius: var(--r-pill);
+    transition: all .2s var(--ease);
 }
-.order-switcher button.active { color: #000; border-color: #0095FF; }
+.order-switcher button.active { color: var(--aqua-700); background: var(--aqua-50); }
 
+/* Верхняя панель */
+/* Шапка-обгортка: панель зверху, таби під нею */
+.driver-map__header { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; }
 .driver-map__top-panel {
-    position: absolute; width: 100%; padding: 24px 0px; display: flex; justify-content: space-between;
-    background-color: #0095FF; border-radius: 0px 0px 10px 10px; z-index: 1000;
+    position: relative; width: 100%; padding: calc(18px + env(safe-area-inset-top, 0px)) 12px 18px; display: flex; gap: 8px; align-items: center;
+    justify-content: space-between; background: var(--grad-hero); border-radius: 0 0 20px 20px;
 }
 .driver-map__block {
-    display: flex; align-items: center; background-color: #e8f1ff; border-radius: 12px; padding: 4px 10px; font-weight: 600; margin: 0 5px;
+    display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.94);
+    border-radius: var(--r-pill); padding: 7px 8px 7px 14px; font-weight: 700; color: var(--ink); font-size: 14px;
 }
-.driver-map__block button { background: none; border: none; font-size: 20px; font-weight: bold; cursor: pointer; }
+.driver-map__block button {
+    background: var(--aqua-50); color: var(--aqua-700); border: none; width: 28px; height: 28px; border-radius: var(--r-pill);
+    font-size: 18px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.logout-btn {
+    background: rgba(255,255,255,.94); color: var(--aqua-700); border: none;
+    border-radius: var(--r-pill); padding: 9px 16px; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.logout-btn:active { transform: scale(.97); }
 
-.driver-map__container { height: 100%; width: 100%; }
-
+/* Фильтр */
 .driver-map__filter-panel {
-    position: absolute;
-    bottom: 5px;
-    left: 10px;
-    z-index: 999;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    position: absolute; bottom: 14px; left: 12px; z-index: 999;
+    display: flex; flex-direction: column; gap: 8px;
 }
 .driver-map__filter-panel button {
-    background-color: white;
-    color: #0095FF;
-    font-weight: 600;
-    padding: 8px 12px;
-    border: 2px solid #0095FF;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.3s;
+    background: rgba(255,255,255,.96); color: var(--aqua-700); font-weight: 700; font-size: 13px;
+    padding: 10px 14px; border: none; border-radius: var(--r-pill); cursor: pointer;
+    box-shadow: var(--sh-sm); transition: .2s var(--ease);
 }
-.driver-map__filter-panel button.active {
-    background-color: #0095FF;
-    color: white;
-}
+.driver-map__filter-panel button.active { background: var(--grad-aqua); color: #fff; box-shadow: var(--sh-aqua); }
 
 /* Попап и алерт */
 .accept-button {
-    background-color: #0095FF; color: white; padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
+    background: var(--grad-aqua); color: #fff; padding: 8px 14px; border: none; border-radius: var(--r-sm); cursor: pointer; font-weight: 700;
 }
-.accept-button:hover { background-color: #43a047; }
-
 .order-alert {
-    position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
-    background-color: #4caf50; color: white; padding: 12px 20px; border-radius: 8px; font-weight: 600;
-    z-index: 9999; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+    background: var(--success); color: #fff; padding: 12px 20px; border-radius: var(--r-pill); font-weight: 700;
+    z-index: 9999; box-shadow: var(--sh-md);
 }
 .order-popup .quality-pill {
-    display:inline-block; padding:2px 8px; border-radius:999px;
-    background:#eef4ff; border:1px solid #d8e2ff; font-size:12px; font-weight:700;
+    display: inline-block; padding: 3px 10px; border-radius: var(--r-pill);
+    background: var(--aqua-50); border: 1px solid var(--aqua-200); font-size: 12px; font-weight: 700; color: var(--aqua-700);
 }
 
 /* Уведомления об отменах */
 .cancel-notifications {
-  position: absolute;
-  top: 120px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 92%;
-  max-width: 760px;
-  z-index: 12000;
+    position: absolute; top: 120px; left: 50%; transform: translateX(-50%);
+    width: 92%; max-width: 420px; z-index: 12000;
 }
 .cancel-item {
-  background: #fff8f8;
-  border: 1px solid #ffbebe;
-  padding: 10px 12px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  transition: transform .18s ease, opacity .18s ease;
+    background: #fff8f8; border: 1px solid #ffbebe;
+    padding: 14px; border-radius: var(--r-md); margin-bottom: 8px;
+    box-shadow: var(--sh-md); transition: transform .18s ease, opacity .18s ease;
 }
 .cancel-item.seen { opacity: 0.6; transform: translateY(-6px); }
-.cancel-item__head { display:flex; justify-content:space-between; gap:8px; align-items:center; }
-.cancel-item__body { font-size:14px; color:#6b1f1f; margin-top:6px; }
-.cancel-item__actions { display:flex; justify-content:flex-end; margin-top:8px; }
-.cancel-item__actions button { background:#0095FF; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-
-/* Модалка общий overlay */
-.modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; }
-.modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-.modal__content { position: relative; background: #fff; padding: 16px; border-radius: 10px; min-width: 320px; }
+.cancel-item__head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.cancel-item__body { font-size: 14px; color: #6b1f1f; margin-top: 8px; line-height: 1.5; }
+.cancel-item__actions { display: flex; justify-content: flex-end; margin-top: 10px; }
+.cancel-item__actions button { background: var(--danger); color: #fff; border: none; padding: 8px 16px; border-radius: var(--r-sm); cursor: pointer; font-weight: 700; }
 </style>

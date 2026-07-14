@@ -261,184 +261,211 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.order__logout {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background-color: #ffffffdd;
-  color: #3498db;
-  border: 1px solid #3498db;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  z-index: 2;
-  transition: background-color 0.2s ease;
-}
-.order__logout:hover {
-  background-color: #3498db;
-  color: white;
-}
-
-.order__driver {
-  background: #f0f8ff;
-  border: 1px solid #3498db;
-  padding: 12px;
-  border-radius: 10px;
-  color: #333;
-  font-size: 14px;
-  text-align: center;
-}
-.order__driver p {
-  margin: 4px 0;
-}
-
-/* Стили для блока отменённых заказов */
-.order__cancelled {
-  margin-top: 12px;
-  background: #fff6f6;
-  border: 1px solid #ffb3b3;
-  padding: 10px;
-  border-radius: 8px;
-  color: #8a1f1f;
-  font-size: 14px;
-  text-align: center;
-}
-
-/* Стандартные стили компонента (твои) */
-.order__title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0;
-  white-space: pre-line;
-  text-align: center;
-}
 .order {
   min-height: 100vh;
-  background-color: #f9f9f9;
+  max-width: var(--maxw);
+  margin: 0 auto;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
-  align-items: center;
 }
+
+/* ---- Хедер ---- */
 .order__header {
   position: relative;
-  height: 140px;
+  height: 132px;
   width: 100%;
-  background-color: #00aaff;
+  overflow: hidden;
+  background: var(--grad-hero);
+  border-radius: 0 0 28px 28px;
 }
 .order__bg {
   position: absolute;
-  top: 16px;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 10px; left: 0;
+  width: 100%; height: 100%;
   object-fit: contain;
+  opacity: .32;
   pointer-events: none;
   z-index: 1;
 }
+.order__logout {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  background: rgba(255,255,255,.92);
+  color: var(--aqua-700);
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: var(--sh-xs);
+}
+.order__logout:active { transform: scale(.97); }
+
+/* ---- Табы (сегмент) ---- */
 .order__tabs {
   display: flex;
-  justify-content: space-around;
-  width: 100%;
-  background: white;
-  padding: 32px 0;
-  border-radius: 16px 16px 0 0;
-  margin-top: -24px;
-  z-index: 2;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  gap: 4px;
+  padding: 5px;
+  margin: -20px 16px 4px;
+  position: relative;
+  z-index: 3;
+  background: var(--surface);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-sm);
 }
 .order__tabs span {
+  flex: 1;
+  text-align: center;
   font-weight: 600;
-  color: #ccc;
-  font-size: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.15;
   cursor: pointer;
-  padding-bottom: 6px;
+  padding: 11px 8px;
+  border-radius: var(--r-pill);
+  transition: all .2s var(--ease);
 }
+.order__tabs span br { display: none; }
 .order__tabs .active {
-  color: #3498db;
-  border-bottom: 2px solid #3498db;
+  color: var(--aqua-700);
+  background: var(--aqua-50);
 }
+
 .order__content {
   width: 100%;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
+
+/* ---- Карточки ---- */
 .order__card {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
   display: flex;
-  gap: 12px;
-  padding: 12px;
-  margin: 16px;
+  gap: 14px;
+  padding: 14px;
   align-items: center;
 }
 .order__image {
-  width: 150px;
-  height: 220px;
+  width: 96px;
+  height: 150px;
   object-fit: contain;
+  flex: none;
 }
 .order__info {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
-.order__btn {
-  font-size: 16px;
-  background-color: #3498db;
-  color: white;
-  border-radius: 10px;
-  border: none;
-  padding: 12px 16px;
+.order__title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+  white-space: pre-line;
+  text-align: center;
+}
+.order__info p { margin: 2px 0; font-size: 14px; color: var(--ink-2); }
+
+.order__driver {
+  width: 100%;
+  background: var(--aqua-50);
+  border: 1px solid var(--aqua-200);
+  padding: 12px;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: center;
+}
+.order__driver p { margin: 4px 0; }
+
+.order__cancelled {
+  width: 100%;
   margin-top: 12px;
-  cursor: pointer;
+  background: var(--danger-bg);
+  border: 1px solid #ffb3b3;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  color: #8a1f1f;
+  font-size: 14px;
+  text-align: center;
 }
+
+.order__actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.order__btn {
+  width: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--grad-aqua);
+  color: white;
+  border-radius: var(--r-sm);
+  border: none;
+  padding: 13px 16px;
+  margin-top: 8px;
+  cursor: pointer;
+  box-shadow: var(--sh-aqua);
+  transition: transform .15s var(--ease);
+}
+.order__btn:active { transform: scale(.98); }
 .order__btn.cancel {
-  background-color: #ff5c5c;
+  background: var(--danger-bg);
+  color: var(--danger);
+  box-shadow: none;
 }
 .order__placeholder {
   text-align: center;
-  color: #777;
-  margin-top: 40px;
+  color: var(--muted);
+  margin-top: 48px;
+  font-size: 15px;
 }
 
-/* Модалка */
+/* ---- Модалка ---- */
 .modal-backdrop {
   position: fixed;
-  left: 0;
-  top: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.5);
+  inset: 0;
+  background: rgba(11,31,51,.45);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 999;
+  padding: 20px;
 }
 .modal {
-  width: 90%;
-  max-width: 560px;
+  width: 100%;
+  max-width: 420px;
   background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  border-radius: var(--r-lg);
+  padding: 22px;
+  box-shadow: var(--sh-lg);
 }
+.modal h3 { font-size: 17px; margin-bottom: 14px; }
 .modal textarea {
   width: 100%;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  padding: 10px;
+  box-sizing: border-box;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+  padding: 12px 14px;
   resize: vertical;
-  font-size: 14px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
 }
+.modal textarea:focus { border-color: var(--aqua-400); box-shadow: 0 0 0 4px var(--tap); }
 .modal-actions {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
-  margin-top: 12px;
+  margin-top: 16px;
 }
+.modal-actions .order__btn { margin-top: 0; }
 </style>

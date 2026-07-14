@@ -45,80 +45,66 @@ const close = () => {
 <style scoped>
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.5);
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: rgba(11, 31, 51, 0.5);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 999;
   padding: 16px;
 }
-
 .modal {
   background-color: white;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
+  max-width: 640px;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--sh-lg);
   overflow: hidden;
 }
-
 .modal__header {
-  padding: 16px 24px 0;
+  padding: 18px 24px 0;
   font-size: 18px;
-  font-weight: bold;
-  color: #3498db;
+  font-weight: 700;
+  color: var(--aqua-700);
 }
-
 .modal__body {
   padding: 16px 24px;
   overflow-y: auto;
   flex-grow: 1;
   font-size: 14px;
-  color: #2c3e50;
+  color: var(--ink-2);
+  line-height: 1.55;
 }
-
 .modal__body h1, .modal__body h2 {
-  color: #3498db;
+  color: var(--aqua-700);
   margin-top: 16px;
 }
-
 .modal__footer {
   padding: 16px 24px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--line-2);
   text-align: right;
 }
-
 .modal__close {
-  padding: 10px 20px;
-  background-color: #3498db;
+  padding: 12px 22px;
+  background: var(--grad-aqua);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: var(--sh-aqua);
 }
+.modal__close:active { transform: scale(.98); }
 
 @media (max-width: 480px) {
-  .modal {
-    width: 100%;
-    border-radius: 8px;
-  }
-
-  .modal__header,
-  .modal__body,
-  .modal__footer {
-    padding: 12px 16px;
-  }
-
-  .modal__close {
-    width: 100%;
-  }
+  .modal { max-width: 100%; border-radius: var(--r-md); }
+  .modal__header, .modal__body, .modal__footer { padding: 14px 16px; }
+  .modal__close { width: 100%; }
 }
 </style>

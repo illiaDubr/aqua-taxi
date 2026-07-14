@@ -47,4 +47,30 @@ const router = createRouter({
     scrollBehavior() { return { top: 0 }; },
 });
 
+// --- Навігаційний guard: захищені маршрути потребують відповідного токена ---
+const ROLE_TOKEN = {
+    user:    'user_token',
+    driver:  'driver_token',
+    factory: 'factory_token',
+    admin:   'admin_token',
+};
+const ROLE_LOGIN = {
+    user:    'authUser',
+    driver:  'authDriver',
+    factory: 'authFactory',
+    admin:   'authAdmin',
+};
+
+router.beforeEach((to) => {
+    const role = to.meta?.role;
+    if (!role) return true; // публічний маршрут
+
+    const token = localStorage.getItem(ROLE_TOKEN[role]);
+    if (!token) {
+        // немає токена — відправляємо на відповідний вхід
+        return { name: ROLE_LOGIN[role] ?? 'home' };
+    }
+    return true;
+});
+
 export default router;

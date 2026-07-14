@@ -1,5 +1,6 @@
 // resources/js/app.js
 import './bootstrap.js';
+import './design-system.css';
 import { createApp } from 'vue';
 import App from './components/App.vue';
 import router from './router';

@@ -91,58 +91,71 @@ async function submitPayment() {
 <style scoped>
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(11, 31, 51, .45);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  padding: 20px;
 }
 .modal {
   background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  width: 320px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  padding: 24px;
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 360px;
+  box-shadow: var(--sh-lg);
 }
+.modal h2 { font-size: 19px; margin-bottom: 4px; }
 .modal-input {
   width: 100%;
-  padding: 0.5rem;
-  margin: 0.75rem 0;
-  font-size: 1rem;
+  padding: 14px 16px;
+  margin: 16px 0;
+  font-size: 16px;
   box-sizing: border-box;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
 }
+.modal-input:focus { border-color: var(--aqua-400); box-shadow: 0 0 0 4px var(--tap); }
 .modal-actions {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
 .btn-primary {
-  background: #007bff;
+  flex: 1;
+  background: var(--grad-aqua);
   color: white;
-  padding: 0.5rem 1rem;
+  padding: 13px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: var(--sh-aqua);
 }
 .btn-primary:disabled {
-  background: #7aaefc;
+  opacity: .55;
+  box-shadow: none;
   cursor: not-allowed;
 }
 .btn-secondary {
-  background: #e0e0e0;
-  color: #222;
-  padding: 0.5rem 1rem;
+  flex: 1;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  padding: 13px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
 }
 .error {
-  color: #c0392b;
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
+  color: var(--danger);
+  margin-top: 12px;
+  font-size: 13.5px;
 }
 </style>

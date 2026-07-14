@@ -76,42 +76,47 @@ function formatStatus(status) {
 
 <style scoped>
 .active-orders {
-    padding: 24px;
-    font-family: 'Montserrat', sans-serif;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 24px 16px;
+    min-height: 100vh;
+    background: var(--bg);
 }
 
 .active-orders__title {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--ink);
     margin-bottom: 20px;
 }
 
 .active-orders__loading,
 .active-orders__error,
 .active-orders__empty {
-    font-size: 16px;
-    color: #555;
-    padding: 12px;
+    font-size: 15px;
+    color: var(--muted);
+    padding: 40px 12px;
     text-align: center;
 }
 
 .active-orders__list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
 }
 
 .order-card {
-    background: #ffffff;
-    padding: 16px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e0e0e0;
+    background: var(--surface);
+    padding: 18px;
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+    border: 1px solid var(--line-2);
 }
 
 .order-card p {
-    margin: 6px 0;
-    font-size: 15px;
-    color: #333;
+    margin: 7px 0;
+    font-size: 14.5px;
+    color: var(--ink-2);
 }
+.order-card strong { color: var(--ink); font-weight: 700; }
 </style>

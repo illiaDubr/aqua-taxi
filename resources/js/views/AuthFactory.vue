@@ -600,112 +600,73 @@ function switchTab(tab) {
 </script>
 
 <style>
+/* Базові стилі auth* централізовані в design-system.css.
+   Нижче — лише специфіка кабінету виробника. */
+
 /* карта/гео */
 .geo-warning {
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 14px;
-    color: #92400e;
-    margin-top: 20px;
+    background: var(--warn-bg); border: 1px solid #fcd34d;
+    padding: 12px 14px; border-radius: var(--r-sm);
+    font-size: 14px; color: #92400e; margin-top: 20px;
 }
-.auth__link {
-  background: none;
-  border: none;
-  color: #3498db;
-  text-decoration: underline;
-  font-size: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-
-.map-container { height: 250px; margin-top: 10px; border-radius: 8px; overflow: hidden; }
+.map-container { height: 250px; margin-top: 10px; border-radius: var(--r-sm); overflow: hidden; box-shadow: var(--sh-xs); }
 .manual-toggle { margin-top: 8px; }
 .geo-select { margin-top: 10px; }
-.geo-hint { font-size: 14px; color:#555; margin: 0 0 6px; }
-.coords { display:flex; gap:8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
-.mini-btn { padding: 8px 10px; border: none; border-radius: 8px; background:#e5f2ff; color:#1663c7; cursor: pointer; font-weight: 600; }
-.coords-view { color:#444; font-size: 13px; margin-top: 6px; }
+.geo-hint { font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+.coords { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.mini-btn { padding: 10px 12px; border: none; border-radius: var(--r-xs); background: var(--aqua-50); color: var(--aqua-700); cursor: pointer; font-weight: 600; }
+.coords-view { color: var(--ink-2); font-size: 13px; margin-top: 6px; }
 
-.field { display:flex; flex-direction: column; gap:6px; }
-.field-inline { display:flex; flex-direction: column; gap:4px; min-width:220px; }
-.fld-err { color:#b91c1c; font-size:12px; line-height:1.3; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-inline { display: flex; flex-direction: column; gap: 4px; min-width: 220px; }
+.fld-err { color: var(--danger); font-size: 12px; line-height: 1.3; }
 
 /* file */
-.upload-wrapper { display:flex; flex-direction:column; gap:6px; }
-.upload-desc { font-size: 12px; color:#6b7280; }
+.upload-wrapper { display: flex; flex-direction: column; gap: 6px; }
+.upload-desc { font-size: 12px; color: var(--muted); }
+.attacher {
+    width: 100%; box-sizing: border-box;
+    padding: 14px 16px; font-size: 14px;
+    border: 1.5px dashed var(--aqua-300); border-radius: var(--r-sm);
+    background: var(--aqua-50); color: var(--ink-2); outline: none;
+}
 
 /* alert */
-.alert { padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-bottom: 8px; }
-.alert--error { background:#fee2e2; border:1px solid #fecaca; color:#7f1d1d; }
-
-/* auth */
-.auth__password-wrapper { position: relative; }
-.auth__password-wrapper input { width: 100%; padding-left: 5px !important; padding-right: 0px !important; }
-.auth__eye-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; }
-
-body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; }
-.attacher { padding: 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 12px; outline: none; }
-
-.auth { position: relative; min-height: 100vh; padding: 60px 0 0 0; background: linear-gradient(to bottom, #00aaff 0%, #f8f9fa 60%); display: flex; flex-direction: column; align-items: center; }
-.auth__bg { position: absolute; top: 180px; left: 0; width: 100%; height: 200px; background: url('@/assets/city.png') no-repeat center top; background-size: cover; z-index: 0; pointer-events: none; }
-.auth__top, .auth__card { position: relative; z-index: 1; }
-.auth__top { padding-top: 0; margin-bottom: 50px; }
-.auth__logo { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
-
-.auth__card { width: 100%; max-width: 360px; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); display: flex; flex-direction: column; gap: 16px; }
-
-.auth__tabs { display: flex; justify-content: space-around; margin-bottom: 48px; }
-.auth__tabs span { font-size: 18px; font-weight: 600; color: #ccc; cursor: pointer; padding-bottom: 4px; transition: all 0.2s ease; }
-.auth__tabs .active { font-size: 24px; color: #3498db; border-bottom: 2px solid #3498db; }
-
-.auth__form { display: flex; flex-direction: column; gap: 16px; transition: all 0.2s ease; }
-.auth__input { width: 100%; padding: 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 12px; outline: none; }
-
-/* чекбокс */
-.auth__checkbox { display: flex; align-items: flex-start; font-size: 13px; color: #7f8c8d; gap: 8px; }
-.auth__checkbox input { width: 16px; height: 16px; margin-top: 2px; }
-.auth__checkbox a { color: #3498db; text-decoration: underline; }
-
-/* кнопка */
-.auth__submit { padding: 14px; font-size: 15px; font-weight: 600; background: #3498db; color: white; border: none; border-radius: 12px; cursor: pointer; }
-.auth__submit:disabled { opacity: .7; cursor: not-allowed; }
+.alert { padding: 12px 14px; border-radius: var(--r-sm); font-size: 14px; margin-bottom: 4px; }
+.alert--error { background: var(--danger-bg); border: 1px solid #fecaca; color: #991b1b; }
 
 /* ======= Види води ======= */
-.water-types { background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:12px; }
-.wt-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-.wt-add { border:none; background:#0ea5e9; color:#fff; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:600; }
+.water-types { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; }
+.wt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.wt-header h4 { font-size: 15px; }
+.wt-add { border: none; background: var(--aqua-500); color: #fff; padding: 9px 14px; border-radius: var(--r-pill); cursor: pointer; font-weight: 600; font-size: 13px; }
 
 .wt-row {
-    position:relative;
-    display:grid;
+    position: relative;
+    display: grid;
     grid-template-columns: repeat(4, minmax(120px, 1fr)) auto;
-    gap:8px;
-    align-items:end;
-    background:#fff;
-    border:1px solid #e5e7eb;
-    border-radius:10px;
-    padding:10px;
-    margin-bottom:8px;
+    gap: 8px;
+    align-items: end;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    padding: 12px;
+    margin-bottom: 8px;
     overflow: hidden;
 }
-.wt-col { display:flex; flex-direction:column; gap:6px; min-width: 0; }
-.wt-label { font-size:12px; color:#6b7280; }
-.wt-input { width: 100%; min-width: 0; box-sizing: border-box; padding:10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
-.wt-input, .wt-input select, .wt-input input { line-height: 1.2; height: 38px; }
+.wt-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wt-label { font-size: 12px; color: var(--muted); }
+.wt-input { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: var(--r-xs); font-size: 14px; background: var(--surface); outline: none; transition: border-color .18s; }
+.wt-input:focus { border-color: var(--aqua-400); }
+.wt-input, .wt-input select, .wt-input input { line-height: 1.2; height: 42px; }
 
-.wt-remove { border:none; background:#ef4444; color:#fff; border-radius:10px; padding:8px 10px; cursor:pointer; height:38px; align-self:center; }
-.wt-empty { font-size:14px; color:#6b7280; background:#fff; border:1px dashed #cbd5e1; padding:10px; border-radius:10px; text-align:center; }
-.wt-errors { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
-.wt-err { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; padding:4px 8px; border-radius:8px; font-size:12px; }
+.wt-remove { border: none; background: var(--danger-bg); color: var(--danger); border-radius: var(--r-xs); padding: 8px 12px; cursor: pointer; height: 42px; align-self: center; font-weight: 700; }
+.wt-empty { font-size: 14px; color: var(--muted); background: var(--surface); border: 1px dashed var(--aqua-200); padding: 12px; border-radius: var(--r-sm); text-align: center; }
+.wt-errors { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.wt-err { background: var(--danger-bg); border: 1px solid #fecaca; color: #991b1b; padding: 4px 8px; border-radius: var(--r-xs); font-size: 12px; }
 
 @media (max-width: 560px) {
     .wt-row { grid-template-columns: 1fr 1fr; }
     .wt-remove { grid-column: 1 / -1; justify-self: end; }
 }
-
-/* Анимация */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

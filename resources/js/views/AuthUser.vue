@@ -114,36 +114,4 @@ const submitForm = async () => {
 };
 </script>
 
-<style>
-
-.auth__link {
-  background: none;
-  border: none;
-  color: #3498db;
-  text-decoration: underline;
-  font-size: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-
-.auth__password-wrapper{position:relative;}
-.auth__eye-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;}
-body{font-family:'Montserrat',sans-serif;margin:0;padding:0;}
-.auth{position:relative;min-height:100vh;padding:60px 0 0;background:linear-gradient(to bottom,#00aaff 0%,#f8f9fa 60%);display:flex;flex-direction:column;align-items:center;}
-.auth__bg{position:absolute;top:180px;left:0;width:100%;height:200px;background:url('@/assets/city.png') no-repeat center top;background-size:cover;z-index:0;pointer-events:none;}
-.auth__top,.auth__card{position:relative;z-index:1;}
-.auth__top{padding-top:0;margin-bottom:50px;}
-.auth__logo{width:96px;height:96px;border-radius:24px;box-shadow:0 4px 20px rgba(0,0,0,.2);}
-.auth__card{width:100%;max-width:360px;background:#fff;border-radius:24px;padding:24px;box-shadow:0 8px 24px rgba(0,0,0,.15);display:flex;flex-direction:column;gap:55px;}
-.auth__tabs{display:flex;justify-content:space-around;align-content:center;}
-.auth__tabs span{font-size:18px;font-weight:600;color:#ccc;cursor:pointer;padding-bottom:4px;transition:.2s;}
-.auth__tabs .active{font-size:24px;color:#3498db;border-bottom:2px solid #3498db;}
-.auth__form{display:flex;flex-direction:column;gap:16px;transition:.2s;}
-.auth__input{width:100%;padding:14px;font-size:15px;border:1px solid #ccc;border-radius:12px;outline:none;}
-.auth__checkbox{display:flex;align-items:center;font-size:13px;color:#7f8c8d;gap:8px;}
-.auth__checkbox input{width:16px;height:16px;margin-top:2px;}
-.auth__checkbox a{color:#3498db;text-decoration:underline;}
-.auth__submit{padding:14px;font-size:15px;font-weight:600;background:#3498db;color:#fff;border:none;border-radius:12px;cursor:pointer;}
-.fade-enter-active,.fade-leave-active{transition:opacity .25s ease;}
-.fade-enter-from,.fade-leave-to{opacity:0;}
-</style>
+<!-- Стилі auth* централізовані в design-system.css -->

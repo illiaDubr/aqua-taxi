@@ -1,0 +1,431 @@
+/* =========================================================================
+   Aqua Taxi — Design System
+   Свежая аква-палитра, mobile-first, вдохновлено ride-hailing (Bolt/Uber).
+   Подключается глобально из app.js. Компоненты используют токены ниже.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+
+:root {
+    /* ---- Brand: свежая аква ---- */
+    --aqua-50:  #ecfdff;
+    --aqua-100: #d3f7fd;
+    --aqua-200: #aeeefb;
+    --aqua-300: #76e0f6;
+    --aqua-400: #33c9ec;
+    --aqua-500: #06b6d4;   /* основной акцент */
+    --aqua-600: #0398b8;   /* hover */
+    --aqua-700: #0a7a95;   /* active / текст на светлом */
+    --aqua-800: #10617a;
+
+    /* градиенты */
+    --grad-aqua: linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%);
+    --grad-hero: linear-gradient(160deg, #2ad3ee 0%, #0aa2d6 55%, #0872a8 100%);
+    --grad-soft: linear-gradient(180deg, #ecfdff 0%, #f4f9fc 100%);
+
+    /* ---- Нейтральные ---- */
+    --ink:        #0b1f33;   /* заголовки */
+    --ink-2:      #33465c;   /* основной текст */
+    --muted:      #64798e;   /* вторичный текст */
+    --faint:      #9db1c2;   /* плейсхолдеры / подписи */
+    --line:       #e4edf3;   /* границы */
+    --line-2:     #eef4f8;
+    --surface:    #ffffff;
+    --surface-2:  #f7fafc;   /* карточки на фоне */
+    --bg:         #eef4f8;   /* фон приложения */
+
+    /* ---- Статусы ---- */
+    --success:   #12b981;
+    --success-bg:#e6f9f1;
+    --danger:    #ef4444;
+    --danger-bg: #fdeaea;
+    --warn:      #f59e0b;
+    --warn-bg:   #fef3e2;
+
+    /* ---- Радиусы ---- */
+    --r-xs: 10px;
+    --r-sm: 14px;
+    --r-md: 18px;
+    --r-lg: 24px;
+    --r-xl: 30px;
+    --r-pill: 999px;
+
+    /* ---- Тени ---- */
+    --sh-xs: 0 1px 2px rgba(11, 31, 51, .06);
+    --sh-sm: 0 4px 14px rgba(11, 31, 51, .07);
+    --sh-md: 0 10px 30px rgba(11, 31, 51, .10);
+    --sh-lg: 0 18px 48px rgba(11, 31, 51, .16);
+    --sh-aqua: 0 10px 24px rgba(6, 182, 212, .35);
+
+    /* ---- Отступы ---- */
+    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px;
+
+    /* ---- Прочее ---- */
+    --font: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --ease: cubic-bezier(.22, .61, .36, 1);
+    --tap: rgba(6, 182, 212, .12);
+    --maxw: 460px; /* макс. ширина мобильного контейнера */
+}
+
+/* ---------------------------------------------------------------- base */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--ink-2);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#app { min-height: 100vh; }
+
+h1, h2, h3, h4 { color: var(--ink); font-weight: 700; letter-spacing: -.02em; margin: 0; }
+
+button { font-family: inherit; }
+
+::selection { background: var(--aqua-200); color: var(--ink); }
+
+/* аккуратный скроллбар */
+* { scrollbar-width: thin; scrollbar-color: var(--aqua-200) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--aqua-200); border-radius: var(--r-pill); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ------------------------------------------------------- reusable UI */
+
+/* Контейнер-телефон: центрирует контент и держит мобильную ширину */
+.ds-screen {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg);
+    position: relative;
+}
+
+/* Кнопки */
+.ds-btn {
+    --_bg: var(--aqua-500);
+    --_fg: #fff;
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 54px;
+    padding: 15px 20px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--_fg);
+    background: var(--_bg);
+    border-radius: var(--r-md);
+    transition: transform .15s var(--ease), box-shadow .2s var(--ease), background .2s var(--ease), opacity .2s;
+    -webkit-tap-highlight-color: transparent;
+}
+.ds-btn:active { transform: scale(.975); }
+.ds-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+.ds-btn--primary { background: var(--grad-aqua); box-shadow: var(--sh-aqua); }
+.ds-btn--primary:active { box-shadow: 0 6px 16px rgba(6, 182, 212, .3); }
+
+.ds-btn--dark { background: var(--ink); box-shadow: var(--sh-md); }
+
+.ds-btn--ghost {
+    background: var(--surface);
+    color: var(--aqua-700);
+    box-shadow: inset 0 0 0 1.5px var(--line);
+}
+.ds-btn--ghost:active { background: var(--aqua-50); }
+
+.ds-btn--soft { background: var(--aqua-50); color: var(--aqua-700); }
+
+/* Поля ввода */
+.ds-input,
+.ds-select,
+.ds-textarea {
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 16px;
+    font-size: 16px; /* >=16px чтобы iOS не зумил */
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--r-sm);
+    outline: none;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s;
+}
+.ds-input::placeholder,
+.ds-textarea::placeholder { color: var(--faint); }
+.ds-input:focus,
+.ds-select:focus,
+.ds-textarea:focus {
+    border-color: var(--aqua-400);
+    box-shadow: 0 0 0 4px var(--tap);
+    background: var(--aqua-50);
+}
+
+/* Карточка */
+.ds-card {
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+    padding: var(--sp-5);
+}
+
+/* Bottom sheet */
+.ds-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    background: var(--surface);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    box-shadow: var(--sh-lg);
+    padding: var(--sp-6);
+    padding-bottom: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+}
+.ds-sheet::before {
+    content: '';
+    display: block;
+    width: 44px; height: 5px;
+    border-radius: var(--r-pill);
+    background: var(--line);
+    margin: -8px auto 16px;
+}
+
+/* Оверлей модалок */
+.ds-overlay {
+    position: fixed; inset: 0;
+    background: rgba(11, 31, 51, .45);
+    backdrop-filter: blur(3px);
+    z-index: 55;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+
+/* Сегментированные табы (pill) */
+.ds-seg {
+    display: flex;
+    gap: 4px;
+    padding: 5px;
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+}
+.ds-seg > * {
+    flex: 1;
+    text-align: center;
+    padding: 11px 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    transition: all .2s var(--ease);
+    user-select: none;
+}
+.ds-seg > .is-active,
+.ds-seg > .active {
+    background: var(--surface);
+    color: var(--aqua-700);
+    box-shadow: var(--sh-xs);
+}
+
+/* Бейджи статусов */
+.ds-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    border-radius: var(--r-pill);
+    background: var(--aqua-50);
+    color: var(--aqua-700);
+    white-space: nowrap;
+}
+.ds-badge--success { background: var(--success-bg); color: var(--success); }
+.ds-badge--danger  { background: var(--danger-bg);  color: var(--danger); }
+.ds-badge--warn    { background: var(--warn-bg);    color: #b26a00; }
+
+/* Шапка-экрана */
+.ds-appbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, .82);
+    backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--line-2);
+}
+.ds-appbar__title { font-size: 18px; font-weight: 700; color: var(--ink); }
+.ds-iconbtn {
+    width: 42px; height: 42px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer;
+    background: var(--surface-2);
+    color: var(--ink);
+    border-radius: var(--r-pill);
+    transition: background .2s;
+}
+.ds-iconbtn:active { background: var(--aqua-50); }
+
+/* Анимации-переходы */
+.ds-fade-enter-active, .ds-fade-leave-active { transition: opacity .25s var(--ease); }
+.ds-fade-enter-from, .ds-fade-leave-to { opacity: 0; }
+
+.ds-pop-enter-active { transition: transform .28s var(--ease), opacity .28s var(--ease); }
+.ds-pop-enter-from { transform: translateY(16px); opacity: 0; }
+
+/* Утилиты */
+.ds-stack   { display: flex; flex-direction: column; }
+.ds-gap-2 { gap: 8px; }  .ds-gap-3 { gap: 12px; } .ds-gap-4 { gap: 16px; }
+.ds-muted { color: var(--muted); }
+.ds-center { text-align: center; }
+
+/* =========================================================================
+   Экраны авторизації (спільні для User / Driver / Factory / Admin)
+   Класи .auth* централізовані тут — компоненти їх більше не дублюють.
+   ========================================================================= */
+.auth {
+    position: relative;
+    min-height: 100vh;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: calc(60px + env(safe-area-inset-top, 0px)) 22px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background:
+        radial-gradient(120% 60% at 50% -10%, var(--aqua-400) 0%, var(--aqua-500) 26%, rgba(6,182,212,0) 62%),
+        var(--bg);
+}
+/* старий фон-місто прибираємо — робимо чистий аква-градієнт */
+.auth__bg { display: none !important; }
+
+.auth__top { position: relative; z-index: 1; margin-bottom: 26px; }
+.auth__logo {
+    width: 84px; height: 84px;
+    border-radius: 24px;
+    object-fit: cover;
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(6,58,80,.28);
+}
+
+.auth__card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border-radius: var(--r-xl);
+    padding: 26px 22px;
+    box-shadow: var(--sh-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* Таби у вигляді сегмент-контролу */
+.auth__tabs {
+    display: flex;
+    gap: 4px;
+    padding: 5px;
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+    margin-bottom: 4px;
+}
+.auth__tabs span {
+    flex: 1;
+    text-align: center;
+    padding: 11px 10px;
+    font-size: 15px !important;
+    font-weight: 600;
+    color: var(--muted);
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    border: none !important;
+    transition: all .2s var(--ease);
+}
+.auth__tabs .active {
+    font-size: 15px !important;
+    color: var(--aqua-700);
+    background: var(--surface);
+    box-shadow: var(--sh-xs);
+    border: none !important;
+}
+
+.auth__form { display: flex; flex-direction: column; gap: 14px; }
+
+.auth__input {
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 16px;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line);
+    border-radius: var(--r-sm);
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s;
+}
+.auth__input::placeholder { color: var(--faint); }
+.auth__input:focus {
+    border-color: var(--aqua-400);
+    box-shadow: 0 0 0 4px var(--tap);
+    background: var(--aqua-50);
+}
+
+.auth__password-wrapper { position: relative; }
+.auth__password-wrapper .auth__input { padding-right: 46px; }
+.auth__eye-icon {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer; color: var(--faint); font-size: 18px;
+}
+
+.auth__checkbox { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.auth__checkbox input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--aqua-500); flex: none; }
+.auth__link {
+    background: none; border: none; padding: 0;
+    color: var(--aqua-600); font-size: inherit; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+
+.auth__submit {
+    width: 100%;
+    min-height: 54px;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--grad-aqua);
+    border: none;
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-aqua);
+    cursor: pointer;
+    transition: transform .15s var(--ease), opacity .2s;
+}
+.auth__submit:active { transform: scale(.98); }
+.auth__submit:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* допоміжні (driver/factory) */
+.err { color: var(--danger); font-size: 13px; margin: 0; text-align: center; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.fld-err { color: var(--danger); font-size: 12px; line-height: 1.3; }
+
+.fade-enter-active, .fade-leave-active { transition: opacity .25s var(--ease); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }

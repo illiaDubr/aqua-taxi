@@ -12,6 +12,9 @@
 <style scoped>
 .home {
     text-align: center;
-    padding: 2rem;
+    padding: 3rem 1.5rem;
+    max-width: var(--maxw);
+    margin: 0 auto;
 }
+.home h1 { font-size: 24px; font-weight: 800; color: var(--ink); }
 </style>
